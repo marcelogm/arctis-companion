@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/hid", "crates/audio", "xtask"]
+members = ["crates/core", "crates/hid", "crates/audio", "crates/ui", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,8 +9,12 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [workspace.dependencies]
+adw = { package = "libadwaita", version = "0.9", features = ["v1_9"] }
 arctis-audio = { path = "crates/audio" }
 arctis-core = { path = "crates/core" }
+arctis-ui = { path = "crates/ui" }
+glib-build-tools = "0.22"
+gtk = { package = "gtk4", version = "0.11", features = ["gnome_50"] }
 pipewire = "0.10"
 
 [workspace.lints.rust]
