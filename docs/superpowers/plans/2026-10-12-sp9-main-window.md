@@ -184,6 +184,9 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 25 | No smoke run of the `arctis-companion` binary in SP9 | after a rebase onto a `main` that carries SP8 the binary opens `/dev/hidraw*`, which only SP0 and SP5 may do with the real dongle plugged in; the widget tests already load every template |
 | 26 | Widget tests run with `LC_ALL=C.UTF-8` locally; the pt_BR rendering is checked through `NumberStyle::for_locale`, never through the process locale | `NumberStyle::current()` reads the environment, so a decimal-comma host would otherwise change what `resolve` returns next to `english()` |
 | 27 | Capability-driven rows are checked with a hand-built `Capabilities::new(&[…])` model: every model in `Model::SUPPORTED` has `ALL_SETTINGS` today | ADR 0013 needs a test that a missing capability hides its row and an emptied group |
+| 28 | `support::collect` also walks `adw::Dialog::child`, and `support::shown` treats a `gtk::Window` or `adw::Dialog` as shown whatever its own visibility | dialog content is not in the widget tree until presented, and the test windows are never mapped |
+| 29 | Executed with small clippy-driven rewrites of plan code (`Resolver` helpers take `self`, `WidgetExt::get_visible` instead of closures, `WidgetExt::activate_action` disambiguated, `owned` returns a tuple, `AccessibleRole::Checkbox`); no behaviour change | pedantic clippy policy |
+| 30 | `cargo llvm-cov` was not run: `llvm-tools-preview` is not installed in the toolbox; the core additions are two small fully tested modules | no sudo-free way to add it here |
 
 ---
 
