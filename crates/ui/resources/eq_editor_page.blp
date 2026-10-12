@@ -23,17 +23,25 @@ template $ArctisEqEditorPage: Adw.NavigationPage {
       [end]
       Button duplicate {
         name: "duplicate";
-        label: _("_Duplicate");
-        use-underline: true;
+        icon-name: "edit-copy-symbolic";
         action-name: "editor.duplicate";
+        tooltip-text: _("Duplicate Preset");
+
+        accessibility {
+          label: _("Duplicate Preset");
+        }
       }
 
       [end]
       ToggleButton preview {
         name: "preview";
-        label: _("_Preview");
-        use-underline: true;
-        tooltip-text: _("Play through this preset while the page is open");
+        icon-name: "audio-speakers-symbolic";
+        tooltip-text: _("Preview Through This Preset");
+
+        accessibility {
+          label: _("Preview");
+          description: _("Plays through this preset while the page is open");
+        }
       }
     }
 
