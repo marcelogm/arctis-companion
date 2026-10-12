@@ -19,6 +19,7 @@ use crate::samples::{CHANNELS, FRAME_BYTES, Processor};
 use crate::volume::{
     CHANNEL_VOLUMES, MUTE, SOFT_MUTE, SOFT_VOLUMES, Volume, VolumeChange, volume_change,
 };
+use crate::wired::Wired;
 
 const UNITY: [f32; CHANNELS] = [1.0; CHANNELS];
 
@@ -29,12 +30,16 @@ pub struct Replaced {
     pub volume: Option<Volume>,
 }
 
-pub struct EqSink {
+struct Streams {
     capture: StreamRc,
     playback: StreamRc,
+}
+
+type Listeners = (StreamListener<()>, StreamListener<Processor>);
+
+pub struct EqSink {
     designer: Rc<RefCell<Designer>>,
-    _capture_listener: StreamListener<()>,
-    _playback_listener: StreamListener<Processor>,
+    wired: Wired<Streams, Listeners>,
 }
 
 impl EqSink {
@@ -60,11 +65,11 @@ impl EqSink {
         connect(&capture, Direction::Input, StreamFlags::empty())?;
         connect(&playback, Direction::Output, StreamFlags::TRIGGER)?;
         Ok(Self {
-            capture,
-            playback,
             designer,
-            _capture_listener: capture_listener,
-            _playback_listener: playback_listener,
+            wired: Wired::new(
+                Streams { capture, playback },
+                (capture_listener, playback_listener),
+            ),
         })
     }
 
@@ -75,8 +80,9 @@ impl EqSink {
 
 impl Drop for EqSink {
     fn drop(&mut self) {
-        let _ = self.playback.disconnect();
-        let _ = self.capture.disconnect();
+        let streams = self.wired.streams();
+        let _ = streams.playback.disconnect();
+        let _ = streams.capture.disconnect();
     }
 }
 

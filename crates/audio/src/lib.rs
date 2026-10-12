@@ -17,6 +17,7 @@ pub mod sinks;
 pub mod streams;
 mod system_engine;
 pub mod volume;
+pub mod wired;
 mod worker;
 
 pub use handle::{AudioCommands, AudioHandle};
