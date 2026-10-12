@@ -37,7 +37,8 @@ flowchart TD
 | About, Keyboard Shortcuts | `crates/ui/src/app_dialogs.rs::about_dialog`, `crates/ui/src/app_dialogs.rs::shortcuts_dialog` | `crates/ui/resources/shortcuts_dialog.blp` |
 
 Templates compile through `crates/ui/build.rs::main` and `crates/ui/resources/resources.gresource.xml`, which
-also bundles `data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in` for the About dialog.
+also bundles the metainfo for the About dialog: `crates/ui/build.rs` merges the translations of `po/` into
+`data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in` with `msgfmt --xml`.
 
 ## One render
 
