@@ -1,0 +1,2 @@
+#!/bin/sh
+exec scripts/check-line-limit.sh --staged
