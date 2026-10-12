@@ -25,11 +25,12 @@ ADR 0005, ADR 0015; `docs/research/hardware-findings.md` §4 (the flap, 56–60 
 `crates/core/src/session/effect.rs::Effect`, `crates/core/src/session/effect.rs::Cadence`,
 `crates/core/src/messages/device.rs` (`Change`, `DeviceUpdate`, `Phase`), `crates/core/src/testkit/simulation.rs`.
 
-Every code block below was compiled, linted (`clippy -D warnings` with the workspace policy) and tested in a
-scratch copy of `origin/main` (`51d3bf9`) inside the toolbox on 2026-10-12, task by task in this order; the
-hardware steps of Task 9 were run on the real dongle (headset on), including the full 30-minute soak. If a snippet
-still trips clippy after an upstream change, fix the names or split the function, keeping the behaviour its test
-asserts.
+Every code block below, in its final form, was applied to a scratch copy of `origin/main` (`51d3bf9`) and passed
+`cargo fmt --check`, `clippy -D warnings` with the workspace policy, `cargo test -p arctis-core -p arctis-hid`,
+`check-rules`, `check-doc-paths` and `check-pure` inside the toolbox on 2026-10-12. The hardware steps of Task 9
+were not part of that check: their results are whatever the executor's own run on the real dongle prints, and
+nothing in this plan is a hardware result to copy. If a snippet still trips clippy after an upstream change, fix
+the names or split the function, keeping the behaviour its test asserts.
 
 ---
 
@@ -64,6 +65,7 @@ asserts.
 |---|---|
 | Discovery against sysfs fixture trees: Nova 5 | Task 3 `a_nova_5_is_found_with_both_interfaces` |
 | … Nova 5X | Task 3 `a_nova_5x_is_found` |
+| … untested models (`0x2255`, `0x2264`) are reported, unknown SteelSeries products are not (device §1 Models) | Task 3 `an_untested_model_is_found`, `an_unknown_steelseries_product_is_ignored` |
 | … bootloader | Task 3 `a_bootloader_is_never_reported` |
 | … two dongles | Task 3 `the_first_dongle_by_physical_path_wins` |
 | … missing iface 5 | Task 3 `a_dongle_without_its_events_interface_is_not_found` |
@@ -72,12 +74,14 @@ asserts.
 | … EACCES (and the EACCES window after a rebind, never shown as PermissionDenied) | Task 4 `open_errors_split_into_denied_and_gone`; Task 7 scenario `an unreadable node after a rebind never shows PermissionDenied` |
 | `ENOENT` on a node sysfs reports (Flatpak without `--device=all`) is PermissionDenied | Task 4 `a_reported_node_missing_from_dev_is_denied`; Task 8 `a_dongle_whose_nodes_cannot_be_opened_is_permission_denied` |
 | A recreated node is unopenable for 56–60 ms after a rebind | Task 7: the `Rebinding` rescan treats `Denied` as `CommandPortDenied` (scenario with a 510 ms window); Task 9 soak on the real node |
+| A rebound iface 3 may come back as another `hidrawN` | Task 3 `a_renumbered_command_node_is_found_by_physical_path` |
+| Flap during Settling and during Probing; `Lost` from Ready, HeadsetOff, Rebinding and PermissionDenied; a dongle plugged back in (quality §1 `core::session` row, over the ports) | Task 2 and Task 7 scenarios `a flap while settling resumes Settling`, `a flap while probing resumes Probing`, `unplugging a ready dongle reaches Absent`, `unplugging while the headset is off reaches Absent`, `losing the dongle while rebinding reaches Absent`, `a denied dongle that leaves is Absent`, `a dongle plugged back in reaches Ready again` |
 | The worker passes the `Simulation` scenarios over a socketpair port | Task 2 (catalogue, green on `Simulation`), Task 7 (same catalogue, green on the real `Worker` over socketpairs) |
 | Real dongle, 30 min, fwupd running: no user-visible disconnect | Task 9 soak: no `Absent`, `PermissionDenied` or `Rebinding` published after connecting; rebinds counted |
-| … zero lost writes | Task 9 soak: sidetone write each minute while Ready, each confirmed by `Observed`, no `WriteFailed`; with the headset off, recorded and moved to SP14 checklist item 14 |
+| … zero lost writes | Task 9 soak: sidetone write each minute while Ready, each confirmed by `Observed` (or interrupted by the headset's auto-off and counted apart), no `WriteFailed`; with the headset off, recorded and moved to SP14 checklist item 14 |
 | `DeviceHandle::spawn(SysfsRoot)` with `changes` and `updates` (design §3.1) | Task 5 (`DeviceChanges`, wake pipe), Task 8 |
 | `poll(2)` on both ports plus a wake pipe, timeout = next `WakeAt`, no busy polling | Task 6, Task 7 |
-| Rescan cadence `Absent` 2 s, `Rebinding` 250 ms, none otherwise | Task 7 (`rescan.rs` follows `Effect::Rescan`) |
+| Rescan cadence `Absent` 2 s, `Rebinding` 250 ms, none otherwise | Task 7 `crates/hid/tests/adapter/rescan.rs` (`the_first_scan_is_due_at_start`, `each_scanning_cadence_repeats_at_its_interval`, `cadence_off_never_scans`); the worker sets it from `Effect::Rescan` |
 | Raw hidraw through `rustix`, no hidapi (ADR 0015) | Task 4 |
 | `docs/architecture/hid.md` with code paths and symbols | Task 10 |
 | CI green, rules, doc paths, coverage | Task 11 |
@@ -89,7 +93,7 @@ asserts.
 | `crates/core/src/testkit/report.rs` | `frame_from_report`: the 65 bytes a worker wrote back into a `Frame` (testkit only) |
 | `crates/core/src/testkit/rig.rs` | `Rig` trait: what a scenario needs from a harness; `impl Rig for Simulation` |
 | `crates/core/src/testkit/scenarios/mod.rs` | `Scenario`, `catalogue::<R>()`, `run_all::<R>()`, shared helpers |
-| `crates/core/src/testkit/scenarios/{lifecycle,rebinding,verify,intent}.rs` | the 25 scenarios, by theme |
+| `crates/core/src/testkit/scenarios/{lifecycle,rebinding,verify,intent}.rs` | the 28 scenarios, by theme |
 | `crates/core/tests/session/scenarios.rs` | the catalogue on `Simulation` |
 | `crates/hid/Cargo.toml` | `rustix`, `async-channel`; dev `tempfile`, `arctis-core/testkit` |
 | `crates/hid/src/lib.rs` | `forbid(unsafe_code)`, modules, `SysfsRoot`, `DeviceHandle`, `DeviceChanges` |
@@ -105,7 +109,7 @@ asserts.
 | `crates/hid/tests/adapter/main.rs` | the adapter test binary |
 | `crates/hid/tests/adapter/sysfs.rs` | `FakeSysfs`, `NodeSpec`: fixture trees in tempdirs |
 | `crates/hid/tests/adapter/sockets.rs` | socketpair helpers |
-| `crates/hid/tests/adapter/{discovery,opening,port,wake,waiter,handle}.rs` | unit-level tests per module |
+| `crates/hid/tests/adapter/{discovery,opening,port,wake,waiter,rescan,handle}.rs` | unit-level tests per module |
 | `crates/hid/tests/adapter/bench.rs` | `Bench`: fake headset, virtual clock, fake nodes and peers |
 | `crates/hid/tests/adapter/rig.rs` | `SocketRig`, `FakeOpener`, `VirtualWaiter` |
 | `crates/hid/tests/adapter/scenarios.rs` | the catalogue on the real `Worker` |
@@ -591,6 +595,14 @@ pub(super) fn scenarios<R: Rig>() -> Vec<Scenario> {
             unplugging_a_ready_dongle_reaches_absent::<R>,
         ),
         scenario(
+            "unplugging while the headset is off reaches Absent",
+            unplugging_while_the_headset_is_off_reaches_absent::<R>,
+        ),
+        scenario(
+            "a dongle plugged back in reaches Ready again",
+            a_dongle_plugged_back_in_reaches_ready_again::<R>,
+        ),
+        scenario(
             "a denied dongle waits for permission",
             a_denied_dongle_waits_for_permission::<R>,
         ),
@@ -652,6 +664,21 @@ fn unplugging_a_ready_dongle_reaches_absent<R: Rig>() {
     assert_eq!(rig.published_phases(), [Phase::Absent]);
 }
 
+fn unplugging_while_the_headset_is_off_reaches_absent<R: Rig>() {
+    let mut rig = headset_off::<R>(Behaviour::default());
+    rig.unplug();
+    rig.run_until(Phase::Absent, 1_000);
+    assert_eq!(rig.published_phases(), [Phase::Absent]);
+}
+
+fn a_dongle_plugged_back_in_reaches_ready_again<R: Rig>() {
+    let mut rig = ready::<R>(Behaviour::default());
+    rig.unplug();
+    rig.run_until(Phase::Absent, 1_000);
+    rig.plug();
+    rig.run_until(Phase::Ready, SETTLED);
+}
+
 fn a_denied_dongle_waits_for_permission<R: Rig>() {
     let mut rig = R::start(FakeHeadset::nova_5());
     rig.deny();
@@ -677,7 +704,7 @@ fn a_denied_dongle_that_leaves_is_absent<R: Rig>() {
 use super::{SETTLED, Scenario, plugged, ready, scenario, setter, with_sidetone, write_failures};
 use crate::messages::device::{Phase, SyncPolicy};
 use crate::session::timing::{
-    REBIND_GIVE_UP, REBIND_SETTLE, RESCAN_ABSENT, RESCAN_REBINDING, VERIFY_BACKOFF,
+    REBIND_GIVE_UP, REBIND_SETTLE, REPLY_TIMEOUT, RESCAN_ABSENT, RESCAN_REBINDING, VERIFY_BACKOFF,
 };
 use crate::settings::headset_settings::Setting;
 use crate::settings::values::Percent;
@@ -693,6 +720,7 @@ const QUICK_FLAP: Flap = Flap {
 const FLAP_DONE: u64 = 60 + RESCAN_REBINDING + REBIND_SETTLE + 50;
 const FLAP_PERIOD: u64 = 20_000;
 const TEN_MINUTES: u64 = 600_000;
+const SLOW_REPLY: u64 = REPLY_TIMEOUT - 100;
 
 pub(super) fn scenarios<R: Rig>() -> Vec<Scenario> {
     vec![
@@ -712,6 +740,10 @@ pub(super) fn scenarios<R: Rig>() -> Vec<Scenario> {
         scenario(
             "a flap while settling resumes Settling",
             a_flap_while_settling_resumes_settling::<R>,
+        ),
+        scenario(
+            "a flap while probing resumes Probing",
+            a_flap_while_probing_resumes_probing::<R>,
         ),
         scenario(
             "a command node that never returns gives up into Absent",
@@ -784,6 +816,26 @@ fn a_flap_while_settling_resumes_settling<R: Rig>() {
     rig.run_for(FLAP_DONE);
     assert_eq!(rig.phase(), Phase::Settling);
     rig.run_until(Phase::Ready, SETTLED);
+}
+
+fn a_flap_while_probing_resumes_probing<R: Rig>() {
+    let headset = FakeHeadset::nova_5().with_behaviour(Behaviour {
+        reply_latency: Some(SLOW_REPLY),
+        ..Behaviour::default()
+    });
+    let mut rig = plugged::<R>(headset);
+    rig.run_until(Phase::Probing, SETTLED);
+    rig.flap(QUICK_FLAP);
+    rig.run_until(Phase::Ready, SETTLED);
+    assert_eq!(
+        rig.published_phases(),
+        [
+            Phase::Settling,
+            Phase::Probing,
+            Phase::Syncing,
+            Phase::Ready
+        ]
+    );
 }
 
 fn a_command_node_that_never_returns_gives_up_into_absent<R: Rig>() {
@@ -1029,7 +1081,7 @@ pub use rig::Rig;
 pub use simulation::{Flap, Simulation};
 ```
 
-- [ ] **Step 11: Run (toolbox), expect PASS and 25 `scenario:` lines on stderr**
+- [ ] **Step 11: Run (toolbox), expect PASS and 28 `scenario:` lines on stderr**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo test -p arctis-core --test session scenarios -- --nocapture'
@@ -1194,6 +1246,16 @@ fn found(sysfs: &FakeSysfs) -> Option<Dongle> {
     discovery::first_dongle(&discovery::scan(&sysfs.root()))
 }
 
+fn add_model(sysfs: &FakeSysfs, pid: u16) {
+    for interface in [3, 5] {
+        let spec = NodeSpec {
+            pid,
+            ..NodeSpec::nova_5(interface)
+        };
+        sysfs.add(&format!("hidraw{interface}"), &spec);
+    }
+}
+
 #[test]
 fn a_nova_5_is_found_with_both_interfaces() {
     let sysfs = FakeSysfs::new();
@@ -1213,26 +1275,28 @@ fn a_nova_5_is_found_with_both_interfaces() {
 #[test]
 fn a_nova_5x_is_found() {
     let sysfs = FakeSysfs::new();
-    for interface in [3, 5] {
-        let spec = NodeSpec {
-            pid: 0x2253,
-            ..NodeSpec::nova_5(interface)
-        };
-        sysfs.add(&format!("hidraw{interface}"), &spec);
-    }
+    add_model(&sysfs, 0x2253);
     assert_eq!(found(&sysfs).map(|dongle| dongle.pid), Some(0x2253));
+}
+
+#[test]
+fn an_untested_model_is_found() {
+    let sysfs = FakeSysfs::new();
+    add_model(&sysfs, 0x2255);
+    assert_eq!(found(&sysfs).map(|dongle| dongle.pid), Some(0x2255));
 }
 
 #[test]
 fn a_bootloader_is_never_reported() {
     let sysfs = FakeSysfs::new();
-    for interface in [3, 5] {
-        let spec = NodeSpec {
-            pid: 0x2233,
-            ..NodeSpec::nova_5(interface)
-        };
-        sysfs.add(&format!("hidraw{interface}"), &spec);
-    }
+    add_model(&sysfs, 0x2233);
+    assert!(discovery::scan(&sysfs.root()).is_empty());
+}
+
+#[test]
+fn an_unknown_steelseries_product_is_ignored() {
+    let sysfs = FakeSysfs::new();
+    add_model(&sysfs, 0x1836);
     assert!(discovery::scan(&sysfs.root()).is_empty());
 }
 
@@ -1333,6 +1397,18 @@ fn the_command_node_is_found_by_physical_path() {
         Some(sysfs.dev_node(COMMAND_NODE))
     );
     assert_eq!(discovery::command_node(&nodes, "usb-elsewhere"), None);
+}
+
+#[test]
+fn a_renumbered_command_node_is_found_by_physical_path() {
+    let sysfs = FakeSysfs::new();
+    sysfs.add(EVENTS_NODE, &NodeSpec::nova_5(5));
+    sysfs.add("hidraw9", &NodeSpec::nova_5(3));
+    let nodes = discovery::scan(&sysfs.root());
+    assert_eq!(
+        discovery::command_node(&nodes, PHYSICAL),
+        Some(sysfs.dev_node("hidraw9"))
+    );
 }
 ```
 
@@ -1536,7 +1612,7 @@ mod uevent;
 pub use discovery::SysfsRoot;
 ```
 
-- [ ] **Step 9: Run (toolbox), expect 11 tests PASS**
+- [ ] **Step 9: Run (toolbox), expect 14 tests PASS**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo test -p arctis-hid --test adapter'
@@ -1846,7 +1922,7 @@ mod uevent;
 pub use discovery::SysfsRoot;
 ```
 
-- [ ] **Step 8: Run (toolbox), expect 20 tests PASS**
+- [ ] **Step 8: Run (toolbox), expect 23 tests PASS**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo test -p arctis-hid --test adapter'
@@ -2307,6 +2383,7 @@ git push --force-with-lease -u origin sp5-hid-adapter
 - Test: `crates/hid/tests/adapter/bench.rs`
 - Test: `crates/hid/tests/adapter/rig.rs`
 - Test: `crates/hid/tests/adapter/scenarios.rs`
+- Test: `crates/hid/tests/adapter/rescan.rs`
 - Modify: `crates/hid/tests/adapter/sysfs.rs`
 - Modify: `crates/hid/tests/adapter/main.rs`
 
@@ -2803,7 +2880,7 @@ impl Rig for SocketRig {
 }
 ```
 
-- [ ] **Step 4: Write the failing test `crates/hid/tests/adapter/scenarios.rs`**
+- [ ] **Step 4: Write the failing tests `crates/hid/tests/adapter/scenarios.rs` and `crates/hid/tests/adapter/rescan.rs` (the cadence the session asks for: due at start, then every `RESCAN_ABSENT` or `RESCAN_REBINDING`, never while `Off`)**
 
 `crates/hid/tests/adapter/scenarios.rs`:
 
@@ -2818,6 +2895,44 @@ fn the_worker_passes_the_scenario_catalogue_over_sockets() {
 }
 ```
 
+`crates/hid/tests/adapter/rescan.rs`:
+
+```rust
+use arctis_core::session::Cadence;
+use arctis_core::session::timing::{RESCAN_ABSENT, RESCAN_REBINDING};
+use arctis_core::time::Millis;
+use arctis_hid::rescan::Rescan;
+
+#[test]
+fn the_first_scan_is_due_at_start() {
+    let mut rescan = Rescan::starting_at(Millis(0));
+    assert_eq!(rescan.take_due(Millis(0)), Some(Cadence::Absent));
+    assert_eq!(rescan.next(), Some(Millis(RESCAN_ABSENT)));
+}
+
+#[test]
+fn each_scanning_cadence_repeats_at_its_interval() {
+    for (cadence, interval) in [
+        (Cadence::Absent, RESCAN_ABSENT),
+        (Cadence::Rebinding, RESCAN_REBINDING),
+    ] {
+        let mut rescan = Rescan::starting_at(Millis(0));
+        rescan.set(cadence, Millis(10));
+        assert_eq!(rescan.take_due(Millis(9 + interval)), None);
+        assert_eq!(rescan.take_due(Millis(10 + interval)), Some(cadence));
+        assert_eq!(rescan.next(), Some(Millis(10 + 2 * interval)));
+    }
+}
+
+#[test]
+fn cadence_off_never_scans() {
+    let mut rescan = Rescan::starting_at(Millis(0));
+    rescan.set(Cadence::Off, Millis(0));
+    assert_eq!(rescan.next(), None);
+    assert_eq!(rescan.take_due(Millis(u64::MAX)), None);
+}
+```
+
 - [ ] **Step 5: Register them in `crates/hid/tests/adapter/main.rs`**
 
 `crates/hid/tests/adapter/main.rs`:
@@ -2827,6 +2942,7 @@ mod bench;
 mod discovery;
 mod opening;
 mod port;
+mod rescan;
 mod rig;
 mod scenarios;
 mod sockets;
@@ -2835,7 +2951,7 @@ mod waiter;
 mod wake;
 ```
 
-- [ ] **Step 6: Run (toolbox), expect a compile error: unresolved `arctis_hid::worker`**
+- [ ] **Step 6: Run (toolbox), expect a compile error: unresolved `arctis_hid::worker` and `arctis_hid::rescan`**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo test -p arctis-hid --test adapter scenarios'
@@ -2856,6 +2972,7 @@ pub struct Rescan {
 }
 
 impl Rescan {
+    #[must_use]
     pub const fn starting_at(now: Millis) -> Self {
         Self {
             cadence: Cadence::Absent,
@@ -2863,6 +2980,7 @@ impl Rescan {
         }
     }
 
+    #[must_use]
     pub const fn next(self) -> Option<Millis> {
         self.next
     }
@@ -3192,7 +3310,7 @@ fn frame_input(source: Source, bytes: Vec<u8>) -> Input {
 pub mod discovery;
 mod open_dongle;
 pub mod port;
-mod rescan;
+pub mod rescan;
 mod uevent;
 pub mod waiter;
 pub mod wake;
@@ -3202,7 +3320,7 @@ pub use discovery::SysfsRoot;
 pub use wake::DeviceChanges;
 ```
 
-- [ ] **Step 11: Run (toolbox), expect PASS with 25 `scenario:` lines, in well under a second**
+- [ ] **Step 11: Run (toolbox), expect PASS with 28 `scenario:` lines and the 3 rescan tests, in well under a second**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo test -p arctis-hid --test adapter scenarios -- --nocapture'
@@ -3291,6 +3409,7 @@ mod discovery;
 mod handle;
 mod opening;
 mod port;
+mod rescan;
 mod rig;
 mod scenarios;
 mod sockets;
@@ -3372,7 +3491,7 @@ pub mod discovery;
 pub mod handle;
 mod open_dongle;
 pub mod port;
-mod rescan;
+pub mod rescan;
 mod uevent;
 pub mod waiter;
 pub mod wake;
@@ -3383,7 +3502,7 @@ pub use handle::DeviceHandle;
 pub use wake::DeviceChanges;
 ```
 
-- [ ] **Step 6: Run (toolbox), expect 31 tests PASS**
+- [ ] **Step 6: Run (toolbox), expect 37 adapter tests PASS and 2 hardware tests ignored**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo test -p arctis-hid'
@@ -3413,7 +3532,7 @@ git push --force-with-lease -u origin sp5-hid-adapter
 - Test: `crates/hid/tests/hardware/soak_log.rs`
 - Modify: `docs/research/hardware-findings.md`
 
-Hardware tests are `#[ignore]` and also return early unless `ARCTIS_HW=1` (quality §1, hardware row), so `cargo test --workspace --include-ignored` in any CI never touches a device. The soak runs the real `Worker` on `SysfsRoot::system()` with an opener that counts successful opens (two at connect, then one per rebind). Every frame it writes comes from `Session`, so only allow-listed commands reach the dongle; the only setter it causes is `39` sidetone, one step away from the observed value and back, and the first observed settings are restored at the end. With the headset off (auto-off timer) the run still checks discovery, the `HeadsetOff` poll and the rebind ride-through, prints that no write was exercised, and the write check moves to SP14's checklist (item 14 below). Run it on the host's toolbox: the toolbox sees `/sys` and `/dev`. Never run two soaks at once and never alongside SP0's scripts.
+Hardware tests are `#[ignore]` and also return early unless `ARCTIS_HW=1` (quality §1, hardware row), so `cargo test --workspace --include-ignored` in any CI never touches a device. The soak runs the real `Worker` on `SysfsRoot::system()` with an opener that counts successful opens (two at connect, then one per rebind). Every frame it writes comes from `Session`, so only allow-listed commands reach the dongle; the only setter it causes is `39` sidetone, one step away from the observed value and back, and the first observed settings are restored at the end. With the headset off (auto-off timer) the run still checks discovery, the `HeadsetOff` poll and the rebind ride-through, prints that no write was exercised, and the write check moves to SP14's checklist (item 14 below). If the headset turns itself off during the run, a write still waiting for its `Observed` is counted as interrupted, not lost: the session keeps it as desired and applies it on the next Syncing (device §5). Run it on the host's toolbox: the toolbox sees `/sys` and `/dev`. Never run two soaks at once and never alongside SP0's scripts.
 
 - [ ] **Step 1: Create `crates/hid/tests/hardware/main.rs`**
 
@@ -3480,17 +3599,25 @@ pub struct SoakLog {
     pub requested: usize,
     pub confirmed: usize,
     pub failed: usize,
+    pub interrupted: usize,
     pub waiting_for: Option<HeadsetSettings>,
 }
 
 impl SoakLog {
     pub fn record(&mut self, at: Duration, update: DeviceUpdate) {
         match update {
-            DeviceUpdate::Phase(phase) => self.phases.push((at, phase)),
+            DeviceUpdate::Phase(phase) => self.enter(at, phase),
             DeviceUpdate::Observed(settings) => self.observe(settings),
             DeviceUpdate::WriteFailed(_) => self.failed += 1,
             _ => {}
         }
+    }
+
+    fn enter(&mut self, at: Duration, phase: Phase) {
+        if phase != Phase::Ready && self.waiting_for.take().is_some() {
+            self.interrupted += 1;
+        }
+        self.phases.push((at, phase));
     }
 
     fn observe(&mut self, settings: HeadsetSettings) {
@@ -3686,8 +3813,8 @@ fn the_worker_rides_through_fwupd_rebinds_on_the_real_dongle() {
 fn report(minutes: u64, opens: usize, log: &SoakLog) {
     let rebinds = opens.saturating_sub(2);
     eprintln!(
-        "soak: {minutes} min, {rebinds} rebinds ridden, phases {:?}, writes requested {}, confirmed {}, failed {}",
-        log.phases, log.requested, log.confirmed, log.failed
+        "soak: {minutes} min, {rebinds} rebinds ridden, phases {:?}, writes requested {}, confirmed {}, failed {}, interrupted by the headset turning off {}",
+        log.phases, log.requested, log.confirmed, log.failed, log.interrupted
     );
     if log.requested == 0 {
         eprintln!("soak: the headset never reached Ready, so no write was exercised");
@@ -3696,7 +3823,11 @@ fn report(minutes: u64, opens: usize, log: &SoakLog) {
     assert!(rebinds >= expected, "too few rebinds: is fwupd running?");
     assert_eq!(log.disconnects(), [], "a user-visible disconnect");
     assert_eq!(log.failed, 0, "a write failed");
-    assert_eq!(log.confirmed, log.requested, "a write was lost");
+    assert_eq!(
+        log.confirmed + log.interrupted,
+        log.requested,
+        "a write was lost"
+    );
 }
 ```
 
@@ -3712,7 +3843,7 @@ toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 &
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && ARCTIS_HW=1 cargo test -p arctis-hid --test hardware the_real_dongle -- --ignored --nocapture'
 ```
 
-- [ ] **Step 7: Run (toolbox) a 3-minute smoke soak. Expected: a `soak: 3 min, 9 rebinds ridden, phases [...]` line with no `Absent`, `PermissionDenied` or `Rebinding` after the first `Ready`/`HeadsetOff`, and PASS. If it fails on `too few rebinds`, check `systemctl is-active fwupd` on the host and record it; do not stop or restart fwupd**
+- [ ] **Step 7: Run (toolbox) a 3-minute smoke soak. Expected: a `soak: 3 min, N rebinds ridden, phases [...]` line (N about 9) with no `Absent`, `PermissionDenied` or `Rebinding` after the first `Ready`/`HeadsetOff`, and PASS. If it fails on `too few rebinds`, check `systemctl is-active fwupd` on the host and record it; do not stop or restart fwupd**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && ARCTIS_HW=1 ARCTIS_SOAK_MINUTES=3 cargo test -p arctis-hid --test hardware soak -- --ignored --nocapture'
@@ -3739,7 +3870,7 @@ with
 | 14 | SP5 soak with the headset on | only if §11 says the headset was off: turn it on, set Automatic power off to Never for the run, then `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored --nocapture`; the `soak:` line must show writes requested = confirmed and failed 0 | write then verify (device §4) |
 ```
 
-- [ ] **Step 10: Append §11 to `docs/research/hardware-findings.md`. The fenced line and the table are the plan prototype's run on 2026-10-12; replace them with the `soak:` line and the numbers of your run (if the headset was off: Headset `off`, writes `0 / 0 / 0`, and point to §7 item 14)**
+- [ ] **Step 10: Append §11 to `docs/research/hardware-findings.md`. Every `<…>` is a placeholder: fill each one from the `soak:` line in `target/sp5-soak.log` of your own 30-minute run, and leave no `<` in the file. If the headset was off, write Headset `off for the whole run (auto-off timer)`, writes `0 / 0 / 0 / 0`, and point to §7 item 14. Never copy numbers from anywhere else**
 
 In `docs/research/hardware-findings.md`, replace
 
@@ -3755,20 +3886,20 @@ with
 ## 11. SP5 soak
 
 `crates/hid/tests/hardware/soak.rs` ran the real `crates/hid/src/worker.rs::Worker` (sysfs discovery, `poll(2)`,
-raw hidraw) against this dongle for 30 minutes with fwupd 2.1.8 running. Each minute, while the session was Ready,
-it asked for the sidetone one step away from the value it first observed (and back the next minute), and counted
-the `Observed` that confirmed each write; at the end it restored the first observed settings.
+raw hidraw) against this dongle for 30 minutes on <date> with fwupd <version> running. Each minute, while the
+session was Ready, it asked for the sidetone one step away from the value it first observed (and back the next
+minute), and counted the `Observed` that confirmed each write; at the end it restored the first observed settings.
 
 ```
-soak: 30 min, 90 rebinds ridden, phases [(150.177879ms, Settling), (3.15341099s, Probing), (3.15341183s, Syncing), (3.353635067s, Ready)], writes requested 30, confirmed 30, failed 0
+<the soak: line, verbatim>
 ```
 
 | Item | Result |
 |---|---|
-| Headset | on for the whole run |
-| Rebinds ridden (iface 3 reopened after an `EIO`) | 90, one every 20 s |
-| User-visible disconnect (`Absent`, `PermissionDenied` or `Rebinding` published after connecting) | none: Settling, Probing, Syncing, Ready, then no other phase |
-| Sidetone writes requested / confirmed by `Observed` / `WriteFailed` | 30 / 30 / 0 |
+| Headset | <on for the whole run, or off, or when it turned off> |
+| Rebinds ridden (iface 3 reopened after an `EIO`) | <rebinds> |
+| User-visible disconnect (`Absent`, `PermissionDenied` or `Rebinding` published after connecting) | <none, or the phases and times> |
+| Sidetone writes requested / confirmed by `Observed` / `WriteFailed` / interrupted by auto-off | <requested> / <confirmed> / <failed> / <interrupted> |
 ````
 
 - [ ] **Step 11: Run (toolbox) the crate gate**
@@ -3903,7 +4034,7 @@ flowchart LR
 | Scenario catalogue shared by both rigs | `crates/core/src/testkit/scenarios/mod.rs::catalogue`, `crates/core/src/testkit/rig.rs::Rig` |
 | Worker over socketpairs on a virtual clock | `crates/hid/tests/adapter/rig.rs::SocketRig`, `crates/hid/tests/adapter/rig.rs::VirtualWaiter`, `crates/hid/tests/adapter/bench.rs::Bench` |
 | sysfs fixture trees in tempdirs | `crates/hid/tests/adapter/sysfs.rs::FakeSysfs` |
-| Discovery, ports, mailbox, waiter, handle | `crates/hid/tests/adapter/discovery.rs`, `crates/hid/tests/adapter/port.rs`, `crates/hid/tests/adapter/wake.rs`, `crates/hid/tests/adapter/waiter.rs`, `crates/hid/tests/adapter/handle.rs` |
+| Discovery, ports, mailbox, waiter, rescan cadence, handle | `crates/hid/tests/adapter/discovery.rs`, `crates/hid/tests/adapter/port.rs`, `crates/hid/tests/adapter/wake.rs`, `crates/hid/tests/adapter/waiter.rs`, `crates/hid/tests/adapter/rescan.rs`, `crates/hid/tests/adapter/handle.rs` |
 | Real dongle, `ARCTIS_HW=1` | `crates/hid/tests/hardware/discovery.rs`, `crates/hid/tests/hardware/soak.rs` |
 ````
 
@@ -3970,7 +4101,7 @@ git push --force-with-lease -u origin sp5-hid-adapter
 
 The same checks as CI (`.github/workflows/ci.yml`), then the PR. The PR body is one sentence.
 
-- [ ] **Step 1: Run (toolbox) the CI checks. Expected: all pass; core line coverage was 99.05 % in the prototype**
+- [ ] **Step 1: Run (toolbox) the CI checks. Expected: all pass; core line coverage at least 90 %**
 
 ```bash
 toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp5 && cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure && LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata cargo llvm-cov --package arctis-core --fail-under-lines 90'
@@ -3997,7 +4128,7 @@ git -C /home/marcelo/Desenvolvimento/arctis-wt/sp5 push --force-with-lease origi
 - [ ] **Step 5: Watch CI until green (host); fix and push on any failure**
 
 ```bash
-gh pr checks --repo marcelogm/arctis-companion --watch
+gh pr checks sp5-hid-adapter --repo marcelogm/arctis-companion --watch
 ```
 
 ## Deviations
@@ -4006,19 +4137,21 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 
 | # | Deviation | Why |
 |---|---|---|
-| 1 | "The worker passes the `Simulation` scenarios" is met by a shared catalogue of 25 scenarios in `core::testkit::scenarios`, generic over a new `Rig` trait that `Simulation` and `SocketRig` both implement. The SP4 test files stay `Simulation`-only | most SP4 tests assert exact virtual timestamps of a harness that feeds `Found` instantly; the catalogue keeps every scenario that crosses the I/O boundary (each way a dongle appears, is denied, leaves, flaps, stays unreadable, gives up, fails a write, plus write, verify, echo, press, adopt, headset-off and wireless-grace paths) with relative limits, so one table proves both rigs |
+| 1 | "The worker passes the `Simulation` scenarios" is met by a shared catalogue of 28 scenarios in `core::testkit::scenarios`, generic over a new `Rig` trait that `Simulation` and `SocketRig` both implement. The SP4 test files stay `Simulation`-only | most SP4 tests assert exact virtual timestamps of a harness that feeds `Found` instantly; the catalogue keeps every scenario that crosses the I/O boundary (each way a dongle appears, is denied, leaves, comes back, flaps while settling, probing or ready, stays unreadable, gives up, fails a write, plus write, verify, echo, press, adopt, headset-off and wireless-grace paths) with relative limits, so one table proves both rigs |
 | 2 | sysfs fixture trees are built in tempdirs by `crates/hid/tests/adapter/sysfs.rs::FakeSysfs` instead of tracked files under `crates/hid/tests/sysfs/` | the socket rig must add and remove nodes during flaps; tracked `uevent` files have no extension and would also need registering in the xtask comment check |
 | 3 | `crates/hid` depends on `async-channel` besides `core` and `rustix` | the bridge reads `updates` with `glib::spawn_future_local` (spec §2); `crates/audio` already does the same |
 | 4 | `DeviceHandle.changes` is `DeviceChanges` (mpsc sender plus wake-pipe bell, `send(Change) -> bool`, `quit()`), not a bare `Sender<Change>`; `updates` is `async_channel::Receiver<DeviceUpdate>` | the `poll(2)` loop has to be woken when a change arrives (spec §2); mirrors `AudioCommands` |
 | 5 | `crates/hid` keeps `#![forbid(unsafe_code)]` | `rustix`'s safe API covers open, read, write, poll and pipe; ADR 0015 allows `unsafe` here but nothing needs it |
 | 6 | Modules beyond the spec's list (`discovery port wake worker handle`): `uevent.rs`, `rescan.rs`, `waiter.rs`, `open_dongle.rs` | one responsibility per file, each well under 400 lines |
-| 7 | `Worker`, `Wiring`, `Opener`, `Waiter`, `Port::from_fd` and `wake::mailbox` are public | the integration tests drive the real worker through these seams; the app only needs `DeviceHandle` |
+| 7 | `Worker`, `Wiring`, `Opener`, `Waiter`, `Rescan`, `Port::from_fd` and `wake::mailbox` are public | the integration tests drive the real worker through these seams; the app only needs `DeviceHandle` |
 | 8 | `core::testkit::frame_from_report` builds a `Frame` from 65 bytes, behind the `testkit` feature | the fake dongle must read back what the worker wrote; `Command` stays the only production constructor (ADR 0004) |
 | 9 | A dongle without both iface 3 and iface 5 on one `HID_PHYS` is not reported | device §2: Present means both interfaces opened |
 | 10 | "First dongle by sysfs path order" is the lowest `HID_PHYS` | stable across rebinds, when `hidrawN` can change |
-| 11 | `EPERM` and `ENOENT` count as denied with `EACCES`; any other open error means the node is gone and the next rescan retries | hardware-findings §9 for `ENOENT`; a node vanishing between scan and open is not a permission problem |
+| 11 | `EPERM` and `ENOENT` count as denied with `EACCES`; any other open error means the node is gone and the next rescan retries | hardware-findings §9 for `ENOENT`. Accepted cost: a dongle unplugged between a scan and its open publishes `PermissionDenied` for one `RESCAN_ABSENT` before the next scan reports it `Lost`; telling that race from a sandbox without `--device=all` would need a second scan for no user benefit |
 | 12 | A read of 0 bytes counts as a lost port | a socket peer that left reads as end of file; hidraw never returns 0 |
 | 13 | The first discovery runs as soon as the worker starts, then every `RESCAN_ABSENT` | no reason to wait 2 s at startup |
 | 14 | "No user-visible disconnect" is measured as no `Phase::Absent`, `PermissionDenied` or `Rebinding` published after the first `Ready` or `HeadsetOff`; "zero lost writes" as one sidetone write per minute while Ready, each confirmed by `Observed`, with no `WriteFailed` | `Rebinding` is published only after `REBIND_NOTICE`, which is what the UI shows as "Reconnecting…"; sidetone is allow-listed, audible only in the mic monitor and restored at the end |
 | 15 | With the headset off the soak still passes and records that no write was exercised; the write half moves to SP14 checklist item 14 | the headset may have powered itself off; the session never writes in HeadsetOff (device §5) |
 | 16 | The mode-0000 open test accepts success when run as root | the CI container runs as root; `classify` covers the errno mapping on every runner |
+| 17 | `DeviceHandle::spawn` returns `io::Result<DeviceHandle>` | creating the wake pipe and the thread can fail; `crates/audio/src/handle.rs::AudioHandle::spawn` already returns `io::Result` |
+| 18 | The soak counts a write still unconfirmed when the headset turns itself off as interrupted, not lost | the session keeps it as desired and applies it on the next Syncing (device §5); a write is lost only if it never lands while the headset stays on |
