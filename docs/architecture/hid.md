@@ -25,13 +25,13 @@ flowchart LR
 |---|---|
 | Public seam to the main thread | `crates/hid/src/handle.rs::DeviceHandle`, `crates/hid/src/handle.rs::spawn`, `crates/hid/src/wake.rs::DeviceChanges` |
 | Desired settings in, wake the loop | `crates/hid/src/wake.rs::mailbox`, `crates/hid/src/wake.rs::Mailbox`, `crates/hid/src/wake.rs::take` |
-| Clock and `poll(2)` | `crates/hid/src/waiter.rs::Waiter`, `crates/hid/src/waiter.rs::PollWaiter` |
+| Clock and `poll(2)`, one readiness rule shared with the test rig | `crates/hid/src/waiter.rs::Waiter`, `crates/hid/src/waiter.rs::PollWaiter`, `crates/hid/src/waiter.rs::poll_ready` |
 | One loop iteration | `crates/hid/src/worker.rs::Worker`, `crates/hid/src/worker.rs::turn`, `crates/hid/src/worker.rs::feed`, `crates/hid/src/worker.rs::execute` |
 | sysfs discovery | `crates/hid/src/discovery.rs::SysfsRoot`, `crates/hid/src/discovery.rs::scan`, `crates/hid/src/discovery.rs::first_dongle`, `crates/hid/src/discovery.rs::command_node`, `crates/hid/src/uevent.rs::parse` |
 | Rescan cadence (`Absent` 2 s, `Rebinding` 250 ms, `Off`) | `crates/hid/src/rescan.rs::Rescan`, `crates/core/src/session/effect.rs::Cadence` |
 | Raw hidraw: open, 65-byte write, read | `crates/hid/src/port.rs::Port`, `crates/hid/src/port.rs::HidrawOpener` |
 | `EACCES`, `EPERM` and `ENOENT` mean denied; anything else means gone | `crates/hid/src/port.rs::classify`, `crates/hid/src/port.rs::OpenError` |
-| The open pair; iface 5 error means `Lost`, iface 3 error means `CommandPortLost` | `crates/hid/src/open_dongle.rs::OpenDongle`, `crates/hid/src/worker.rs::port_gone` |
+| The open pair; iface 5 error means `Lost`, iface 3 error means `CommandPortLost` | `crates/hid/src/open_dongle.rs::OpenDongle`, `crates/hid/src/open_dongle.rs::PortKind`, `crates/hid/src/worker.rs::port_gone`, `crates/hid/src/worker.rs::drop_command_port` |
 
 ## One turn
 
@@ -65,7 +65,8 @@ sequenceDiagram
     alt both open
         W->>S: Found{pid, uniq}
     else EACCES or ENOENT
-        W->>S: Denied (PermissionDenied)
+        W->>R: retry_soon (once, after 250 ms: udev may still be applying the ACL)
+        W->>S: Denied (PermissionDenied) if the retry is denied too
     end
     Note over W,S: fwupd unbinds iface 3: read fails
     W->>S: CommandPortLost
@@ -83,6 +84,7 @@ sequenceDiagram
 |---|---|
 | Only supported, non-bootloader models of vendor `1038` are reported | `crates/hid/src/discovery.rs::scan` |
 | A dongle needs both iface 3 and iface 5 on one physical path; the lowest `HID_PHYS` wins | `crates/hid/src/discovery.rs::first_dongle` |
+| A denied open from `Absent` is retried once after `RESCAN_REBINDING` before `Denied` is fed | `crates/hid/src/worker.rs::denied`, `crates/hid/src/rescan.rs::retry_soon` |
 | A denied dongle that disappears from sysfs is `Lost` | `crates/hid/src/worker.rs::discover` |
 | The command node is looked up again by physical path, since its `hidrawN` may change | `crates/hid/src/worker.rs::reopen_command` |
 
@@ -90,7 +92,7 @@ sequenceDiagram
 
 ```mermaid
 flowchart LR
-    Cat["core testkit: scenarios::catalogue<br/>generic over Rig"] --> Sim["Simulation<br/>crates/core/tests/session/scenarios.rs"]
+    Cat["core testkit: scenario_tests!<br/>one #[test] per scenario, generic over Rig"] --> Sim["Simulation<br/>crates/core/tests/session/scenarios.rs"]
     Cat --> Sock["SocketRig<br/>crates/hid/tests/adapter/scenarios.rs"]
     Sock --> Wk["Worker"]
     Wk -- "socketpair" --> Bench["Bench: FakeHeadset,<br/>virtual clock, FakeSysfs"]
@@ -98,7 +100,7 @@ flowchart LR
 
 | Piece | Code |
 |---|---|
-| Scenario catalogue shared by both rigs | `crates/core/src/testkit/scenarios/mod.rs::catalogue`, `crates/core/src/testkit/rig.rs::Rig` |
+| Scenario catalogue shared by both rigs | `crates/core/src/testkit/scenarios/mod.rs::scenario_tests`, `crates/core/src/testkit/rig.rs::Rig`, `crates/hid/tests/adapter/scenarios.rs` |
 | Worker over socketpairs on a virtual clock | `crates/hid/tests/adapter/rig.rs::SocketRig`, `crates/hid/tests/adapter/rig.rs::VirtualWaiter`, `crates/hid/tests/adapter/bench.rs::Bench` |
 | sysfs fixture trees in tempdirs | `crates/hid/tests/adapter/sysfs.rs::FakeSysfs` |
 | Discovery, ports, mailbox, waiter, rescan cadence, handle | `crates/hid/tests/adapter/discovery.rs`, `crates/hid/tests/adapter/port.rs`, `crates/hid/tests/adapter/wake.rs`, `crates/hid/tests/adapter/waiter.rs`, `crates/hid/tests/adapter/rescan.rs`, `crates/hid/tests/adapter/handle.rs` |

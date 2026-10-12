@@ -38,6 +38,12 @@ fn a_quick_retry_comes_once_then_the_cadence_resumes() {
     assert_eq!(rescan.take_due(Millis(0)), Some(Cadence::Absent));
     rescan.retry_soon(Millis(0));
     assert_eq!(rescan.next(), Some(Millis(RESCAN_REBINDING)));
-    assert_eq!(rescan.take_due(Millis(RESCAN_REBINDING)), Some(Cadence::Absent));
-    assert_eq!(rescan.next(), Some(Millis(RESCAN_REBINDING + RESCAN_ABSENT)));
+    assert_eq!(
+        rescan.take_due(Millis(RESCAN_REBINDING)),
+        Some(Cadence::Absent)
+    );
+    assert_eq!(
+        rescan.next(),
+        Some(Millis(RESCAN_REBINDING + RESCAN_ABSENT))
+    );
 }

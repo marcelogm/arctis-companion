@@ -8,7 +8,7 @@ use arctis_core::protocol::Frame;
 use arctis_core::protocol::status::Link;
 use arctis_core::settings::headset_settings::{HeadsetSettings, SettingChange};
 use arctis_core::settings::values::Percent;
-use arctis_core::testkit::{FakeHeadset, Flap, Rig};
+use arctis_core::testkit::{Emission, FakeHeadset, Flap, Rig};
 use arctis_core::time::Millis;
 use arctis_hid::DeviceChanges;
 use arctis_hid::port::{OpenError, Opener, Port};
@@ -155,6 +155,10 @@ impl Rig for SocketRig {
         let now = bench.now;
         let emissions = bench.headset.battery_event(battery, now);
         bench.emit(emissions);
+    }
+
+    fn emit(&mut self, emissions: Vec<Emission>) {
+        self.bench().emit(emissions);
     }
 
     fn run_for(&mut self, duration: u64) {

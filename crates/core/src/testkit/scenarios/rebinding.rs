@@ -1,4 +1,4 @@
-use super::{SETTLED, Scenario, plugged, ready, scenario, setter, with_sidetone, write_failures};
+use super::{SETTLED, plugged, ready, setter, with_sidetone, write_failures};
 use crate::messages::device::{Phase, SyncPolicy};
 use crate::session::timing::{
     REBIND_GIVE_UP, REBIND_SETTLE, REPLY_TIMEOUT, RESCAN_ABSENT, RESCAN_REBINDING, VERIFY_BACKOFF,
@@ -19,45 +19,7 @@ const FLAP_PERIOD: u64 = 20_000;
 const TEN_MINUTES: u64 = 600_000;
 const SLOW_REPLY: u64 = REPLY_TIMEOUT - 100;
 
-pub(super) fn scenarios<R: Rig>() -> Vec<Scenario> {
-    vec![
-        scenario("a flap in Ready is silent", a_flap_in_ready_is_silent::<R>),
-        scenario(
-            "a flap every 20 s for ten minutes sends nothing",
-            a_flap_every_20_s_for_ten_minutes_sends_nothing::<R>,
-        ),
-        scenario(
-            "an unreadable node after a rebind never shows PermissionDenied",
-            an_unreadable_node_after_a_rebind_never_shows_permission_denied::<R>,
-        ),
-        scenario(
-            "a stale frame after a rebind is dropped",
-            a_stale_frame_after_a_rebind_is_dropped::<R>,
-        ),
-        scenario(
-            "a flap while settling resumes Settling",
-            a_flap_while_settling_resumes_settling::<R>,
-        ),
-        scenario(
-            "a flap while probing resumes Probing",
-            a_flap_while_probing_resumes_probing::<R>,
-        ),
-        scenario(
-            "a command node that never returns gives up into Absent",
-            a_command_node_that_never_returns_gives_up_into_absent::<R>,
-        ),
-        scenario(
-            "a write that fails is redone after the rebind",
-            a_write_that_fails_is_redone_after_the_rebind::<R>,
-        ),
-        scenario(
-            "losing the dongle while rebinding reaches Absent",
-            losing_the_dongle_while_rebinding_reaches_absent::<R>,
-        ),
-    ]
-}
-
-fn a_flap_in_ready_is_silent<R: Rig>() {
+pub fn a_flap_in_ready_is_silent<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     rig.flap(QUICK_FLAP);
     rig.run_for(FLAP_DONE);
@@ -66,7 +28,7 @@ fn a_flap_in_ready_is_silent<R: Rig>() {
     assert!(rig.published_phases().is_empty());
 }
 
-fn a_flap_every_20_s_for_ten_minutes_sends_nothing<R: Rig>() {
+pub fn a_flap_every_20_s_for_ten_minutes_sends_nothing<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     for flap in 0..TEN_MINUTES / FLAP_PERIOD {
         rig.flap(Flap {
@@ -83,7 +45,7 @@ fn a_flap_every_20_s_for_ten_minutes_sends_nothing<R: Rig>() {
     assert_eq!(rig.phase(), Phase::Ready);
 }
 
-fn an_unreadable_node_after_a_rebind_never_shows_permission_denied<R: Rig>() {
+pub fn an_unreadable_node_after_a_rebind_never_shows_permission_denied<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     rig.flap(Flap {
         unreadable_for: 2 * RESCAN_REBINDING + 10,
@@ -94,7 +56,7 @@ fn an_unreadable_node_after_a_rebind_never_shows_permission_denied<R: Rig>() {
     assert!(rig.published_phases().is_empty());
 }
 
-fn a_stale_frame_after_a_rebind_is_dropped<R: Rig>() {
+pub fn a_stale_frame_after_a_rebind_is_dropped<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     rig.flap(Flap {
         stale_frame: true,
@@ -105,7 +67,7 @@ fn a_stale_frame_after_a_rebind_is_dropped<R: Rig>() {
     assert!(rig.updates().is_empty());
 }
 
-fn a_flap_while_settling_resumes_settling<R: Rig>() {
+pub fn a_flap_while_settling_resumes_settling<R: Rig>() {
     let mut rig = plugged::<R>(FakeHeadset::nova_5());
     rig.run_until(Phase::Settling, RESCAN_ABSENT);
     rig.run_for(1_000);
@@ -115,7 +77,7 @@ fn a_flap_while_settling_resumes_settling<R: Rig>() {
     rig.run_until(Phase::Ready, SETTLED);
 }
 
-fn a_flap_while_probing_resumes_probing<R: Rig>() {
+pub fn a_flap_while_probing_resumes_probing<R: Rig>() {
     let headset = FakeHeadset::nova_5().with_behaviour(Behaviour {
         reply_latency: Some(SLOW_REPLY),
         ..Behaviour::default()
@@ -135,7 +97,7 @@ fn a_flap_while_probing_resumes_probing<R: Rig>() {
     );
 }
 
-fn a_command_node_that_never_returns_gives_up_into_absent<R: Rig>() {
+pub fn a_command_node_that_never_returns_gives_up_into_absent<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     rig.remove_command_node();
     rig.run_for(REBIND_GIVE_UP - 1_000);
@@ -144,7 +106,7 @@ fn a_command_node_that_never_returns_gives_up_into_absent<R: Rig>() {
     assert_eq!(rig.published_phases(), [Phase::Rebinding, Phase::Absent]);
 }
 
-fn a_write_that_fails_is_redone_after_the_rebind<R: Rig>() {
+pub fn a_write_that_fails_is_redone_after_the_rebind<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     let desired = with_sidetone(rig.headset().settings(), 6);
     rig.fail_next_write();
@@ -156,7 +118,7 @@ fn a_write_that_fails_is_redone_after_the_rebind<R: Rig>() {
     assert_eq!(rig.phase(), Phase::Ready);
 }
 
-fn losing_the_dongle_while_rebinding_reaches_absent<R: Rig>() {
+pub fn losing_the_dongle_while_rebinding_reaches_absent<R: Rig>() {
     let mut rig = ready::<R>(Behaviour::default());
     rig.remove_command_node();
     rig.run_for(100);

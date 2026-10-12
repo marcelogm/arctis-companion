@@ -1,7 +1,7 @@
-mod intent;
-mod lifecycle;
-mod rebinding;
-mod verify;
+pub mod intent;
+pub mod lifecycle;
+pub mod rebinding;
+pub mod verify;
 
 use super::fake_headset::{Behaviour, FakeHeadset};
 use super::rig::Rig;
@@ -14,29 +14,57 @@ use crate::settings::values::Sidetone;
 const DISCOVERY: u64 = RESCAN_ABSENT + 100;
 const SETTLED: u64 = DISCOVERY + ENUMERATION_SETTLE + 1_000;
 
-pub struct Scenario {
-    pub name: &'static str,
-    pub run: fn(),
-}
-
-const fn scenario(name: &'static str, run: fn()) -> Scenario {
-    Scenario { name, run }
-}
-
-#[must_use]
-pub fn catalogue<R: Rig>() -> Vec<Scenario> {
-    let mut scenarios = lifecycle::scenarios::<R>();
-    scenarios.extend(rebinding::scenarios::<R>());
-    scenarios.extend(verify::scenarios::<R>());
-    scenarios.extend(intent::scenarios::<R>());
-    scenarios
-}
-
-pub fn run_all<R: Rig>() {
-    for scenario in catalogue::<R>() {
-        eprintln!("scenario: {}", scenario.name);
-        (scenario.run)();
-    }
+#[macro_export]
+macro_rules! scenario_tests {
+    (@for $rig:ty; $($module:ident: $($name:ident),+;)+) => {
+        $($(
+            #[test]
+            fn $name() {
+                $crate::testkit::scenarios::$module::$name::<$rig>();
+            }
+        )+)+
+    };
+    ($rig:ty) => {
+        $crate::scenario_tests!(@for $rig;
+            lifecycle:
+                plugging_in_reaches_ready,
+                a_headset_that_is_off_returns_on_its_link_event,
+                a_headset_without_events_is_found_by_the_headset_off_poll,
+                an_unanswered_probe_means_headset_off,
+                a_command_frame_while_settling_is_dropped,
+                an_idle_ready_dongle_asks_for_status_once_per_safety_poll,
+                unplugging_while_settling_reaches_absent,
+                unplugging_while_probing_reaches_absent,
+                unplugging_while_syncing_reaches_absent,
+                unplugging_a_ready_dongle_reaches_absent,
+                unplugging_while_the_headset_is_off_reaches_absent,
+                a_dongle_plugged_back_in_reaches_ready_again,
+                a_denied_dongle_waits_for_permission,
+                a_denied_dongle_that_leaves_is_absent;
+            rebinding:
+                a_flap_in_ready_is_silent,
+                a_flap_every_20_s_for_ten_minutes_sends_nothing,
+                an_unreadable_node_after_a_rebind_never_shows_permission_denied,
+                a_stale_frame_after_a_rebind_is_dropped,
+                a_flap_while_settling_resumes_settling,
+                a_flap_while_probing_resumes_probing,
+                a_command_node_that_never_returns_gives_up_into_absent,
+                a_write_that_fails_is_redone_after_the_rebind,
+                losing_the_dongle_while_rebinding_reaches_absent;
+            verify:
+                a_desired_change_is_written_then_verified,
+                a_value_visible_only_at_the_last_readback_passes,
+                a_dropped_write_is_reported,
+                a_wireless_mode_change_rides_through_its_link_drop;
+            intent:
+                an_echo_on_the_events_interface_is_consumed,
+                an_echo_on_the_command_interface_is_consumed,
+                a_press_becomes_headset_changed,
+                without_desired_settings_nothing_is_written,
+                adopt_writes_nothing_and_publishes_observed,
+                changes_made_while_the_headset_is_off_apply_when_it_turns_on;
+        );
+    };
 }
 
 fn plugged<R: Rig>(headset: FakeHeadset) -> R {
