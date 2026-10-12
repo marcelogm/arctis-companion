@@ -8,6 +8,7 @@ use arctis_core::eq::curve::Curve;
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
+use arctis_core::messages::device::Change;
 use arctis_core::ports::PresetRepository;
 use arctis_core::testkit::snapshots::{id, percent, values};
 use arctis_core::time::Millis;
@@ -127,4 +128,13 @@ pub fn published(seen: &[Seen]) -> Option<Rc<Snapshot>> {
         Seen::Published(snapshot) => Some(Rc::clone(snapshot)),
         _ => None,
     })
+}
+
+pub fn device_curves(seen: &[Seen]) -> Vec<Curve> {
+    seen.iter()
+        .filter_map(|item| match item {
+            Seen::Device(Change::Desired { settings, .. }) => Some(settings.equalizer.clone()),
+            _ => None,
+        })
+        .collect()
 }
