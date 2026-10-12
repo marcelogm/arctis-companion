@@ -8,3 +8,4 @@ mod sinks;
 mod streams;
 mod support;
 mod volume;
+mod wired;

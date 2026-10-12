@@ -21,6 +21,7 @@ flowchart BT
     samples["samples.rs<br/>Processor: bytes through Equalizer"]
     designer["designer.rs<br/>Designer: coefficients per curve and rate"]
     registry["registry.rs<br/>registry, metadata and info listeners"]
+    wired["wired.rs<br/>Wired: listeners dropped before streams"]
     eq_sink["eq_sink.rs<br/>EqSink: two pw_streams"]
     engine["system_engine.rs<br/>SystemEngine: insert, retarget, remove"]
     worker["worker.rs<br/>pw main loop, commands, reconnect"]
@@ -29,12 +30,12 @@ flowchart BT
     sinks --> insertion
     graph --> registry
     pod --> volume --> eq_sink
-    pod & samples & designer --> eq_sink
+    pod & samples & designer & wired --> eq_sink
     insertion & registry & eq_sink --> engine
     changes & registry & engine --> worker --> handle
 ```
 
-Graph, links, sinks, insertion, streams, changes, volume, pod, samples and designer are pure: they take a `Graph` or
+Graph, links, sinks, insertion, streams, changes, volume, pod, samples, designer and wired are pure: they take a `Graph` or
 bytes and return values, and are tested by tables in `crates/audio/tests/pure/main.rs`. Registry, equalizer sink,
 system engine and worker hold the PipeWire objects, stay private to the crate, and are tested through
 `AudioHandle` against a private PipeWire (see Tests).
@@ -56,6 +57,7 @@ system engine and worker hold the PipeWire objects, stay private to the crate, a
 | PipeWire mirror (nodes enter on their first info; Props volumes subscribed) | `crates/audio/src/registry.rs::Registry`, `crates/audio/src/registry.rs::changed_props` |
 | System engine | `crates/audio/src/system_engine.rs::SystemEngine`, `crates/audio/src/system_engine.rs::Inserted` |
 | Equalizer sink | `crates/audio/src/eq_sink.rs::EqSink`, `crates/audio/src/eq_sink.rs::Replaced`, `crates/audio/src/eq_sink.rs::apply_initial_volume`, `crates/audio/src/eq_sink.rs::keep_unity` |
+| Listeners released before the streams they hook into | `crates/audio/src/wired.rs::Wired` |
 | Coefficients per curve and rate | `crates/audio/src/designer.rs::Designer`, `crates/audio/src/designer.rs::rate_of` |
 | Thread and connection | `crates/audio/src/worker.rs::run`, `crates/audio/src/worker.rs::Connection`, `crates/audio/src/worker.rs::Worker`, `crates/audio/src/worker.rs::Dispatcher`, `crates/audio/src/worker.rs::Outbox` |
 | Handle | `crates/audio/src/handle.rs::AudioHandle`, `crates/audio/src/handle.rs::AudioCommands`, `crates/audio/src/handle.rs::spawn` |
