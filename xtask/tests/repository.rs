@@ -13,3 +13,9 @@ fn repository_passes_check_doc_paths() {
     let outcome = xtask_in(&repo_root(), &["check-doc-paths"]);
     assert!(outcome.succeeded(), "{}", outcome.stderr);
 }
+
+#[test]
+fn repository_passes_check_pure() {
+    let outcome = xtask_in(&repo_root(), &["check-pure"]);
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
