@@ -1,4 +1,5 @@
 mod drive;
+mod echo;
 mod effect;
 mod exchange;
 mod frames;

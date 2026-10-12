@@ -94,6 +94,7 @@ impl Session {
 
     fn finish_transaction(&mut self, failed: Vec<Setting>) {
         self.transaction = None;
+        self.echoes.close(self.now);
         for setting in &failed {
             self.publish(DeviceUpdate::WriteFailed(*setting));
         }
@@ -117,11 +118,21 @@ impl Session {
     }
 
     fn on_setting_event(&mut self, change: SettingChange) {
+        if self.echoes.consume(&change, self.now) {
+            return;
+        }
         if let Some(desired) = &mut self.desired {
             desired.apply(change.clone());
         }
         if let Some(observed) = &mut self.observed {
             observed.apply(change.clone());
+        }
+        if self
+            .transaction
+            .as_mut()
+            .is_some_and(|transaction| transaction.forget(change.setting()))
+        {
+            self.finish_transaction(Vec::new());
         }
         self.publish(DeviceUpdate::HeadsetChanged(change));
     }

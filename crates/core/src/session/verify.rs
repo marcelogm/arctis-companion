@@ -71,6 +71,12 @@ impl Transaction {
         self.next_step()
     }
 
+    pub(crate) fn forget(&mut self, setting: Setting) -> bool {
+        self.targets.retain(|target| target.setting() != setting);
+        self.unwritten.retain(|change| change.setting() != setting);
+        self.targets.is_empty()
+    }
+
     pub(crate) fn link(&mut self, up: bool) {
         self.link_down = !up;
     }
