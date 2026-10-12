@@ -3,6 +3,7 @@ use arctis_core::testkit::english::english;
 use arctis_core::view::app_presets::{
     AppPresetsContent, RuleRowModel, add_rule_dialog, app_presets,
 };
+use arctis_core::view::presets::preset_items;
 use arctis_core::view::text::Text;
 
 use crate::support::{id, rules, snapshot};
@@ -124,4 +125,47 @@ fn add_rule_without_seen_apps_offers_only_another_app() {
         english(&dialog.other_hint),
         "Flatpak app id, application id or binary name"
     );
+}
+
+#[test]
+fn rules_are_listed_by_identifier() {
+    let mut s = snapshot();
+    s.presets.rules = rules(&[("mpv", "podcast"), ("firefox", "footsteps")]);
+    let identifiers: Vec<String> = rows(app_presets(&s).content)
+        .into_iter()
+        .map(|row| row.identifier)
+        .collect();
+    assert_eq!(identifiers, ["firefox", "mpv"]);
+}
+
+#[test]
+fn a_rule_finds_its_app_whatever_the_case() {
+    let mut s = snapshot();
+    s.presets.seen_apps = vec![firefox()];
+    s.presets.rules = rules(&[("ORG.MOZILLA.FIREFOX", "footsteps")]);
+    assert_eq!(
+        rows(app_presets(&s).content)[0].title,
+        Text::verbatim("Firefox")
+    );
+}
+
+#[test]
+fn add_rule_names_a_seen_app_by_its_key() {
+    let mut s = snapshot();
+    s.presets.seen_apps = vec![firefox()];
+    let dialog = add_rule_dialog(&s);
+    assert_eq!(dialog.seen[0].identifier, "org.mozilla.firefox");
+    assert_eq!(
+        dialog.seen[0].subtitle,
+        Text::verbatim("org.mozilla.firefox")
+    );
+}
+
+#[test]
+fn every_rule_chooses_from_the_whole_library() {
+    let mut s = snapshot();
+    s.presets.rules = rules(&[("firefox", "footsteps")]);
+    let page = app_presets(&s);
+    assert_eq!(page.presets, preset_items(&s));
+    assert!(page.presets.iter().any(|item| item.id == id("footsteps")));
 }
