@@ -4,6 +4,7 @@ use std::fmt::Debug;
 use arctis_core::companion::adoption::DongleIdentity;
 use arctis_core::companion::app_settings::{AppRules, HeadsetValues, RoutePresets};
 use arctis_core::eq::preset::PresetId;
+use arctis_core::eq::reference::Overlays;
 use arctis_core::messages::audio::SoundPath;
 use arctis_core::settings::values::{
     AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone, WirelessMode,
@@ -29,6 +30,8 @@ pub const BLUETOOTH_SINK_SEEN: &str = "bluetooth-sink-seen";
 pub const LOW_BATTERY_THRESHOLD: &str = "low-battery-threshold";
 pub const RUN_IN_BACKGROUND: &str = "run-in-background";
 pub const BACKGROUND_REQUESTED: &str = "background-requested";
+pub const GRAPH_HEADSET: &str = "graph-headset";
+pub const GRAPH_TARGET: &str = "graph-target";
 
 #[must_use]
 pub fn accepted<T: TryFrom<u8> + Debug>(key: &str, stored: i32, fallback: fn(u8) -> T) -> T {
@@ -112,6 +115,20 @@ pub fn write_app_rule(
         None => rules.remove(identifier),
     };
     settings.set(APP_RULES, rules.to_variant())
+}
+
+#[must_use]
+pub fn overlays(settings: &gio::Settings) -> Overlays {
+    Overlays {
+        headset: settings.boolean(GRAPH_HEADSET),
+        target: None,
+    }
+    .with_target_setting(&settings.string(GRAPH_TARGET))
+}
+
+pub fn write_overlays(settings: &gio::Settings, overlays: Overlays) -> Result<(), glib::BoolError> {
+    settings.set_boolean(GRAPH_HEADSET, overlays.headset)?;
+    settings.set_string(GRAPH_TARGET, overlays.target_setting())
 }
 
 #[must_use]

@@ -2,6 +2,7 @@ use crate::companion::Input;
 use crate::companion::app_settings::{AppRules, AppSettings, Persisted, RoutePresets};
 use crate::eq::curve::Curve;
 use crate::eq::library;
+use crate::eq::reference::Overlays;
 use crate::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use crate::messages::device::DeviceUpdate;
 use crate::protocol::status::{Charging, Link};
@@ -24,6 +25,7 @@ pub fn persisted() -> Persisted {
             adopted_identity: None,
             bluetooth_sink_seen: false,
             low_battery_threshold: percent(15),
+            overlays: Overlays::default(),
         },
         custom_presets: Vec::new(),
         seen_apps: Vec::new(),

@@ -15,6 +15,7 @@ use arctis_core::companion::adoption::DongleIdentity;
 use arctis_core::companion::app_settings::PersistedChange;
 use arctis_core::companion::app_settings::{AppRules, AppSettings, HeadsetValues, RoutePresets};
 use arctis_core::eq::preset::PresetId;
+use arctis_core::eq::reference::{Overlays, Target};
 use arctis_core::messages::audio::SoundPath;
 use arctis_core::settings::values::{
     AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone, WirelessMode,
@@ -25,7 +26,7 @@ use main_context::{drain, on_own_context};
 use memory_settings::memory_pair;
 use schema::compiled_dir;
 
-const KEYS: [&str; 15] = [
+const KEYS: [&str; 17] = [
     "mic-volume",
     "sidetone",
     "mute-light",
@@ -41,6 +42,8 @@ const KEYS: [&str; 15] = [
     "low-battery-threshold",
     "run-in-background",
     "background-requested",
+    "graph-headset",
+    "graph-target",
 ];
 
 #[test]
@@ -73,6 +76,7 @@ fn defaults() -> AppSettings {
         adopted_identity: None,
         bluetooth_sink_seen: false,
         low_battery_threshold: Percent::try_from(15).expect("percent"),
+        overlays: Overlays::default(),
     }
 }
 
@@ -259,6 +263,37 @@ fn app_and_dongle_changes_round_trip() {
     assert_round_trip(&PersistedChange::LowBatteryThreshold(threshold), |s| {
         s.low_battery_threshold = threshold;
     });
+}
+
+#[test]
+fn graph_overlays_round_trip_through_every_target_nick() {
+    let targets = [None, Some(Target::Harman), Some(Target::DiffuseField)];
+    let choices = [false, true]
+        .into_iter()
+        .flat_map(|headset| targets.map(|target| Overlays { headset, target }));
+    for overlays in choices {
+        assert_round_trip(&PersistedChange::Overlays(overlays), |s| {
+            s.overlays = overlays;
+        });
+    }
+}
+
+#[test]
+fn the_graph_target_takes_only_known_nicks() {
+    let dir = compiled_dir();
+    let (settings, _) = memory_pair(dir.path());
+    assert_eq!(settings.string("graph-target"), "harman");
+    assert!(settings.set_string("graph-target", "harman-5128").is_err());
+    settings
+        .set_string("graph-target", "none")
+        .expect("no target");
+    settings
+        .set_boolean("graph-headset", false)
+        .expect("no headset");
+    assert_eq!(
+        GSettingsStore::new(settings).load().overlays,
+        Overlays::NONE
+    );
 }
 
 #[test]

@@ -10,6 +10,7 @@ pub const CREDITS: [&str; 2] = [
     "AutoEq by Jaakko Pasanen https://github.com/jaakkopasanen/AutoEq",
 ];
 pub const AUTOEQ_COPYRIGHT: &str = "© 2018-2022 Jaakko Pasanen";
+pub const NO_TARGET: &str = "none";
 
 const MEASUREMENT: &str = include_str!("../../data/nova5_rtings_5128.csv");
 const HARMAN: &str = include_str!("../../data/target_lmg_5128_0.6.csv");
@@ -46,10 +47,73 @@ impl Target {
     }
 
     #[must_use]
+    pub const fn setting(self) -> &'static str {
+        match self {
+            Self::Harman => "harman",
+            Self::DiffuseField => "diffuse-field",
+        }
+    }
+
+    #[must_use]
+    pub fn from_setting(setting: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|target| target.setting() == setting)
+    }
+
+    #[must_use]
     pub fn response(self) -> FrequencyResponse {
         match self {
             Self::Harman => HARMAN_TARGET.clone(),
             Self::DiffuseField => DIFFUSE_FIELD_TARGET.clone(),
+        }
+    }
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub struct Overlays {
+    pub headset: bool,
+    pub target: Option<Target>,
+}
+
+impl Default for Overlays {
+    fn default() -> Self {
+        Self {
+            headset: true,
+            target: Some(Target::Harman),
+        }
+    }
+}
+
+impl Overlays {
+    pub const NONE: Self = Self {
+        headset: false,
+        target: None,
+    };
+
+    #[must_use]
+    pub const fn any(self) -> bool {
+        self.headset || self.target.is_some()
+    }
+
+    #[must_use]
+    pub const fn with_headset(self, headset: bool) -> Self {
+        Self { headset, ..self }
+    }
+
+    #[must_use]
+    pub fn with_target_setting(self, setting: &str) -> Self {
+        Self {
+            target: Target::from_setting(setting),
+            ..self
+        }
+    }
+
+    #[must_use]
+    pub const fn target_setting(self) -> &'static str {
+        match self.target {
+            Some(target) => target.setting(),
+            None => NO_TARGET,
         }
     }
 }

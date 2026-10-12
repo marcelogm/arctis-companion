@@ -18,6 +18,11 @@
     <value nick="75m" value="75"/>
     <value nick="90m" value="90"/>
   </enum>
+  <enum id="io.github.marcelogm.ArctisCompanion.GraphTarget">
+    <value nick="none" value="0"/>
+    <value nick="harman" value="1"/>
+    <value nick="diffuse-field" value="2"/>
+  </enum>
   <schema id="io.github.marcelogm.ArctisCompanion" path="/io/github/marcelogm/ArctisCompanion/">
     <key name="mic-volume" type="i">
       <range min="0" max="15"/>
@@ -66,6 +71,12 @@
     </key>
     <key name="background-requested" type="b">
       <default>false</default>
+    </key>
+    <key name="graph-headset" type="b">
+      <default>true</default>
+    </key>
+    <key name="graph-target" enum="io.github.marcelogm.ArctisCompanion.GraphTarget">
+      <default>'harman'</default>
     </key>
   </schema>
 </schemalist>

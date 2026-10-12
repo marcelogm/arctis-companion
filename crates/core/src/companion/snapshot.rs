@@ -13,6 +13,7 @@ use super::selection::ActivePreset;
 use super::selection::{ActivateError, picked_path};
 use crate::battery::sample::{Reading, Sample};
 use crate::eq::preset::{Preset, PresetId};
+use crate::eq::reference::Overlays;
 use crate::messages::audio::{DefaultSink, SoundPath};
 use crate::messages::device::Phase;
 use crate::protocol::firmware::Firmware;
@@ -49,6 +50,7 @@ pub struct PresetsSnapshot {
     pub rules: AppRules,
     pub automatic: bool,
     pub seen_apps: Vec<SeenApp>,
+    pub overlays: Overlays,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -156,6 +158,7 @@ impl Companion {
             rules: self.settings.app_rules.clone(),
             automatic: self.settings.automatic_presets,
             seen_apps: self.seen_apps.clone(),
+            overlays: self.settings.overlays,
         }
     }
 

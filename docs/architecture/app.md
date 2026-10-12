@@ -99,7 +99,7 @@ A failed store write is logged (`crates/app/src/logging.rs::report`) and the rem
 
 | Data | Where | Code |
 |---|---|---|
-| headset values, route presets, app rules, automatic presets, adopted identity, Bluetooth seen, low-battery threshold, Run in Background | GSettings `data/io.github.marcelogm.ArctisCompanion.gschema.xml` | `crates/app/src/platform/settings_keys.rs::headset`, `crates/app/src/platform/settings_keys.rs::accepted`, `crates/app/src/platform/settings_store.rs::load`, `crates/app/src/platform/settings_store.rs::watch` |
+| headset values, route presets, app rules, automatic presets, adopted identity, Bluetooth seen, low-battery threshold, Run in Background, equalizer graph overlays | GSettings `data/io.github.marcelogm.ArctisCompanion.gschema.xml` | `crates/app/src/platform/settings_keys.rs::headset`, `crates/app/src/platform/settings_keys.rs::overlays`, `crates/app/src/platform/settings_keys.rs::accepted`, `crates/app/src/platform/settings_store.rs::load`, `crates/app/src/platform/settings_store.rs::watch` |
 | custom presets | one JSON file per preset in the presets folder, named after its id | `crates/app/src/platform/preset_store.rs::FilePresets` |
 | battery history | battery.csv, 8 days kept at start-up | `crates/app/src/platform/battery_store.rs::FileBattery`, `crates/app/src/platform/persisted.rs::load_persisted` |
 | seen apps | seen-apps.json, newest first, 50 | `crates/app/src/platform/seen_apps_store.rs::FileSeenApps` |
