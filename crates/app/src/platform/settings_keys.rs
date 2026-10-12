@@ -1,13 +1,18 @@
 use std::collections::HashMap;
+use std::fmt::Debug;
 
 use arctis_core::companion::adoption::DongleIdentity;
 use arctis_core::companion::app_settings::{AppRules, HeadsetValues, RoutePresets};
 use arctis_core::eq::preset::PresetId;
 use arctis_core::messages::audio::SoundPath;
-use arctis_core::settings::values::{AutoPowerOff, MuteLight, WirelessMode};
+use arctis_core::settings::values::{
+    AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone, WirelessMode,
+};
 use gtk::gio;
 use gtk::gio::prelude::*;
 use gtk::glib;
+
+use crate::logging::warn;
 
 pub const MIC_VOLUME: &str = "mic-volume";
 pub const SIDETONE: &str = "sidetone";
@@ -26,23 +31,37 @@ pub const RUN_IN_BACKGROUND: &str = "run-in-background";
 pub const BACKGROUND_REQUESTED: &str = "background-requested";
 
 #[must_use]
-pub fn ranged<T: TryFrom<u8>>(settings: &gio::Settings, key: &str) -> T {
-    u8::try_from(settings.int(key))
-        .ok()
-        .and_then(|value| T::try_from(value).ok())
-        .expect("GSettings keeps every integer key inside its schema range")
+pub fn accepted<T: TryFrom<u8> + Debug>(key: &str, stored: i32, fallback: fn(u8) -> T) -> T {
+    let raw = small(stored);
+    T::try_from(raw).unwrap_or_else(|_| {
+        let replacement = fallback(raw);
+        warn(&format!(
+            "{key} holds {stored}, which the headset does not take; reading it as {replacement:?}"
+        ));
+        replacement
+    })
 }
 
 #[must_use]
 pub fn headset(settings: &gio::Settings) -> HeadsetValues {
     HeadsetValues {
-        mic_volume: ranged(settings, MIC_VOLUME),
-        sidetone: ranged(settings, SIDETONE),
-        mute_light: MuteLight::from_raw(enum_value(settings, MUTE_LIGHT)),
+        mic_volume: accepted(MIC_VOLUME, settings.int(MIC_VOLUME), MicVolume::nearest),
+        sidetone: accepted(SIDETONE, settings.int(SIDETONE), Sidetone::nearest),
+        mute_light: accepted(MUTE_LIGHT, settings.enum_(MUTE_LIGHT), MuteLight::from_raw),
         volume_limiter: settings.boolean(VOLUME_LIMITER),
         wireless_mode: wireless_mode(settings.boolean(EXTENDED_RANGE)),
-        auto_power_off: AutoPowerOff::nearest(small(settings.int(AUTO_POWER_OFF))),
+        auto_power_off: accepted(
+            AUTO_POWER_OFF,
+            settings.enum_(AUTO_POWER_OFF),
+            AutoPowerOff::nearest,
+        ),
     }
+}
+
+#[must_use]
+pub fn low_battery_threshold(settings: &gio::Settings) -> Percent {
+    let stored = settings.int(LOW_BATTERY_THRESHOLD);
+    accepted(LOW_BATTERY_THRESHOLD, stored, Percent::nearest)
 }
 
 pub fn write_headset(
@@ -55,7 +74,7 @@ pub fn write_headset(
     settings.set_boolean(VOLUME_LIMITER, values.volume_limiter)?;
     let extended = values.wireless_mode == WirelessMode::ExtendedRange;
     settings.set_boolean(EXTENDED_RANGE, extended)?;
-    settings.set_int(AUTO_POWER_OFF, i32::from(values.auto_power_off.minutes()))
+    settings.set_enum(AUTO_POWER_OFF, i32::from(values.auto_power_off.minutes()))
 }
 
 #[must_use]
@@ -104,12 +123,8 @@ fn stored_rules(settings: &gio::Settings) -> HashMap<String, String> {
     settings.get(APP_RULES)
 }
 
-fn enum_value(settings: &gio::Settings, key: &str) -> u8 {
-    small(settings.enum_(key))
-}
-
 fn small(value: i32) -> u8 {
-    u8::try_from(value).unwrap_or(u8::MAX)
+    u8::try_from(value.max(0)).unwrap_or(u8::MAX)
 }
 
 const fn wireless_mode(extended_range: bool) -> WirelessMode {

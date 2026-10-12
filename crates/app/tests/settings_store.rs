@@ -1,9 +1,14 @@
+#[path = "common/main_context.rs"]
+mod main_context;
+#[path = "common/memory_settings.rs"]
+mod memory_settings;
 #[path = "common/schema.rs"]
 mod schema;
 
 use std::cell::RefCell;
 use std::rc::Rc;
 
+use arctis_app::platform::settings_keys::accepted;
 use arctis_app::platform::settings_store::GSettingsStore;
 use arctis_app::ports::SettingsStore;
 use arctis_core::companion::adoption::DongleIdentity;
@@ -15,9 +20,10 @@ use arctis_core::settings::values::{
     AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone, WirelessMode,
 };
 use gtk::gio::prelude::*;
-use gtk::glib;
 
-use schema::{compiled_dir, memory_pair};
+use main_context::{drain, on_own_context};
+use memory_settings::memory_pair;
+use schema::compiled_dir;
 
 const KEYS: [&str; 15] = [
     "mic-volume",
@@ -85,7 +91,7 @@ fn store_maximums(settings: &gtk::gio::Settings) {
         .set_boolean("extended-range", true)
         .expect("extended-range");
     settings
-        .set_int("auto-power-off", 90)
+        .set_enum("auto-power-off", 90)
         .expect("auto-power-off");
     settings
         .set_string("preset-bluetooth", "podcast")
@@ -119,6 +125,41 @@ fn stored_values_load_into_app_settings() {
         Some(DongleIdentity::new(0x2232, None))
     );
     assert_eq!(loaded.low_battery_threshold.get(), 50);
+}
+
+#[test]
+fn auto_power_off_takes_only_the_headset_choices() {
+    let dir = compiled_dir();
+    let (settings, _) = memory_pair(dir.path());
+    assert!(settings.set_enum("auto-power-off", 7).is_err());
+    assert_eq!(settings.string("auto-power-off"), "30m");
+    let store = GSettingsStore::new(settings);
+    for choice in AutoPowerOff::CHOICES {
+        let mut values = headset_values();
+        values.auto_power_off = choice;
+        store.persist(&PersistedChange::Headset(values));
+        assert_eq!(store.load().headset.auto_power_off, choice);
+    }
+}
+
+#[test]
+fn a_value_the_headset_does_not_take_reads_as_its_fallback() {
+    assert_eq!(
+        accepted("mic-volume", 40, MicVolume::nearest),
+        MicVolume::nearest(15)
+    );
+    assert_eq!(
+        accepted("mic-volume", -3, MicVolume::nearest),
+        MicVolume::nearest(0)
+    );
+    assert_eq!(
+        accepted("mute-light", 7, MuteLight::from_raw),
+        MuteLight::Medium
+    );
+    assert_eq!(
+        accepted("low-battery-threshold", 50, Percent::nearest).get(),
+        50
+    );
 }
 
 #[test]
@@ -238,17 +279,6 @@ fn removing_an_app_rule_deletes_only_that_rule() {
     let rules = store.load().app_rules;
     assert_eq!(rules.len(), 1);
     assert!(rules.preset_for("spotify").is_some());
-}
-
-fn on_own_context(test: impl FnOnce(&glib::MainContext)) {
-    let context = glib::MainContext::new();
-    context
-        .with_thread_default(|| test(&context))
-        .expect("the test owns its main context");
-}
-
-fn drain(context: &glib::MainContext) {
-    while context.iteration(false) {}
 }
 
 type Seen = Rc<RefCell<Vec<AppSettings>>>;
