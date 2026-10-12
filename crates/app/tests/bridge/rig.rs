@@ -29,6 +29,10 @@ impl Rig {
         Self::assemble(persisted, Box::new(Recorder(Rc::clone(&journal))), journal)
     }
 
+    pub fn with_presets(persisted: Persisted, presets: Box<dyn PresetRepository>) -> Self {
+        Self::assemble(persisted, presets, Journal::default())
+    }
+
     fn assemble(
         persisted: Persisted,
         presets: Box<dyn PresetRepository>,

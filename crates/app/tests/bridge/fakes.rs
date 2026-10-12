@@ -125,6 +125,22 @@ impl SeenAppsRepository for Recorder {
     }
 }
 
+pub struct BrokenPresets;
+
+impl PresetRepository for BrokenPresets {
+    fn load(&self) -> Result<Vec<Preset>, StoreError> {
+        Ok(Vec::new())
+    }
+
+    fn save(&mut self, _preset: &Preset) -> Result<(), StoreError> {
+        Err(StoreError("disk full".to_owned()))
+    }
+
+    fn delete(&mut self, _id: &PresetId) -> Result<(), StoreError> {
+        Err(StoreError("disk full".to_owned()))
+    }
+}
+
 type Wake = Box<dyn FnOnce()>;
 
 #[derive(Clone)]
