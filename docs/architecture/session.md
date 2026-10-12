@@ -118,7 +118,7 @@ sequenceDiagram
 | Rule | Code |
 |---|---|
 | No desired settings, no write; `Adopt` ends any open transaction, writes nothing and republishes observed | `crates/core/src/session/reconcile.rs::desire` |
-| A newer desired value drops the older target from the open transaction, so only the latest value is written and verified | `crates/core/src/session/verify.rs::keep_wanted` |
+| A newer desired value drops the older target from the open transaction, so only the latest value is written and verified; a dropped target that was already written leaves the setting unknown until a readback or an event, so drift writes the latest value again | `crates/core/src/session/verify.rs::keep_wanted`, `crates/core/src/session/reconcile.rs::drop_unwanted_targets`, `crates/core/src/session/reconcile.rs::drift` |
 | Only drifted fields are written, wireless mode last, failed fields skipped until the next `Change::Desired` or the next Syncing | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/reconcile.rs::next`, `crates/core/src/session/reducer.rs::enter` |
 | One readback per query kind, backoff steps, one retry | `crates/core/src/session/verify.rs::next`, `crates/core/src/session/verify.rs::check` |
 | Curves compare with `equivalent` | `crates/core/src/session/verify.rs::same`, `crates/core/src/eq/curve.rs::equivalent` |
