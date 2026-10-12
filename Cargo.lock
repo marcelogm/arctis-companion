@@ -43,6 +43,7 @@ dependencies = [
  "arctis-ui",
  "ashpd",
  "async-channel",
+ "gettext-rs",
  "gtk4",
  "libadwaita",
  "serde_json",
