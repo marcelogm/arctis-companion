@@ -45,6 +45,7 @@ pub struct Bench {
     inbox: Vec<Emission>,
     plugged: bool,
     denied: bool,
+    denied_until: Millis,
     command: CommandNode,
     events_peer: Option<OwnedFd>,
     severed: Vec<OwnedFd>,
@@ -62,6 +63,7 @@ impl Bench {
             inbox: Vec::new(),
             plugged: false,
             denied: false,
+            denied_until: Millis(0),
             command: CommandNode::Closed,
             events_peer: None,
             severed: Vec::new(),
@@ -75,6 +77,11 @@ impl Bench {
             self.plugged = true;
             self.command = CommandNode::Closed;
         }
+    }
+
+    pub fn plug_with_permission_after(&mut self, delay: u64) {
+        self.plug();
+        self.denied_until = self.now.after(delay);
     }
 
     pub fn deny(&mut self) {
@@ -125,7 +132,7 @@ impl Bench {
     }
 
     pub fn open(&mut self, path: &Path) -> Result<Port, OpenError> {
-        if self.denied {
+        if self.denied || self.now < self.denied_until {
             return Err(OpenError::Denied);
         }
         if !self.plugged {
