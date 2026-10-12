@@ -1325,7 +1325,7 @@ git push
 - Modify: `crates/core/src/lib.rs`
 - Test: `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`, `crates/core/tests/companion/timing.rs`, `crates/core/tests/companion/routing.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `crates/core/tests/companion/main.rs`:
 
@@ -1445,12 +1445,12 @@ fn audio_events_update_the_state() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: FAIL to compile (`arctis_core::companion` missing).
 
-- [ ] **Step 3: Implement `timing` and `routing`**
+- [x] **Step 3: Implement `timing` and `routing`**
 
 `crates/core/src/companion/mod.rs`:
 
@@ -1592,12 +1592,12 @@ impl Default for AudioState {
 
 Add `pub mod companion;` to `crates/core/src/lib.rs` (after `pub mod battery;`).
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS, 7 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src crates/core/tests/companion
