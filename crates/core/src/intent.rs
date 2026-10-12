@@ -1,4 +1,5 @@
 use crate::eq::preset::{Preset, PresetId};
+use crate::eq::reference::Overlays;
 use crate::messages::audio::SoundPath;
 use crate::settings::headset_settings::{Setting, SettingChange};
 use crate::settings::values::{
@@ -29,6 +30,7 @@ pub enum Intent {
     EndPreview,
     SetLowBatteryThreshold(Percent),
     SetRunInBackground(bool),
+    SetOverlays(Overlays),
 }
 
 impl Intent {

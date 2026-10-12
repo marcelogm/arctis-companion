@@ -4,6 +4,7 @@ use super::app_settings::PersistedChange;
 use super::reducer::Companion;
 use super::selection::{ActivateError, ManualPick, picked_path};
 use crate::eq::preset::{Preset, PresetId};
+use crate::eq::reference::Overlays;
 use crate::intent::Intent;
 use crate::messages::audio::SoundPath;
 use crate::settings::values::Percent;
@@ -33,6 +34,7 @@ impl Companion {
             }
             Intent::SavePreset(preset) => self.save_preset(preset, out),
             Intent::DeletePreset(preset) => self.delete_preset(&preset, out),
+            Intent::SetOverlays(overlays) => self.set_overlays(overlays, out),
             Intent::SetRunInBackground(_) => {}
         }
     }
@@ -155,6 +157,11 @@ impl Companion {
                 .into_iter()
                 .map(Action::from),
         );
+    }
+
+    fn set_overlays(&mut self, overlays: Overlays, out: &mut Vec<Action>) {
+        self.settings.overlays = overlays;
+        out.push(Action::Persist(PersistedChange::Overlays(overlays)));
     }
 
     fn save_preset(&mut self, preset: Preset, out: &mut Vec<Action>) {

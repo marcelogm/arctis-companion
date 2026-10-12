@@ -6,6 +6,7 @@ use super::seen_apps::SeenApp;
 use crate::battery::sample::Sample;
 use crate::eq::curve::Curve;
 use crate::eq::preset::{Preset, PresetId};
+use crate::eq::reference::Overlays;
 use crate::messages::audio::{AppIdentifiers, SoundPath};
 use crate::settings::headset_settings::{HeadsetSettings, SettingChange};
 use crate::settings::values::{
@@ -130,6 +131,7 @@ pub struct AppSettings {
     pub adopted_identity: Option<DongleIdentity>,
     pub bluetooth_sink_seen: bool,
     pub low_battery_threshold: Percent,
+    pub overlays: Overlays,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -144,6 +146,7 @@ pub enum PersistedChange {
     AdoptedIdentity(DongleIdentity),
     BluetoothSinkSeen,
     LowBatteryThreshold(Percent),
+    Overlays(Overlays),
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]

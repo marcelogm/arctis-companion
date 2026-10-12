@@ -8,6 +8,7 @@ use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::companion::{Action, Companion, Input, Snapshot};
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
+use arctis_core::eq::reference::Overlays;
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::intent::Intent;
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
@@ -138,6 +139,7 @@ pub fn settings() -> AppSettings {
         adopted_identity: None,
         bluetooth_sink_seen: false,
         low_battery_threshold: percent(15),
+        overlays: Overlays::default(),
     }
 }
 

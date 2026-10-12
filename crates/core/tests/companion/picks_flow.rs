@@ -1,6 +1,7 @@
 use arctis_core::companion::app_settings::{HeadsetValues, PersistedChange};
 use arctis_core::companion::selection::{ActivateError, ActivePreset};
 use arctis_core::companion::{Action, Input};
+use arctis_core::eq::reference::Overlays;
 use arctis_core::intent::Intent;
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, SinkKind, SoundPath};
 use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
@@ -294,6 +295,21 @@ fn a_new_low_battery_threshold_is_persisted_and_re_evaluated() {
             .any(|action| matches!(action, Action::Notify(_)))
     );
     assert_eq!(h.snapshot().battery.low_threshold, percent(20));
+}
+
+#[test]
+fn graph_overlays_are_persisted_and_shown_without_touching_the_headset() {
+    let mut h = Harness::new(persisted());
+    assert_eq!(h.snapshot().presets.overlays, Overlays::default());
+    let hidden = Overlays::NONE.with_target_setting("diffuse-field");
+    let actions = h.intent(Intent::SetOverlays(hidden));
+    assert_eq!(
+        persisted_changes(&actions),
+        [PersistedChange::Overlays(hidden)]
+    );
+    assert!(device_changes(&actions).is_empty());
+    assert!(audio_commands(&actions).is_empty());
+    assert_eq!(h.snapshot().presets.overlays, hidden);
 }
 
 #[test]

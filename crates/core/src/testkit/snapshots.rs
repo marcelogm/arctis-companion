@@ -10,6 +10,7 @@ use crate::companion::selection::ActivePreset;
 use crate::companion::snapshot::{AudioSnapshot, BatterySnapshot, DongleSnapshot, PresetsSnapshot};
 use crate::eq::library;
 use crate::eq::preset::{Preset, PresetId};
+use crate::eq::reference::Overlays;
 use crate::eq::{Curve, Filter, FilterKind};
 use crate::messages::audio::{DefaultSink, SinkKind};
 use crate::messages::device::Phase;
@@ -101,6 +102,7 @@ fn presets() -> PresetsSnapshot {
         rules: AppRules::default(),
         automatic: true,
         seen_apps: Vec::new(),
+        overlays: Overlays::default(),
     }
 }
 

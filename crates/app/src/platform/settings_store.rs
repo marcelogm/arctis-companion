@@ -36,6 +36,7 @@ impl GSettingsStore {
             adopted_identity: keys::adopted_identity(settings),
             bluetooth_sink_seen: settings.boolean(BLUETOOTH_SINK_SEEN),
             low_battery_threshold: keys::low_battery_threshold(settings),
+            overlays: keys::overlays(settings),
         }
     }
 }
@@ -59,6 +60,7 @@ impl GSettingsStore {
             PersistedChange::LowBatteryThreshold(threshold) => {
                 settings.set_int(LOW_BATTERY_THRESHOLD, i32::from(threshold.get()))
             }
+            PersistedChange::Overlays(overlays) => keys::write_overlays(settings, *overlays),
         }
     }
 }

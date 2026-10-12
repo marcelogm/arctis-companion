@@ -1,6 +1,7 @@
 use arctis_core::eq::frequency_response::FrequencyResponse;
 use arctis_core::eq::reference::{
-    self, SeriesId, Target, headset_response, headset_response_with, measurement,
+    self, NO_TARGET, Overlays, SeriesId, Target, headset_response, headset_response_with,
+    measurement,
 };
 use arctis_core::eq::{Curve, library};
 
@@ -113,4 +114,40 @@ fn a_boost_shows_on_the_equalized_headset_relative_to_the_rest() {
     let after = headset_response_with(&curve);
     let lift = |response: &FrequencyResponse| response.db_at(100.0) - response.db_at(1_000.0);
     assert_close(lift(&after) - lift(&before), 6.0, 0.1, "boost at 100 Hz");
+}
+
+#[test]
+fn the_graph_shows_the_headset_and_harman_until_told_otherwise() {
+    let shown = Overlays::default();
+    assert!(shown.headset && shown.any());
+    assert_eq!(shown.target, Some(Target::Harman));
+    assert!(!Overlays::NONE.any());
+    assert!(Overlays::NONE.with_headset(true).any());
+    assert!(Overlays::NONE.with_target_setting("harman").any());
+}
+
+#[test]
+fn targets_map_to_and_from_their_setting() {
+    for target in Target::ALL {
+        assert_eq!(Target::from_setting(target.setting()), Some(target));
+    }
+    assert_eq!(Target::Harman.setting(), "harman");
+    assert_eq!(Target::DiffuseField.setting(), "diffuse-field");
+    assert_eq!(Target::from_setting(NO_TARGET), None);
+    assert_eq!(Target::from_setting("harman-5128"), None);
+}
+
+#[test]
+fn overlays_change_one_choice_at_a_time() {
+    let shown = Overlays::default();
+    assert_eq!(shown.target_setting(), "harman");
+    let hidden = shown.with_headset(false);
+    assert_eq!(hidden.target, Some(Target::Harman));
+    assert!(!hidden.headset);
+    let diffuse = shown.with_target_setting("diffuse-field");
+    assert_eq!(diffuse.target, Some(Target::DiffuseField));
+    assert!(diffuse.headset);
+    let none = shown.with_target_setting(NO_TARGET);
+    assert_eq!(none.target, None);
+    assert_eq!(none.target_setting(), NO_TARGET);
 }

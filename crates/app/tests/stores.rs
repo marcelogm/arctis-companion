@@ -200,6 +200,7 @@ fn app_settings() -> arctis_core::companion::app_settings::AppSettings {
         adopted_identity: None,
         bluetooth_sink_seen: false,
         low_battery_threshold: snapshot.battery.low_threshold,
+        overlays: snapshot.presets.overlays,
     }
 }
 
