@@ -10099,3 +10099,9 @@ Expected: merged by rebase.
 ## Deviations taken during execution
 
 (Filled in while executing; one numbered line per decision, continuing the table above.)
+
+| # | Decision | Why |
+|---|---|---|
+| 39 | `companion/intents.rs`: the two `match` arms that `cargo fmt` wraps into blocks (`SetAppRule`, `SetLowBatteryThreshold`) end with `;` | clippy pedantic `semicolon_if_nothing_returned` under `-D warnings` |
+| 40 | Four tests added in Task 30 for branches no planned test reached: Critical withdrawing the Low notification through `Companion`, the header battery text for Charging, PluggedIn and Unknown, every write-failure toast title, and `Default` of `AudioState` and `DongleState` | the per-file 95 % coverage gate (`action.rs`, `routing.rs`, `headset_page.rs` were below it) |
+| 41 | `cargo llvm-cov` in the toolbox needs `LLVM_COV=/usr/bin/llvm-cov LLVM_PROFDATA=/usr/bin/llvm-profdata` (Fedora's rustc has no `llvm-tools-preview`) | environment only; no code change |
