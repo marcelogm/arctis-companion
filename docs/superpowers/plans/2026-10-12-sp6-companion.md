@@ -39,7 +39,8 @@ on the Nova 5) and §2.6 (sidetone marks 0/3/6/10).
   each `if`/`for`/`match` block count), at most 4 arguments (`self` included), no `unwrap()` (tests use `expect`),
   at most 3 `bool` fields per struct, `pedantic` as errors under `-D warnings`. So: no `as` casts (use
   `f64::from`, `u32::try_from`), no `==` on floats (use `assert_close`), `#[must_use]` on public functions that
-  return a value, small `Copy` types by value. When clippy objects, extract a function or rename; never add an
+  return a value, small `Copy` types by value, and a non-`Copy` parameter that is only read is taken by reference
+  (`needless_pass_by_value`, also for `impl Trait` parameters other than closures). When clippy objects, extract a function or rename; never add an
   `allow` or `expect` attribute.
 - Pure core: `crates/core` may depend only on `serde` and `serde_json` (`cargo xtask check-pure`); dev-dependencies
   are free.
@@ -56,9 +57,12 @@ on the Nova 5) and §2.6 (sidetone marks 0/3/6/10).
   moved the branch, `git push --force-with-lease`.
 - SP4 (`core::session` + `core::testkit` with `FakeHeadset` and `Simulation`) and SP7 (`crates/audio`) run in
   parallel. Overlap with SP4 is limited to `crates/core/src/lib.rs`, `crates/core/Cargo.toml` (the `testkit`
-  feature and the self dev-dependency) and `crates/core/src/testkit/mod.rs`. Before Task 1, before
-  Task 14 and before the PR run `git fetch origin && git rebase origin/main`; on a conflict in those files keep
-  both sides' lines (module lists are unions; the feature and dev-dependency are identical).
+  feature and the self dev-dependency), `crates/core/src/testkit/mod.rs` and `docs/architecture/README.md`
+  (one page row each, and both sides' entries in the `crates/core/` row). Before Task 1, before Task 14 and
+  before the PR run `git fetch origin && git rebase origin/main`; on a conflict in those files keep both sides'
+  lines (module lists are unions; the feature and dev-dependency are identical). SP4 publishes
+  `DeviceUpdate::Identity` on every Syncing and forgets desired settings with the dongle (SP4 Deviations 8 and
+  18), which is why `Companion` answers every `Identity` with a `Change::Desired`.
 
 ## Acceptance criteria → tasks
 
@@ -199,6 +203,8 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 34 | Delete-toast texts are eight whole-sentence msgids (route paths × with or without app rules), never a sentence with a translated fragment inserted | ui §4 "Msgids are whole sentences …, never concatenated"; translators need the whole sentence for agreement |
 | 35 | The repository contract suite takes `fresh` and `reopen` (`impl Fn(R) -> R`) and reads back only after `reopen`; the memory adapters pass the identity | SP8's file stores must prove that what they write survives a new store over the same directory, which an in-instance check cannot show |
 | 36 | Known cross-sub-project gap, not fixed here: `AdoptionStatus` needs `DeviceUpdate::Identity`, which SP4 publishes on Syncing only (SP4 Deviation 18). After a restart with the headset off, the page therefore shows banner 2 ("Turn on the headset to read its settings") instead of banner 3 until the headset turns on. `Companion` already handles `Identity` in any phase, so it needs no change if the session publishes `Identity` on `Found` (`Firmware` fields are `Option`s) | reported to the orchestrator for SP4/SP8; SP6 cannot invent a dongle identity, and presuming adoption would send a previous dongle's settings to a new one |
+| 37 | The design's `AUTO_SWITCH_MIN_INTERVAL` "30 s (2.4 GHz) and 2 s (Bluetooth)" is `timing::auto_switch_min_interval(SoundPath)` over `DONGLE_SWITCH_INTERVAL` and `BLUETOOTH_SWITCH_INTERVAL`; `battery::series` takes a third argument `now: UnixSeconds` | one constant cannot hold two values; `core` has no clock, so the window's end must be passed in |
+| 38 | The English test resolver checks placeholders in the msgid, not in the rendered text, so user text (`Arg::Str`, `Text::Verbatim`) may contain braces | a custom preset or app named "{x}" is legal user text and must not fail a view test |
 
 ---
 ### Task 1: The `testkit` feature
@@ -206,7 +212,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 **Files:**
 - Modify: `crates/core/Cargo.toml`
 
-- [ ] **Step 1: Rebase on main**
+- [x] **Step 1: Rebase on main**
 
 ```bash
 cd /home/marcelo/Desenvolvimento/arctis-wt/sp6
@@ -217,7 +223,7 @@ git rebase origin/main
 If SP4 has already landed a `testkit` feature in `crates/core/Cargo.toml`, keep it and skip the matching lines of
 Step 2.
 
-- [ ] **Step 2: Add the feature and the self dev-dependency**
+- [x] **Step 2: Add the feature and the self dev-dependency**
 
 `crates/core/Cargo.toml` becomes:
 
@@ -245,12 +251,12 @@ serde_json = "1"
 workspace = true
 ```
 
-- [ ] **Step 3: Check the workspace still builds and passes**
+- [x] **Step 3: Check the workspace still builds and passes**
 
 Run (toolbox): `cargo clippy -p arctis-core --all-targets --features testkit -- -D warnings && cargo test -p arctis-core && cargo xtask check-pure && cargo xtask check-rules`
 Expected: PASS (`check-pure` ignores the dev-dependency on itself).
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add crates/core/Cargo.toml Cargo.lock
@@ -366,6 +372,15 @@ fn built_in_names_are_msgids_and_custom_names_are_user_text() {
 #[should_panic(expected = "unbound placeholder")]
 fn english_rejects_an_unbound_placeholder() {
     let _ = english(&Text::format("{missing} remaining", Vec::new()));
+}
+
+#[test]
+fn user_text_may_contain_braces() {
+    let text = Text::format(
+        "{preset}, chosen by hand",
+        vec![("preset", Arg::Str("{Mine}".to_owned()))],
+    );
+    assert_eq!(english(&text), "{Mine}, chosen by hand");
 }
 ```
 
@@ -494,12 +509,13 @@ pub mod english;
 `crates/core/src/testkit/english.rs`:
 
 ```rust
-use crate::view::text::{Arg, Args, Text};
+use crate::view::text::{Arg, Text};
 
 #[must_use]
 pub fn english(text: &Text) -> String {
-    let rendered = match text {
-        Text::Plain(msgid) | Text::Verbatim(msgid) => msgid.clone(),
+    match text {
+        Text::Verbatim(text) => text.clone(),
+        Text::Plain(msgid) => substitute(msgid, &[]),
         Text::Format { msgid, args } => substitute(msgid, args),
         Text::Plural {
             singular,
@@ -510,18 +526,21 @@ pub fn english(text: &Text) -> String {
             let form = if *n == 1 { singular } else { plural };
             substitute(&form.replace("{n}", &n.to_string()), args)
         }
-    };
-    assert!(
-        matches!(text, Text::Verbatim(_)) || !rendered.contains('{'),
-        "unbound placeholder in {rendered:?}"
-    );
-    rendered
+    }
 }
 
-fn substitute(template: &str, args: &Args) -> String {
+fn substitute(template: &str, args: &[(&str, Arg)]) -> String {
+    let unbound = args
+        .iter()
+        .fold(template.to_owned(), |text, (name, _)| text.replace(&placeholder(name), ""));
+    assert!(!unbound.contains('{'), "unbound placeholder in {template:?}");
     args.iter().fold(template.to_owned(), |text, (name, arg)| {
-        text.replace(&format!("{{{name}}}"), &argument(arg))
+        text.replace(&placeholder(name), &argument(arg))
     })
+}
+
+fn placeholder(name: &str) -> String {
+    format!("{{{name}}}")
 }
 
 fn argument(arg: &Arg) -> String {
@@ -561,7 +580,7 @@ pub mod view;
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test view`
-Expected: PASS, 7 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 7: Commit**
 
@@ -631,6 +650,22 @@ fn unix_seconds_come_from_wall_clock_millis() {
         UnixSeconds::from_millis(Millis(1_760_000_000_999)),
         UnixSeconds(1_760_000_000)
     );
+}
+
+#[test]
+fn unix_seconds_subtract_without_wrapping() {
+    assert_eq!(UnixSeconds(100).minus(30), UnixSeconds(70));
+    assert_eq!(UnixSeconds(10).minus(30), UnixSeconds(0));
+    assert_eq!(UnixSeconds(100).since(UnixSeconds(40)), 60);
+    assert_eq!(UnixSeconds(40).since(UnixSeconds(100)), 0);
+}
+
+#[test]
+fn only_a_connected_link_is_connected() {
+    for link in Link::ALL {
+        let connected = reading(50, Charging::Discharging, link).is_connected();
+        assert_eq!(connected, link == Link::Connected, "{link:?}");
+    }
 }
 
 #[test]
@@ -782,7 +817,7 @@ pub use sample::{Reading, Sample, Sampler, UnixSeconds};
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
-Expected: PASS, 6 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -991,7 +1026,7 @@ Add `pub mod log_format;` to `crates/core/src/battery/mod.rs` (before `pub mod s
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
-Expected: PASS, 13 tests.
+Expected: PASS, 15 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1272,7 +1307,7 @@ pub use series::{Series, Window, series};
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
-Expected: PASS, 20 tests.
+Expected: PASS, 22 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -2658,21 +2693,21 @@ use crate::settings::values::Percent;
 
 pub fn preset_repository_contract<R: PresetRepository>(fresh: impl Fn() -> R, reopen: impl Fn(R) -> R) {
     assert_eq!(loaded_presets(&fresh()), Vec::new());
-    saved_presets_load_back(reopen(saved(fresh())));
-    saving_an_id_again_replaces_it(reopen(saved_twice(fresh())));
-    deleted_presets_are_gone(reopen(deleted(fresh())));
+    saved_presets_load_back(&reopen(saved(fresh())));
+    saving_an_id_again_replaces_it(&reopen(saved_twice(fresh())));
+    deleted_presets_are_gone(&reopen(deleted(fresh())));
 }
 
 pub fn battery_repository_contract<R: BatteryRepository>(fresh: impl Fn() -> R, reopen: impl Fn(R) -> R) {
     assert_eq!(fresh().load().expect("samples load"), Vec::new());
-    appended_samples_load_back_in_order(reopen(appended(fresh())));
-    retention_drops_only_older_samples(reopen(retained(fresh())));
+    appended_samples_load_back_in_order(&reopen(appended(fresh())));
+    retention_drops_only_older_samples(&reopen(retained(fresh())));
 }
 
 pub fn seen_apps_repository_contract<R: SeenAppsRepository>(fresh: impl Fn() -> R, reopen: impl Fn(R) -> R) {
     assert_eq!(fresh().load().expect("seen apps load"), Vec::new());
-    recorded_apps_load_newest_first(reopen(recorded(fresh())));
-    at_most_fifty_apps_are_kept(reopen(recorded_many(fresh())));
+    recorded_apps_load_newest_first(&reopen(recorded(fresh())));
+    at_most_fifty_apps_are_kept(&reopen(recorded_many(fresh())));
 }
 
 fn custom(id: &str, name: &str) -> Preset {
@@ -2691,8 +2726,8 @@ fn saved<R: PresetRepository>(mut store: R) -> R {
     store
 }
 
-fn saved_presets_load_back(store: impl PresetRepository) {
-    assert_eq!(loaded_presets(&store), [custom("a", "A"), custom("b", "B")], "presets survive a reopen");
+fn saved_presets_load_back(store: &impl PresetRepository) {
+    assert_eq!(loaded_presets(store), [custom("a", "A"), custom("b", "B")], "presets survive a reopen");
 }
 
 fn saved_twice<R: PresetRepository>(mut store: R) -> R {
@@ -2701,8 +2736,8 @@ fn saved_twice<R: PresetRepository>(mut store: R) -> R {
     store
 }
 
-fn saving_an_id_again_replaces_it(store: impl PresetRepository) {
-    assert_eq!(loaded_presets(&store), [custom("a", "Renamed")]);
+fn saving_an_id_again_replaces_it(store: &impl PresetRepository) {
+    assert_eq!(loaded_presets(store), [custom("a", "Renamed")]);
 }
 
 fn deleted<R: PresetRepository>(mut store: R) -> R {
@@ -2713,8 +2748,8 @@ fn deleted<R: PresetRepository>(mut store: R) -> R {
     store
 }
 
-fn deleted_presets_are_gone(store: impl PresetRepository) {
-    assert_eq!(loaded_presets(&store), [custom("b", "B")]);
+fn deleted_presets_are_gone(store: &impl PresetRepository) {
+    assert_eq!(loaded_presets(store), [custom("b", "B")]);
 }
 
 fn row(at: u64, percent: u8) -> Sample {
@@ -2734,7 +2769,7 @@ fn appended<R: BatteryRepository>(mut store: R) -> R {
     store
 }
 
-fn appended_samples_load_back_in_order(store: impl BatteryRepository) {
+fn appended_samples_load_back_in_order(store: &impl BatteryRepository) {
     assert_eq!(store.load().expect("load"), [row(1, 90), row(2, 89)]);
 }
 
@@ -2746,7 +2781,7 @@ fn retained<R: BatteryRepository>(mut store: R) -> R {
     store
 }
 
-fn retention_drops_only_older_samples(store: impl BatteryRepository) {
+fn retention_drops_only_older_samples(store: &impl BatteryRepository) {
     assert_eq!(store.load().expect("load"), [row(2, 89), row(3, 88)]);
 }
 
@@ -2765,7 +2800,7 @@ fn recorded<R: SeenAppsRepository>(mut store: R) -> R {
     store
 }
 
-fn recorded_apps_load_newest_first(store: impl SeenAppsRepository) {
+fn recorded_apps_load_newest_first(store: &impl SeenAppsRepository) {
     assert_eq!(store.load().expect("load"), [app("a"), app("b")]);
 }
 
@@ -2776,7 +2811,7 @@ fn recorded_many<R: SeenAppsRepository>(mut store: R) -> R {
     store
 }
 
-fn at_most_fifty_apps_are_kept(store: impl SeenAppsRepository) {
+fn at_most_fifty_apps_are_kept(store: &impl SeenAppsRepository) {
     let apps = store.load().expect("load");
     assert_eq!(apps.len(), MAX_SEEN_APPS);
     assert_eq!(apps.first(), Some(&app(&format!("app{MAX_SEEN_APPS}"))));
@@ -3138,8 +3173,8 @@ use arctis_core::companion::app_settings::AppRules;
 use arctis_core::companion::catalog::Catalog;
 use arctis_core::companion::routing::Route;
 use arctis_core::companion::selection::{
-    ActivateError, ActivePreset, Candidate, ManualPick, PathSelection, PresetReason, RuledSet,
-    candidates, picked_path,
+    ActivateError, ActivePreset, Candidate, ManualPick, PATHS, PathSelection, PresetReason,
+    RuledSet, Selection, candidates, picked_path,
 };
 use arctis_core::companion::timing::{RULE_ENTER, RULE_LEAVE};
 use arctis_core::messages::audio::SoundPath;
@@ -3284,6 +3319,31 @@ fn ending_a_preview_keeps_a_real_pick() {
     });
     selection.end_preview();
     assert_eq!(selection.manual, None);
+}
+
+#[test]
+fn the_selection_wakes_for_the_earliest_path() {
+    let mut selection = Selection::default();
+    selection
+        .path_mut(SoundPath::Bluetooth)
+        .observe(&[candidate("spotify", "podcast")], T);
+    selection
+        .path_mut(SoundPath::Dongle)
+        .observe(&[candidate("firefox", "footsteps")], T.after(500));
+    assert_eq!(selection.next_deadline(), Some(T.after(RULE_ENTER)));
+}
+
+#[test]
+fn ending_manual_picks_ends_them_on_both_paths() {
+    let mut selection = Selection::default();
+    for path in PATHS {
+        selection.path_mut(path).manual = Some(ManualPick {
+            preset: id("podcast"),
+            preview: false,
+        });
+    }
+    selection.end_manual_picks();
+    assert!(PATHS.iter().all(|path| selection.path(*path).manual.is_none()));
 }
 
 #[test]
@@ -3642,7 +3702,7 @@ Add `pub mod selection;` to `crates/core/src/companion/mod.rs`.
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion selection`
-Expected: PASS, 12 tests.
+Expected: PASS, 14 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -4989,7 +5049,7 @@ fn every_action_of_the_contract_exists() {
 ```rust
 use arctis_core::battery::sample::{Sample, UnixSeconds};
 use arctis_core::companion::adoption::AdoptionStatus;
-use arctis_core::companion::alerts::AlertId;
+use arctis_core::companion::alerts::{AlertId, BatteryWarning};
 use arctis_core::companion::dongle::WriteFailure;
 use arctis_core::companion::selection::{ActivateError, ActivePreset};
 use arctis_core::companion::{Action, Input};
@@ -5098,6 +5158,7 @@ fn a_low_battery_reading_notifies() {
     let actions = h.device(status(15));
     let low = |action: &Action| matches!(action, Action::Notify(alert) if alert.id == AlertId::LowBattery);
     assert!(actions.iter().any(low));
+    assert_eq!(h.snapshot().battery.warning, BatteryWarning::Low);
 }
 
 #[test]
@@ -5438,7 +5499,7 @@ pub use snapshot::Snapshot;
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
-Expected: PASS (13 new tests in `contract` and `lifecycle`).
+Expected: PASS (14 new tests in `contract` and `lifecycle`).
 
 - [ ] **Step 6: Commit**
 
@@ -6342,8 +6403,13 @@ use arctis_core::settings::values::{MicVolume, Sidetone};
 use crate::support::{
     Harness, audio_commands, chosen_for, curve_of, default_sink, device_changes, device_curves,
     firefox_playing, firmware, id, nova_5, observed, percent, persisted, persisted_changes,
-    picked_by_hand, playing, ready,
+    picked_by_hand, playing, ready, ruled, with_rules,
 };
+
+fn firefox_joins(h: &mut Harness) {
+    let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
+    let _ = h.at(2_000).send(Input::Woke);
+}
 
 fn ten() -> Sidetone {
     Sidetone::try_from(10).expect("sidetone")
@@ -6431,8 +6497,23 @@ fn the_shell_with_a_ruled_app_playing_picks_without_persisting() {
 fn a_shell_pick_does_not_survive_a_restart() {
     let mut h = firefox_playing();
     assert!(persisted_changes(&h.at(5_000).intent(Intent::ActivatePreset(id("podcast")))).is_empty());
-    let restarted = Harness::new(crate::support::with_rules(&[("firefox", "footsteps")]));
-    assert_eq!(restarted.snapshot().presets.dongle, ActivePreset::route(id("flat")));
+    let mut restarted = ruled(&[("firefox", "footsteps"), ("spotify", "bass-boost")]);
+    firefox_joins(&mut restarted);
+    assert_eq!(restarted.snapshot().presets.dongle, chosen_for("footsteps", "firefox"));
+}
+
+#[test]
+fn a_combo_pick_survives_a_restart_only_as_the_route_preset() {
+    let mut h = firefox_playing();
+    let picked = h.at(5_000).intent(Intent::SetRoutePreset(SoundPath::Dongle, id("podcast")));
+    assert_eq!(persisted_changes(&picked), [route_preset(SoundPath::Dongle, "podcast")]);
+    let mut saved = with_rules(&[("firefox", "footsteps")]);
+    saved.settings.route_presets.dongle = id("podcast");
+    let mut restarted = Harness::new(saved);
+    let _ = restarted.connect(observed());
+    assert_eq!(restarted.snapshot().presets.dongle, ActivePreset::route(id("podcast")));
+    firefox_joins(&mut restarted);
+    assert_eq!(restarted.snapshot().presets.dongle, chosen_for("footsteps", "firefox"));
 }
 
 #[test]
@@ -6501,6 +6582,7 @@ fn a_new_low_battery_threshold_is_persisted_and_re_evaluated() {
     let actions = h.intent(Intent::SetLowBatteryThreshold(percent(20)));
     assert_eq!(persisted_changes(&actions), [PersistedChange::LowBatteryThreshold(percent(20))]);
     assert!(actions.iter().any(|action| matches!(action, Action::Notify(_))));
+    assert_eq!(h.snapshot().battery.low_threshold, percent(20));
 }
 
 #[test]
@@ -7255,10 +7337,10 @@ git push
 ```
 
 ---
-### Task 22: Status pages and the presets page model
+### Task 22: The presets page model
 
 **Files:**
-- Create: `crates/core/src/view/status_page.rs`, `crates/core/src/view/presets.rs`
+- Create: `crates/core/src/view/presets.rs`
 - Modify: `crates/core/src/view/mod.rs`
 - Test: `crates/core/tests/view/presets.rs`, `crates/core/tests/view/main.rs`, `crates/core/tests/view/support.rs`
 
@@ -7459,33 +7541,7 @@ fn the_delete_toast_names_the_uses() {
 Run (toolbox): `cargo test -p arctis-core --test view presets`
 Expected: FAIL to compile (`view::presets` missing).
 
-- [ ] **Step 3: Implement `status_page` and `presets`**
-
-`crates/core/src/view/status_page.rs`:
-
-```rust
-use super::text::Text;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct StatusPageModel {
-    pub icon: &'static str,
-    pub title: Text,
-    pub description: Text,
-    pub button: Option<Text>,
-}
-
-impl StatusPageModel {
-    #[must_use]
-    pub fn new(icon: &'static str, title: &str, description: &str, button: Option<&str>) -> Self {
-        Self {
-            icon,
-            title: Text::plain(title),
-            description: Text::plain(description),
-            button: button.map(Text::plain),
-        }
-    }
-}
-```
+- [ ] **Step 3: Implement `presets`**
 
 `crates/core/src/view/presets.rs`:
 
@@ -7602,7 +7658,6 @@ fn item(preset: &Preset) -> PresetItem {
 
 ```rust
 pub mod presets;
-pub mod status_page;
 pub mod text;
 ```
 
@@ -8344,10 +8399,10 @@ git push
 
 ---
 
-### Task 25: The headset page: Phase × Route, banner, header and failure toast
+### Task 25: The headset page: Phase × Route, status pages, banner, header and failure toast
 
 **Files:**
-- Create: `crates/core/src/view/headset_page.rs`
+- Create: `crates/core/src/view/headset_page.rs`, `crates/core/src/view/status_page.rs`
 - Modify: `crates/core/src/view/mod.rs`
 - Test: `crates/core/tests/view/headset_page.rs`, `crates/core/tests/view/main.rs`, `crates/core/tests/view/support.rs`
 
@@ -8593,7 +8648,33 @@ fn a_write_failure_offers_a_retry_toast() {
 Run (toolbox): `cargo test -p arctis-core --test view headset_page`
 Expected: FAIL to compile (`view::headset_page` missing).
 
-- [ ] **Step 3: Implement `headset_page`**
+- [ ] **Step 3: Implement `status_page` and `headset_page`**
+
+`crates/core/src/view/status_page.rs`:
+
+```rust
+use super::text::Text;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct StatusPageModel {
+    pub icon: &'static str,
+    pub title: Text,
+    pub description: Text,
+    pub button: Option<Text>,
+}
+
+impl StatusPageModel {
+    #[must_use]
+    pub fn new(icon: &'static str, title: &str, description: &str, button: Option<&str>) -> Self {
+        Self {
+            icon,
+            title: Text::plain(title),
+            description: Text::plain(description),
+            button: button.map(Text::plain),
+        }
+    }
+}
+```
 
 `crates/core/src/view/headset_page.rs`:
 
@@ -9973,10 +10054,12 @@ the branch).
 - [ ] **Step 4: Mutation check on the reducer**
 
 Run (toolbox):
-`export PATH="$HOME/.cargo/bin:$PATH" && cargo mutants -p arctis-core --features testkit --file 'crates/core/src/companion/*.rs' --timeout 120`
-Expected: no surviving mutant (the nightly job runs this scope). For each survivor, add the missing table case in
-the matching `crates/core/tests/companion/*.rs` file and rerun. If `cargo mutants` is not installed, install it
-with `cargo install --locked cargo-mutants` first.
+`export PATH="$HOME/.cargo/bin:$PATH" && cargo mutants -p arctis-core --features testkit --file 'crates/core/src/companion/*.rs' --jobs 4 --timeout 120 --cargo-test-arg=--test=companion --cargo-test-arg=--test=view`
+Expected: no surviving mutant (the nightly job runs this scope over the whole crate). Only the `companion` and
+`view` test binaries can catch a mutant in `companion/` (`view` reads `snapshot.rs`), so the other binaries are
+skipped to keep the run near 20 minutes. For each survivor, add the missing table case in the matching
+`crates/core/tests/companion/*.rs` or `crates/core/tests/view/*.rs` file and rerun. `cargo-mutants` and
+`cargo-llvm-cov` are already in `~/.cargo/bin` of the toolbox.
 
 - [ ] **Step 5: Commit any fixes**
 
