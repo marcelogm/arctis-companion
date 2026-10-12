@@ -225,6 +225,7 @@ impl EqEditorPage {
             .as_mut()
             .and_then(|working| working.apply(change));
         let Some(applied) = applied else {
+            self.render_model();
             return;
         };
         self.emit(Intent::SavePreset(applied.preset.clone()));
