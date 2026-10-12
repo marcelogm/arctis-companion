@@ -1,0 +1,57 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisHeadsetStatus: Adw.Bin {
+  child: Box {
+    spacing: 12;
+
+    Image {
+      icon-name: "audio-headset-symbolic";
+      pixel-size: 48;
+    }
+
+    Box {
+      orientation: vertical;
+      valign: center;
+      spacing: 2;
+
+      Box {
+        spacing: 6;
+
+        Image level_icon {}
+
+        Label battery_label {
+          name: "battery";
+          xalign: 0;
+
+          styles [
+            "heading",
+          ]
+        }
+      }
+
+      Label route_label {
+        name: "route";
+        xalign: 0;
+        wrap: true;
+
+        styles [
+          "dim-label",
+        ]
+      }
+
+      Box connection_box {
+        name: "connection";
+        spacing: 6;
+        visible: false;
+
+        Adw.Spinner spinner {}
+
+        Label subtitle_label {
+          xalign: 0;
+          wrap: true;
+        }
+      }
+    }
+  };
+}
