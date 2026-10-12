@@ -9841,7 +9841,7 @@ Every backticked span with a `/` or ending in `.rs` must exist, and every `path.
 `enum` or `trait` declared in that file; constants cannot be cited as symbols. Spans with `*`, `<` or `{` are not
 treated as paths.
 
-- [ ] **Step 1: Write the page**
+- [x] **Step 1: Write the page**
 
 `docs/architecture/companion.md`:
 
@@ -9996,7 +9996,7 @@ flowchart TD
 | view models | `crates/core/tests/view/main.rs` |
 ````
 
-- [ ] **Step 2: Add the README row**
+- [x] **Step 2: Add the README row**
 
 In `docs/architecture/README.md`, append a row to the pages table (keep any row another sub-project added, such as SP4's session page):
 
@@ -10006,12 +10006,12 @@ In `docs/architecture/README.md`, append a row to the pages table (keep any row 
 
 and add `crates/core/src/companion/mod.rs`, `crates/core/src/view/mod.rs` to the `crates/core/` entry points row.
 
-- [ ] **Step 3: Check the paths**
+- [x] **Step 3: Check the paths**
 
 Run (toolbox): `cargo xtask check-doc-paths && cargo xtask check-rules`
 Expected: PASS. A failure names the line and the span; fix the span, never the check.
 
-- [ ] **Step 4: Commit**
+- [x] **Step 4: Commit**
 
 ```bash
 git add docs/architecture
