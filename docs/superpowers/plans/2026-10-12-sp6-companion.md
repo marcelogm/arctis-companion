@@ -598,7 +598,7 @@ git push
 - Modify: `crates/core/src/battery/sample.rs`
 - Test: `crates/core/tests/battery/main.rs`, `crates/core/tests/battery/support.rs`, `crates/core/tests/battery/sample.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `crates/core/tests/battery/main.rs`:
 
@@ -722,12 +722,12 @@ fn plugged_means_charging_or_plugged_in() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
 Expected: FAIL to compile (`Sampler`, `Reading`, `Sample`, `from_millis` missing).
 
-- [ ] **Step 3: Implement `battery::sample`**
+- [x] **Step 3: Implement `battery::sample`**
 
 `crates/core/src/battery/sample.rs`:
 
@@ -814,12 +814,12 @@ pub mod sample;
 pub use sample::{Reading, Sample, Sampler, UnixSeconds};
 ```
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/battery crates/core/tests/battery
