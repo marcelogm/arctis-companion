@@ -1,4 +1,7 @@
-use arctis_audio::graph::{Graph, Link, ObjectId, Props};
+use arctis_audio::graph::{
+    CONFIGURED_AUDIO_SINK, DEFAULT_AUDIO_SINK, Graph, Link, ObjectId, Props,
+};
+use arctis_audio::outputs::{EQ_LINK_GROUP, EQ_OUTPUT_NAME, EQ_SINK_NAME};
 
 pub const BLUEZ: &str = "bluez_output.AA_BB_CC_DD_EE_FF.1";
 pub const USB: &str = "alsa_output.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.iec958-stereo";
@@ -79,6 +82,16 @@ impl Scene {
         self.sink(id, SPEAKERS)
     }
 
+    pub fn equalizer(self, sink: ObjectId, output: ObjectId) -> Self {
+        self.filter(&FilterNodes {
+            sink,
+            output,
+            name: EQ_SINK_NAME,
+            output_name: EQ_OUTPUT_NAME,
+            group: EQ_LINK_GROUP,
+        })
+    }
+
     pub fn filter(self, nodes: &FilterNodes) -> Self {
         self.node(
             nodes.sink,
@@ -117,6 +130,16 @@ impl Scene {
     pub fn link(mut self, output: ObjectId, input: ObjectId) -> Self {
         self.graph.put_link(self.next_link, Link { output, input });
         self.next_link += 1;
+        self
+    }
+
+    pub fn default_sink(self, name: &str) -> Self {
+        self.metadata(DEFAULT_AUDIO_SINK, name)
+            .metadata(CONFIGURED_AUDIO_SINK, name)
+    }
+
+    pub fn metadata(mut self, key: &str, name: &str) -> Self {
+        self.graph.set_default(Some(key), Some(&quoted(name)));
         self
     }
 
