@@ -6,7 +6,7 @@ use arctis_core::view::text::Text;
 
 use crate::intents::IntentSink;
 use crate::preset_files::PresetFiles;
-use crate::text::resolve;
+use crate::text::{resolve, translated};
 use crate::toasts::{button_toast, plain_toast};
 
 const CLOSE: &str = "close";
@@ -48,11 +48,11 @@ impl Services {
 pub fn details_dialog(lines: &[Text]) -> adw::AlertDialog {
     let body: Vec<String> = lines.iter().map(resolve).collect();
     let dialog = adw::AlertDialog::builder()
-        .heading(resolve(&Text::plain(msgid("Changed to Fit the Headset"))))
+        .heading(translated(msgid("Changed to Fit the Headset")))
         .body(body.join("\n"))
         .body_use_markup(false)
         .close_response(CLOSE)
         .build();
-    dialog.add_response(CLOSE, &resolve(&Text::plain(msgid("_Close"))));
+    dialog.add_response(CLOSE, &translated(msgid("_Close")));
     dialog
 }

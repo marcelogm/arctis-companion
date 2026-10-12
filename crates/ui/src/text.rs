@@ -115,6 +115,11 @@ pub fn resolve(text: &Text) -> String {
 }
 
 #[must_use]
+pub fn translated(english: &'static str) -> String {
+    resolve(&Text::plain(english))
+}
+
+#[must_use]
 pub fn optional(text: Option<&Text>) -> String {
     text.map(resolve).unwrap_or_default()
 }
