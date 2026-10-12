@@ -22,6 +22,13 @@ fn percent_spans_zero_to_one_hundred() {
 }
 
 #[test]
+fn out_of_range_values_read_as_the_nearest_bound() {
+    assert_eq!(MicVolume::nearest(200).get(), 15);
+    assert_eq!(Sidetone::nearest(4).get(), 4);
+    assert_eq!(Percent::nearest(101).get(), 100);
+}
+
+#[test]
 fn mute_light_levels_use_the_raw_bytes_0_1_4_10() {
     let raws: Vec<u8> = MuteLight::ALL.into_iter().map(MuteLight::raw).collect();
     assert_eq!(raws, [0, 1, 4, 10]);

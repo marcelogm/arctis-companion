@@ -14,6 +14,11 @@ macro_rules! bounded {
             pub const fn get(self) -> $raw {
                 self.0
             }
+
+            #[must_use]
+            pub fn nearest(value: $raw) -> Self {
+                Self(value.clamp(Self::MIN, Self::MAX))
+            }
         }
 
         impl TryFrom<$raw> for $name {

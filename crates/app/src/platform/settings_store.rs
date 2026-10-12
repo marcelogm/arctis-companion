@@ -35,7 +35,7 @@ impl GSettingsStore {
             automatic_presets: settings.boolean(AUTOMATIC_PRESETS),
             adopted_identity: keys::adopted_identity(settings),
             bluetooth_sink_seen: settings.boolean(BLUETOOTH_SINK_SEEN),
-            low_battery_threshold: keys::ranged(settings, LOW_BATTERY_THRESHOLD),
+            low_battery_threshold: keys::low_battery_threshold(settings),
         }
     }
 }
