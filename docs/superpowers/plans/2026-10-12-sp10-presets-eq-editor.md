@@ -86,7 +86,7 @@ row); ui part §1 (navigation), §3 (presets and EQ editor), §4 (HIG capitaliza
 | keyboard-only editing of every band | 6, 8, 12 |
 | low-pass/high-pass gain insensitive | 2, 6, 8 |
 | instant save with undo toast | 2, 4, 8 |
-| delete toast names the preset's uses | 10 (uses `core::view::presets::deleted_toast` from SP6) |
+| delete toast names the preset's uses | 10 (uses `core::view::presets::deleted_toast` from SP6), 11 (Preview ends before the delete) |
 | Preview emits its manual-pick intents (`StartPreview`, `EndPreview`, also when the page closes) | 11 |
 | APO import of a published AutoEQ file | 3, 7, 9 |
 | empty Custom group description | 7 (model from SP6) |
@@ -125,7 +125,7 @@ crates/ui/resources/eq_editor_page.blp          header Preview / Duplicate / men
 crates/ui/resources/window.blp                  the two pages inside the navigation view
 crates/ui/resources/resources.gresource.xml     three .ui files
 crates/ui/tests/widgets/main.rs                 new modules
-crates/ui/tests/widgets/support.rs              FakeFiles, fake_services, band, custom_preset, with_preset, shows_text, click, saved, step_up, open_editor, visible_tag
+crates/ui/tests/widgets/support.rs              FakeFiles, fake_services, band, custom_preset, with_preset, shows_text, click, saved, step_up, drain, dismiss_toast, open_editor, visible_tag
 crates/ui/tests/widgets/services.rs             toasts and undo
 crates/ui/tests/widgets/response_graph.rs       role, description, drawing
 crates/ui/tests/widgets/eq_band_row.rs          values, gain sensitivity, read-only, edits, render guard
@@ -153,9 +153,9 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 2 | The file chooser lives in `crates/ui/src/preset_files.rs`: `PortalFiles` opens `gtk::FileDialog` (the file chooser portal under Flatpak) and reads or writes only the document the person picked, behind the `PresetFiles` trait. No widget touches a file; pages get text and hand back text. `docs/architecture/ui.md` says so | ui §3 puts Import and Export "through the file chooser portal", which is a GTK dialog; ui §1's "no file" is read as "no app-owned file" (stores, settings). The trait lets tests fake the portal and lets SP8 swap the implementation without touching the pages |
 | 3 | `serde_json` moves from `arctis-core`'s dev-dependencies to its dependencies | JSON import and export are pure decisions in `core::view::preset_files`; design §3 allows `serde_json` in core and `xtask check-pure` already lists it |
 | 4 | No new `Intent` variants: edits, Duplicate, Rename, Import and Undo all emit `Intent::SavePreset`, Delete emits `Intent::DeletePreset`, Preview emits `StartPreview`/`EndPreview` | SP6 froze these intents and `Companion` already persists, applies live and throttles (SP6 Deviations 11, 12) |
-| 5 | The editor edits a working copy of the preset: each change builds the edited `Preset` with `core::view::preset_edits`, keeps it, emits `SavePreset` at once and re-renders from it. A later snapshot that contains the same id replaces the working copy; a snapshot without it (a duplicate not yet published) keeps it | instant save with no wait for the round trip; band rows update in place so keyboard focus is never lost |
-| 6 | Edit undo: the first edit after the editor opens (or after its toast went away) shows one toast "Saved “{preset}”" with Undo; Undo saves the preset as it was when the editor opened. Later edits while that toast is shown add no toast | ui §3 "instant save" and design §7 "undo toasts"; one toast per burst of spin-button steps instead of one per step |
-| 7 | Delete: the toast "Deleted “X”. Used by …" (SP6 `core::view::presets::deleted_toast`) has High priority and Undo (`SavePreset` of the deleted preset); the editor pops before `DeletePreset` is emitted, so an active Preview ends first | audio §3; a High toast replaces a pending "Saved" toast instead of queueing behind it |
+| 5 | The editor edits a working copy of the preset: each change builds the edited `Preset` with `core::view::preset_edits`, keeps it, emits `SavePreset` at once and re-renders from it. A later snapshot that contains the same id replaces the working copy; a snapshot without it (a duplicate not yet published) keeps it. This assumes the bridge publishes a snapshot synchronously after each intent (SP8), so a published copy is never older than the working copy | instant save with no wait for the round trip; band rows update in place so keyboard focus is never lost |
+| 6 | Edit undo: the first edit of a burst (after the editor opens, or after the previous "Saved" toast went away) shows one toast "Saved “{preset}”" with Undo; Undo saves the preset as it was just before that first edit. Later edits while that toast is shown add no toast and extend the burst. Rename goes through the same path | ui §3 "instant save" and design §7 "undo toasts"; one toast per burst of spin-button steps instead of one per step; undoing a burst never silently reverts an earlier, already-acknowledged burst |
+| 7 | Delete: the toast "Deleted “X”. Used by …" (SP6 `core::view::presets::deleted_toast`) has High priority and Undo (`SavePreset` of the deleted preset); the editor turns Preview off (emitting `EndPreview` when it was on), pops, then emits `DeletePreset` | audio §3; a High toast replaces a pending "Saved" toast instead of queueing behind it; ending Preview explicitly keeps the intent order independent of when `hidden` fires |
 | 8 | Remove Band is an `AdwButtonRow` inside each band's expander row (removes that band); Add Band is a `list-add-symbolic` button in the Bands group header. A new band is Peaking 1000 Hz, 0 dB, Q 1.41 (the factory Q) | ui §3 names both actions but not their place; per-band removal needs no selection model; a 0 dB peak changes nothing until edited |
 | 9 | Duplicate (built-ins only): name "{preset} (Copy)" resolved in the person's language, id `fresh_preset_id` of that name, curve copied; the editor ends Preview and switches to the copy in place. Custom presets get the Rename / Export / Delete menu instead | ui §3 "Built-ins are read-only with a Duplicate header button"; a custom copy of a custom preset is Export + Import |
 | 10 | Rename: an `AdwAlertDialog` with an entry; empty or unchanged names are ignored, the id never changes. The dialog's presentation is not tested (SP9 Deviation 24); `EqEditorPage::rename_to` is | rules and route presets keep pointing at the id |
@@ -171,6 +171,9 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 20 | "Keyboard-only editing" is checked as: every editing control of every band (type, frequency, gain, Q, enabled, Remove Band) is focusable and sensitive (gain only for gain kinds), and each band's frequency is changed through its spin button's `change-value` key-binding signal (what Up does) and saved; opening an expander and choosing in a combo row are libadwaita's own keyboard handling | GTK has no public API to send key events to an unmapped test window |
 | 21 | `PortalFiles` itself has no automated test (it needs a running portal); SP14's hardware checklist imports and exports a file by hand | the pages are tested through `FakeFiles` |
 | 22 | Two Duplicates of the same built-in before the first snapshot arrives get the same fresh id; the second overwrites the first | the bridge publishes after each intent (SP8), so this needs two clicks inside one main-loop turn |
+| 23 | A JSON preset whose `name` is empty or blank is named after the file without its extension, like an APO import | a custom preset with an empty title would render an empty row and an empty editor title |
+| 24 | `win.show-preset` with an id the current snapshot does not know (a stale row) does nothing: the editor keeps its state and nothing is pushed | otherwise the editor would be pushed showing the previous preset |
+| 25 | The accessibility and 360 px checks for the new pages are written after the pages (Task 12); each is first seen failing by temporarily breaking the property it guards, then restored | the walks need both pages in the window; Task 12 still observes red before green |
 
 ---
 
@@ -193,8 +196,10 @@ pub fn filter(kind: FilterKind, hz: u16, half_db: i8, milli_q: u16) -> Filter {
 }
 ```
 
-In `crates/core/tests/view/eq_editor.rs` delete the local `fn filter` and import it from support:
-`use crate::support::{assert_close, filter, id, snapshot, with};`
+In `crates/core/tests/view/eq_editor.rs` delete the local `fn filter`, import it from support
+(`use crate::support::{assert_close, filter, id, snapshot, with};`) and drop `Filter` from the `arctis_core::eq`
+import, which becomes `use arctis_core::eq::{Curve, FilterKind};` (the deleted function was the only user of the
+type name, and an unused import fails `clippy -D warnings`).
 
 - [ ] **Step 2: Write the failing tests**
 
@@ -692,6 +697,15 @@ fn problems_name_the_file() {
 }
 
 #[test]
+fn a_json_preset_without_a_name_takes_the_file_name() {
+    let text = r#"{"format": 1, "id": "x", "name": "  ", "filters": [{"kind": "peaking", "hz": 250, "gain_db": 2.0, "q": 1.0}]}"#;
+    let imported = import_preset(&snapshot(), "Blank.json", text).expect("imported");
+    assert_eq!(imported.preset.name(), "Blank");
+    assert_eq!(imported.preset.id(), &id("blank"));
+    assert_eq!(imported.preset.curve().filters(), [filter(FilterKind::Peaking, 250, 4, 1_000)]);
+}
+
+#[test]
 fn a_json_export_imports_back_under_a_fresh_id() {
     let mut s = snapshot();
     let mine = custom("Mine");
@@ -788,10 +802,16 @@ pub fn export_failed(preset: &Preset) -> Text {
 fn from_json(file_name: &str, text: &str) -> Result<Parsed, Text> {
     let preset: Preset = serde_json::from_str(text).map_err(|_| not_a_preset(file_name))?;
     Ok(Parsed {
-        name: preset.name().to_owned(),
+        name: name_or_stem(preset.name(), file_name),
         curve: preset.curve().clone(),
         clamped: 0,
     })
+}
+
+fn name_or_stem(name: &str, file_name: &str) -> String {
+    let name = name.trim();
+    let chosen = if name.is_empty() { stem(file_name) } else { name };
+    chosen.to_owned()
 }
 
 fn from_apo(file_name: &str, text: &str) -> Result<Parsed, Text> {
@@ -831,32 +851,37 @@ fn not_a_preset(file_name: &str) -> Text {
 }
 
 fn apo_problem(file_name: &str, error: ApoError) -> Text {
-    let mut args = file_args(file_name);
     match error {
-        ApoError::NoFilters => Text::format("“{file}” has no filters", args),
-        ApoError::TooManyFilters(found) => {
-            args.push(("max", Arg::Number(count(MAX_FILTERS))));
-            Text::plural(
-                [
-                    "“{file}” has {n} filter; the headset takes at most {max}",
-                    "“{file}” has {n} filters; the headset takes at most {max}",
-                ],
-                count(found),
-                args,
-            )
-        }
+        ApoError::NoFilters => Text::format("“{file}” has no filters", file_args(file_name)),
+        ApoError::TooManyFilters(found) => too_many_filters(file_name, found),
         ApoError::Malformed { line } => {
-            args.push(("line", Arg::Number(count(line))));
-            Text::format("Could not read line {line} of “{file}”", args)
+            bad_line(file_name, "Could not read line {line} of “{file}”", line)
         }
-        ApoError::UnsupportedKind { line } => {
-            args.push(("line", Arg::Number(count(line))));
-            Text::format(
-                "Line {line} of “{file}” uses a filter type the headset does not support",
-                args,
-            )
-        }
+        ApoError::UnsupportedKind { line } => bad_line(
+            file_name,
+            "Line {line} of “{file}” uses a filter type the headset does not support",
+            line,
+        ),
     }
+}
+
+fn too_many_filters(file_name: &str, found: usize) -> Text {
+    let mut args = file_args(file_name);
+    args.push(("max", Arg::Number(count(MAX_FILTERS))));
+    Text::plural(
+        [
+            "“{file}” has {n} filter; the headset takes at most {max}",
+            "“{file}” has {n} filters; the headset takes at most {max}",
+        ],
+        count(found),
+        args,
+    )
+}
+
+fn bad_line(file_name: &str, msgid: &str, line: usize) -> Text {
+    let mut args = file_args(file_name);
+    args.push(("line", Arg::Number(count(line))));
+    Text::format(msgid, args)
 }
 
 fn file_args(file_name: &str) -> Args {
@@ -868,13 +893,10 @@ fn count(value: usize) -> u32 {
 }
 ```
 
-If clippy reports `apo_problem` above 40 lines or cognitive complexity 8, split each arm's body into one small
-function (`too_many_filters(args, found)`, `bad_line(args, msgid, line)`).
-
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run (core): `cargo test -p arctis-core --test view preset_files && cargo clippy -p arctis-core --all-targets -- -D warnings`
-Expected: PASS, 6 tests; clippy clean.
+Expected: PASS, 7 tests; clippy clean.
 
 - [ ] **Step 6: Commit**
 
@@ -1206,25 +1228,38 @@ fn the_graph_is_an_image_described_by_its_model() {
     ));
 }
 
-#[gtk::test]
-fn the_graph_draws_a_grid_and_a_curve() {
-    init();
-    let graph = ResponseGraph::default();
-    graph.render(&graph_of("bass-boost"));
+fn drawn(graph: &ResponseGraph) -> gsk::RenderNode {
     let snapshot = gtk::Snapshot::new();
     graph.draw(&snapshot, 360, 160);
-    assert!(snapshot.to_node().is_some());
+    snapshot.to_node().expect("something was drawn")
 }
 
 #[gtk::test]
-fn an_empty_graph_still_draws_its_grid() {
+fn a_graph_without_points_draws_its_grid() {
     init();
     let graph = ResponseGraph::default();
-    let snapshot = gtk::Snapshot::new();
-    graph.draw(&snapshot, 0, 0);
-    assert!(snapshot.to_node().is_some());
+    assert!(!drawn(&graph).serialize().is_empty());
+}
+
+#[gtk::test]
+fn the_curve_is_drawn_over_the_grid() {
+    init();
+    let graph = ResponseGraph::default();
+    let grid = drawn(&graph).serialize().len();
+    graph.render(&graph_of("bass-boost"));
+    assert!(drawn(&graph).serialize().len() > grid);
+}
+
+#[gtk::test]
+fn a_zero_sized_graph_draws_without_panicking() {
+    init();
+    let graph = ResponseGraph::default();
+    graph.render(&graph_of("bass-boost"));
+    graph.draw(&gtk::Snapshot::new(), 0, 0);
 }
 ```
+
+Add `use gtk::gsk;` to the test's imports.
 
 - [ ] **Step 2: Run the tests to see them fail**
 
@@ -1362,7 +1397,7 @@ In `crates/ui/src/lib.rs` add `mod response_graph;` and `pub use response_graph:
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (ui): `cargo test -p arctis-ui response_graph`
-Expected: PASS, 3 tests.
+Expected: PASS, 4 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -2205,7 +2240,25 @@ pub fn band_rows(page: &EqEditorPage) -> Vec<EqBandRow> {
 pub fn step_up(row: &adw::SpinRow) {
     first::<gtk::SpinButton>(row).emit_by_name::<()>("change-value", &[&gtk::ScrollType::StepUp]);
 }
+
+pub fn drain() {
+    while glib::MainContext::default().iteration(false) {}
+}
+
+pub fn dismiss_toast(root: &impl IsA<gtk::Widget>) {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Button>().ok())
+        .find(|button| button.icon_name().as_deref() == Some("window-close-symbolic"))
+        .expect("a toast with a close button")
+        .emit_clicked();
+    drain();
+}
 ```
+
+`AdwToastWidget`'s close button uses `window-close-symbolic`; if this libadwaita build names it differently, match
+the button whose tooltip is “Dismiss” instead. Toast widgets leave on an animation that libadwaita skips for
+unmapped widgets; `drain` lets any idle work finish before a test looks at the overlay again.
 
 Add `mod eq_editor_page;` to `crates/ui/tests/widgets/main.rs` and create
 `crates/ui/tests/widgets/eq_editor_page.rs`:
@@ -2226,8 +2279,8 @@ use arctis_ui::{EqBandRow, ResponseGraph};
 use gtk::AccessibleProperty;
 
 use crate::support::{
-    band, band_rows, click, custom_preset, first, has_accessible_text, named, saved, shows_text,
-    standalone_editor, step_up, with_preset,
+    band, band_rows, click, custom_preset, dismiss_toast, drain, first, has_accessible_text, named,
+    saved, shows_text, standalone_editor, step_up, with_preset,
 };
 
 const EDIT_CONTROLS: [&str; 6] = [
@@ -2272,7 +2325,8 @@ fn a_custom_preset_opens_editable() {
     assert_eq!(band_rows(page).len(), 1);
     assert!(!named::<gtk::Button>(page, "duplicate").is_visible());
     assert!(named::<gtk::MenuButton>(page, "editor-menu").is_visible());
-    assert!(named::<gtk::Button>(page, "add-band").is_visible());
+    let add_band = named::<gtk::Button>(page, "add-band");
+    assert!(add_band.is_visible() && add_band.is_sensitive() && add_band.is_focusable());
     assert!(spin(&band_rows(page)[0], "band-frequency").is_sensitive());
     assert!(editor.files.saved.borrow().is_empty());
 }
@@ -2324,12 +2378,22 @@ fn one_toast_covers_a_burst_of_edits() {
     step_up(&gain);
     step_up(&gain);
     assert_eq!(saved(&editor.log).curve().filters()[0].gain().half_db(), 6);
-    let toasts = crate::support::descendants(&editor.toasts)
-        .into_iter()
-        .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
-        .filter(|label| label.label() == "Saved “Mine”")
-        .count();
-    assert_eq!(toasts, 1);
+    click(&editor.toasts, "Undo");
+    drain();
+    assert_eq!(saved(&editor.log), one_peak());
+    assert!(!shows_text(&editor.toasts, "Saved “Mine”"));
+}
+
+#[gtk::test]
+fn undo_after_a_pause_restores_the_start_of_the_new_burst() {
+    let editor = standalone_editor(with_preset(&one_peak()), "mine");
+    step_up(&spin(&band_rows(&editor.page)[0], "band-gain"));
+    let after_first_burst = saved(&editor.log);
+    dismiss_toast(&editor.toasts);
+    step_up(&spin(&band_rows(&editor.page)[0], "band-q"));
+    assert!(shows_text(&editor.toasts, "Saved “Mine”"));
+    click(&editor.toasts, "Undo");
+    assert_eq!(saved(&editor.log), after_first_burst);
 }
 
 #[gtk::test]
@@ -2608,7 +2672,6 @@ mod imp {
         pub services: RefCell<Option<Services>>,
         pub snapshot: RefCell<Option<Rc<Snapshot>>>,
         pub preset: RefCell<Option<Preset>>,
-        pub opened: RefCell<Option<Preset>>,
         pub band_rows: RefCell<Vec<EqBandRow>>,
         pub undo_toast: RefCell<Option<adw::Toast>>,
         pub rendering: Cell<bool>,
@@ -2655,9 +2718,7 @@ impl EqEditorPage {
 
     pub fn open(&self, snapshot: &Rc<Snapshot>, id: &PresetId) {
         let imp = self.imp();
-        let preset = snapshot.presets.find(id).cloned();
-        imp.opened.replace(preset.clone());
-        imp.preset.replace(preset);
+        imp.preset.replace(snapshot.presets.find(id).cloned());
         imp.undo_toast.replace(None);
         self.render(snapshot);
     }
@@ -2740,12 +2801,15 @@ impl EqEditorPage {
     }
 
     fn edit(&self, change: impl FnOnce(&Preset) -> Option<Preset>) {
-        let current = self.imp().preset.borrow().clone();
-        let Some(edited) = current.as_ref().and_then(change) else {
+        let before = self.imp().preset.borrow().clone();
+        let Some(before) = before else {
+            return;
+        };
+        let Some(edited) = change(&before) else {
             return;
         };
         self.save(edited);
-        self.offer_undo();
+        self.offer_undo(before);
     }
 
     fn save(&self, preset: Preset) {
@@ -2768,14 +2832,13 @@ impl EqEditorPage {
         }
     }
 
-    fn offer_undo(&self) {
+    fn offer_undo(&self, before: Preset) {
         let imp = self.imp();
         if imp.undo_toast.borrow().is_some() {
             return;
         }
-        let opened = imp.opened.borrow().clone();
         let current = imp.preset.borrow().clone();
-        let (Some(services), Some(opened), Some(current)) = (self.services(), opened, current) else {
+        let (Some(services), Some(current)) = (self.services(), current) else {
             return;
         };
         let toast = undo_toast(
@@ -2783,7 +2846,7 @@ impl EqEditorPage {
             glib::clone!(
                 #[weak(rename_to = page)]
                 self,
-                move || page.restore(opened.clone())
+                move || page.restore(before.clone())
             ),
         );
         toast.connect_dismissed(glib::clone!(
@@ -2817,7 +2880,7 @@ In `crates/ui/src/lib.rs` add `mod eq_editor_page;` and `pub use eq_editor_page:
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run (ui): `cargo test -p arctis-ui eq_editor_page`
-Expected: PASS, 14 tests. If `every_band_is_editable_from_the_keyboard` reports a control as not focusable, check
+Expected: PASS, 15 tests. If `every_band_is_editable_from_the_keyboard` reports a control as not focusable, check
 the widget named in the message: a row control that GTK makes unfocusable is a regression in the template
 (`can-focus`/`focusable` must stay at their defaults).
 
@@ -2909,6 +2972,16 @@ fn a_preset_opens_in_the_editor() {
 }
 
 #[gtk::test]
+fn an_unknown_preset_opens_nothing() {
+    let (window, log) = rendered_window(snapshot());
+    open_presets(&window);
+    WidgetExt::activate_action(&window, "win.show-preset", Some(&"gone".to_variant()))
+        .expect("the action exists");
+    assert_eq!(visible_tag(&window).as_deref(), Some("presets"));
+    assert!(log.borrow().is_empty());
+}
+
+#[gtk::test]
 fn the_window_renders_the_preset_pages() {
     let mine = custom_preset(&[band(arctis_core::eq::FilterKind::Peaking, 250, 4, 1_000)]);
     let (window, _) = rendered_window(snapshot());
@@ -2938,8 +3011,8 @@ fn the_window_hands_the_file_chooser_to_its_pages() {
 - [ ] **Step 3: Run the tests to see them fail**
 
 Run (ui): `cargo test -p arctis-ui window`
-Expected: FAIL: `the_presets_row_opens_the_presets_page` (no page tagged `presets`), and compile error for
-`Window::set_preset_files`.
+Expected: compile error for `Window::set_preset_files`; once it compiles, `the_presets_row_opens_the_presets_page`
+fails (no page tagged `presets`), and `win.show-preset` does not exist yet.
 
 - [ ] **Step 4: Add the pages to the window template**
 
@@ -3042,10 +3115,14 @@ Add these methods to `impl Window`:
     fn show_preset(&self, id: Option<&str>) {
         let imp = self.imp();
         let snapshot = imp.snapshot.borrow().clone();
+        let id = id.map(PresetId::new);
         let (Some(snapshot), Some(id)) = (snapshot, id) else {
             return;
         };
-        imp.eq_editor_page.open(&snapshot, &PresetId::new(id));
+        if snapshot.presets.find(&id).is_none() {
+            return;
+        }
+        imp.eq_editor_page.open(&snapshot, &id);
         if imp.navigation.visible_page_tag().as_deref() != Some(EDITOR_TAG) {
             imp.navigation.push_by_tag(EDITOR_TAG);
         }
@@ -3217,7 +3294,6 @@ impl EqEditorPage {
             return;
         };
         let copy = duplicate(&snapshot, &source, &resolve(&copy_name(&source)));
-        imp.opened.replace(Some(copy.clone()));
         self.save(copy);
     }
 
@@ -3382,7 +3458,7 @@ fn closing_the_editor_ends_its_preview() {
     let (window, log) = rendered_window(snapshot());
     let page = open_editor(&window, "flat");
     named::<gtk::ToggleButton>(&page, "preview").set_active(true);
-    named::<adw::NavigationView>(&window, "navigation").pop();
+    assert!(named::<adw::NavigationView>(&window, "navigation").pop());
     assert_eq!(
         *log.borrow(),
         vec![Intent::StartPreview(id("flat")), Intent::EndPreview]
@@ -3398,6 +3474,21 @@ fn edits_while_previewing_keep_the_preview() {
     assert!(preview.is_active());
     assert_eq!(editor.log.borrow()[0], Intent::StartPreview(id("mine")));
     assert!(matches!(editor.log.borrow()[1], Intent::SavePreset(_)));
+}
+
+#[gtk::test]
+fn deleting_while_previewing_ends_the_preview_first() {
+    let editor = standalone_editor(with_preset(&mine()), "mine");
+    named::<gtk::ToggleButton>(&editor.page, "preview").set_active(true);
+    editor.page.activate_action("editor.delete", None).expect("the action exists");
+    assert_eq!(
+        *editor.log.borrow(),
+        vec![
+            Intent::StartPreview(id("mine")),
+            Intent::EndPreview,
+            Intent::DeletePreset(id("mine")),
+        ]
+    );
 }
 
 #[gtk::test]
@@ -3456,12 +3547,22 @@ Append to the `impl EqEditorPage` block of `crates/ui/src/eq_editor_page/header.
     }
 ```
 
+make `delete_preset` end the preview before it pops, so the order is `EndPreview`, then `DeletePreset`, whenever
+`hidden` fires:
+
+```rust
+        let title = deleted_toast(&snapshot, &preset);
+        services.urgent_undo_toast(&title, move || sink.emit(Intent::SavePreset(preset.clone())));
+        self.end_preview();
+        self.activate_action("navigation.pop", None).ok();
+        services.sink.emit(Intent::DeletePreset(id));
+```
+
 and make `duplicate_preset` end the preview before it saves the copy:
 
 ```rust
         let copy = duplicate(&snapshot, &source, &resolve(&copy_name(&source)));
         self.end_preview();
-        imp.opened.replace(Some(copy.clone()));
         self.save(copy);
 ```
 
@@ -3500,9 +3601,9 @@ In `crates/ui/src/eq_editor_page.rs`:
 
 Run (ui): `cargo test -p arctis-ui`
 Expected: PASS, the whole widgets binary. `AdwNavigationView::pop` on an unmapped window skips its animation and
-emits `hidden` at once; if this libadwaita build delivers it on a later main-loop turn instead, drain the loop in
-`closing_the_editor_ends_its_preview` and `delete_closes_the_editor_and_names_the_uses_with_undo` with
-`while gtk::glib::MainContext::default().iteration(false) {}` before their assertions.
+emits `hidden` at once; if this libadwaita build delivers it on a later main-loop turn instead, call
+`support::drain()` (Task 8) in `closing_the_editor_ends_its_preview` and
+`delete_closes_the_editor_and_names_the_uses_with_undo` before their assertions.
 
 - [ ] **Step 5: Commit**
 
@@ -3603,10 +3704,26 @@ fn the_editor_never_scrolls_horizontally() {
 }
 ```
 
-- [ ] **Step 2: Run the tests**
+- [ ] **Step 2: See each guard fail, then pass**
+
+The pages already exist, so make each test red once on purpose (Deviation 25), without committing the breakage:
+
+1. Delete the `accessibility { label: _("Add Band"); }` block of `add_band` in
+   `crates/ui/resources/eq_editor_page.blp`. Run (ui): `cargo test -p arctis-ui every_control_of_the_editor_has_a_name`.
+   Expected: FAIL naming the `add-band` button. Restore the block.
+2. Change `width-request: 360;` of the `Adw.BreakpointBin` in the same file to `width-request: 400;`. Run (ui):
+   `cargo test -p arctis-ui the_preset_pages_fit_the_narrowest_window`. Expected: FAIL with a width above 360.
+   Restore it.
+3. Change `hscrollbar-policy: never;` of the editor's `ScrolledWindow` to `hscrollbar-policy: automatic;`. Run (ui):
+   `cargo test -p arctis-ui the_editor_never_scrolls_horizontally`. Expected: FAIL. Restore it.
+4. In `ResponseGraph::render` (`crates/ui/src/response_graph.rs`) replace `resolve(&model.description)` with
+   `String::new()`. Run (ui): `cargo test -p arctis-ui the_response_graph_has_a_description`.
+   Expected: FAIL. Restore it.
+
+`git diff --exit-code crates/ui/resources crates/ui/src` must be clean afterwards.
 
 Run (ui): `cargo test -p arctis-ui accessibility layout`
-Expected: PASS. A failure names the widget type and name: give an icon-only button an
+Expected: PASS. A later failure names the widget type and name: give an icon-only button an
 `accessibility { label: … }` block in its template, or lower a `width-request` above 360.
 
 - [ ] **Step 3: Commit**
