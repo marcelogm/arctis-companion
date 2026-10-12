@@ -14,3 +14,11 @@ pub fn factory_curve(milli_q: u16) -> Curve {
     let filters = FACTORY_BANDS.iter().map(|&hz| peaking(hz, 0, milli_q));
     Curve::new(filters.collect()).expect("ten filters")
 }
+
+pub fn assert_close(actual: f64, expected: f64, tolerance: f64, case: &str) {
+    let error = (actual - expected).abs();
+    assert!(
+        error <= tolerance,
+        "{case}: got {actual}, expected {expected} ± {tolerance}"
+    );
+}

@@ -1,3 +1,4 @@
+pub mod biquad;
 pub mod curve;
 pub mod filter;
 pub mod library;
