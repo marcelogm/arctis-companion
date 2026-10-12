@@ -70,10 +70,7 @@ fn a_fresh_schema_loads_the_defaults() {
     assert_eq!(GSettingsStore::new(settings).load(), defaults());
 }
 
-#[test]
-fn stored_values_load_into_app_settings() {
-    let dir = compiled_dir();
-    let (settings, _) = memory_pair(dir.path());
+fn store_maximums(settings: &gtk::gio::Settings) {
     settings.set_int("mic-volume", 15).expect("mic-volume");
     settings.set_int("sidetone", 10).expect("sidetone");
     settings.set_enum("mute-light", 10).expect("mute-light");
@@ -92,12 +89,23 @@ fn stored_values_load_into_app_settings() {
     settings
         .set_int("low-battery-threshold", 50)
         .expect("threshold");
+}
+
+fn assert_maximum_headset(headset: HeadsetValues) {
+    assert_eq!(headset.mic_volume.get(), 15);
+    assert_eq!(headset.sidetone.get(), 10);
+    assert_eq!(headset.mute_light, MuteLight::High);
+    assert_eq!(headset.wireless_mode, WirelessMode::ExtendedRange);
+    assert_eq!(headset.auto_power_off.minutes(), 90);
+}
+
+#[test]
+fn stored_values_load_into_app_settings() {
+    let dir = compiled_dir();
+    let (settings, _) = memory_pair(dir.path());
+    store_maximums(&settings);
     let loaded = GSettingsStore::new(settings).load();
-    assert_eq!(loaded.headset.mic_volume.get(), 15);
-    assert_eq!(loaded.headset.sidetone.get(), 10);
-    assert_eq!(loaded.headset.mute_light, MuteLight::High);
-    assert_eq!(loaded.headset.wireless_mode, WirelessMode::ExtendedRange);
-    assert_eq!(loaded.headset.auto_power_off.minutes(), 90);
+    assert_maximum_headset(loaded.headset);
     assert_eq!(loaded.route_presets.bluetooth, PresetId::new("podcast"));
     assert_eq!(
         loaded.adopted_identity,
