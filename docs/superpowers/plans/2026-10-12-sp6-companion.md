@@ -2518,7 +2518,7 @@ git push
 - Modify: `crates/core/src/lib.rs`, `crates/core/src/testkit/mod.rs`
 - Test: `crates/core/tests/ports/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `crates/core/tests/ports/main.rs`:
 
@@ -2560,12 +2560,12 @@ fn a_store_error_shows_its_message() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test ports`
 Expected: FAIL to compile (`arctis_core::ports` missing).
 
-- [ ] **Step 3: Implement the ports**
+- [x] **Step 3: Implement the ports**
 
 `crates/core/src/ports.rs`:
 
@@ -2608,7 +2608,7 @@ pub trait SeenAppsRepository {
 
 Add `pub mod ports;` to `crates/core/src/lib.rs` (after `pub mod messages;`).
 
-- [ ] **Step 4: Implement the memory adapters**
+- [x] **Step 4: Implement the memory adapters**
 
 `crates/core/src/testkit/memory_repositories.rs`:
 
@@ -2678,7 +2678,7 @@ impl SeenAppsRepository for MemorySeenApps {
 }
 ```
 
-- [ ] **Step 5: Implement the contract suite**
+- [x] **Step 5: Implement the contract suite**
 
 `crates/core/src/testkit/repository_contracts.rs`:
 
@@ -2828,12 +2828,12 @@ pub mod repository_contracts;
 
 (Keep SP4's `testkit` modules if they are already there.)
 
-- [ ] **Step 6: Run the tests to see them pass**
+- [x] **Step 6: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test ports`
 Expected: PASS, 5 tests. SP8 runs the same three contracts on its file stores, with a `reopen` that builds a new store over the same directory.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add crates/core/src crates/core/tests/ports
