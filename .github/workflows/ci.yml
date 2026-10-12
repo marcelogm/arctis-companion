@@ -102,6 +102,15 @@ jobs:
           name: shell-extension
           path: extension/dist/arctis-companion@marcelogm.github.io.shell-extension.zip
 
+  i18n:
+    needs: rules
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False gettext appstream findutils diffutils
+      - uses: actions/checkout@v4
+      - run: sh po/check.sh
+
   audio-integration:
     needs: test
     runs-on: ubuntu-latest
