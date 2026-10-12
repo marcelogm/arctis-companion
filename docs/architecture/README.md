@@ -8,6 +8,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [rules.md](rules.md) | engineering rules and how `xtask/` enforces them |
 | [eq.md](eq.md) | equalizer core: envelope, curves, presets, APO, response, real-time filter |
 | [protocol.md](protocol.md) | protocol codec, headset settings, thread messages |
+| [shell-extension.md](shell-extension.md) | GNOME Shell Quick Settings extension and its tests |
 
 ## Workspace
 
@@ -84,9 +85,9 @@ flowchart LR
     PR["pull_request, push to main"] --> R["rules: fmt, check-rules, check-doc-paths,<br/>check-pure, check-commits"]
     R --> T["test: clippy -D warnings, cargo test,<br/>llvm-cov 90 % on core"]
     R --> G["ui: weston headless, cargo test -p arctis-ui"]
-    R --> X["extension: eslint"]
+    R --> X["extension: eslint, gjs tests,<br/>catalogue check, pack"]
     T --> F["flatpak: flatpak-builder"]
-    N["nightly"] --> M["cargo mutants, proptest x10"]
+    N["nightly"] --> M["cargo mutants, proptest x10,<br/>optional shell smoke"]
 ```
 
 Workflows: `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`. Branch ruleset: `.github/rulesets/main.json`
