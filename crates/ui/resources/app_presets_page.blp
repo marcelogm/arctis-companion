@@ -1,0 +1,60 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisAppPresetsPage: Adw.NavigationPage {
+  tag: "app-presets";
+  title: _("App Presets");
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      [end]
+      Button add_rule {
+        name: "add-rule";
+        icon-name: "list-add-symbolic";
+        tooltip-text: _("Add Rule");
+        action-name: "app-presets.add-rule";
+        visible: false;
+
+        accessibility {
+          label: _("Add Rule");
+        }
+      }
+    }
+
+    content: Stack content_stack {
+      name: "app-presets-stack";
+
+      StackPage {
+        name: "empty";
+
+        child: $ArctisStatusView empty_view {};
+      }
+
+      StackPage {
+        name: "rules";
+
+        child: Adw.PreferencesPage rules_page {
+          Adw.PreferencesGroup automatic_off_group {
+            name: "automatic-off-group";
+            visible: false;
+
+            Adw.ActionRow automatic_off {
+              name: "automatic-off";
+              use-markup: false;
+
+              [prefix]
+              Image {
+                icon-name: "dialog-warning-symbolic";
+              }
+            }
+          }
+
+          Adw.PreferencesGroup rules_group {
+            name: "rules-group";
+          }
+        };
+      }
+    };
+  };
+}
