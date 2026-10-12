@@ -14,7 +14,7 @@ use arctis_core::view::headset_page::{
 
 use crate::support::{percent, snapshot, with};
 
-const PHASES: [Phase; 8] = [
+pub(crate) const PHASES: [Phase; 8] = [
     Phase::Absent,
     Phase::PermissionDenied,
     Phase::Settling,
@@ -24,7 +24,7 @@ const PHASES: [Phase; 8] = [
     Phase::Ready,
     Phase::Rebinding,
 ];
-const ROUTES: [Route; 3] = [Route::Dongle, Route::Bluetooth, Route::None];
+pub(crate) const ROUTES: [Route; 3] = [Route::Dongle, Route::Bluetooth, Route::None];
 
 #[derive(Debug, PartialEq, Eq)]
 enum Page {
