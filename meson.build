@@ -6,11 +6,14 @@ project(
 )
 
 gnome = import('gnome')
+i18n = import('i18n')
+gettext_package = meson.project_name()
 
 app_id = 'io.github.marcelogm.ArctisCompanion'
 bindir = get_option('prefix') / get_option('bindir')
 datadir = get_option('prefix') / get_option('datadir')
 
+subdir('po')
 subdir('data')
 
 cargo = find_program('cargo')

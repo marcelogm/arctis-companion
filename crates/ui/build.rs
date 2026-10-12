@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-const METAINFO: &str = "../../data/io.github.marcelogm.ArctisCompanion.metainfo.xml";
+const METAINFO: &str = "../../data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed=resources");

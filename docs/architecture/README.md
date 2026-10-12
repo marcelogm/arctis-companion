@@ -80,8 +80,8 @@ flowchart LR
 | Top-level meson | `meson.build` |
 | Data install and validation | `data/meson.build` |
 | D-Bus contract | `data/dbus/io.github.marcelogm.ArctisCompanion.Headset1.xml` |
-| Desktop entry | `data/io.github.marcelogm.ArctisCompanion.desktop` |
-| AppStream metadata | `data/io.github.marcelogm.ArctisCompanion.metainfo.xml` |
+| Desktop entry | `data/io.github.marcelogm.ArctisCompanion.desktop.in` |
+| AppStream metadata | `data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in` |
 | Settings schema | `data/io.github.marcelogm.ArctisCompanion.gschema.xml` |
 | D-Bus activation | `data/io.github.marcelogm.ArctisCompanion.service.in` |
 
