@@ -3,6 +3,7 @@
 mod add_rule_dialog;
 pub mod app_dialogs;
 pub mod app_icons;
+mod app_presets_page;
 mod app_rule_row;
 mod equalizer_group;
 mod headset_page;
@@ -19,6 +20,7 @@ pub mod widget_values;
 mod window;
 
 pub use add_rule_dialog::AddRuleDialog;
+pub use app_presets_page::AppPresetsPage;
 pub use app_rule_row::AppRuleRow;
 pub use equalizer_group::EqualizerGroup;
 pub use headset_page::HeadsetPage;

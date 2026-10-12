@@ -12,6 +12,7 @@
     <file preprocess="xml-stripblanks">shortcuts_dialog.ui</file>
     <file preprocess="xml-stripblanks">app_rule_row.ui</file>
     <file preprocess="xml-stripblanks">add_rule_dialog.ui</file>
+    <file preprocess="xml-stripblanks">app_presets_page.ui</file>
     <file alias="metainfo.xml">io.github.marcelogm.ArctisCompanion.metainfo.xml</file>
   </gresource>
 </gresources>

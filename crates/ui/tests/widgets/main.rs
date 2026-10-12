@@ -4,6 +4,7 @@ mod accessibility;
 mod add_rule_dialog;
 mod app_dialogs;
 mod app_icons;
+mod app_presets_page;
 mod app_rule_row;
 mod equalizer_group;
 mod headset_page;
