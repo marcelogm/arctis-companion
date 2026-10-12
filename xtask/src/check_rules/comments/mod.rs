@@ -46,7 +46,8 @@ fn by_extension(extension: &str) -> Option<Syntax> {
     match extension {
         "rs" => Some(Syntax::Rust),
         "js" | "mjs" | "blp" | "css" => Some(Syntax::CLike),
-        "toml" | "yml" | "yaml" | "sh" | "desktop" | "service" | "rules" => Some(Syntax::Hash),
+        "toml" | "lock" | "yml" | "yaml" | "sh" | "desktop" | "service" | "rules" | "po"
+        | "pot" => Some(Syntax::Hash),
         "xml" => Some(Syntax::Xml),
         _ => None,
     }
