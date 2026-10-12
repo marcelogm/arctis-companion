@@ -137,17 +137,17 @@ the evidence.
 | 13 | SP13 | devkit visual table | Checklist | row E1–E8 |
 | 14 | SP13 | 100 % pt_BR review of the extension | Fix | Task 12 |
 | 15 | SP13 | extension zip as a release asset | Fix | Task 10 |
-| 16 | SP13 | upload the nightly shell-smoke log | Issue | optional; Task 16 issue C |
+| 16 | SP13 | upload the nightly shell-smoke log | Issue | optional; #17 |
 | 17 | SP10 | publish a snapshot synchronously after Save/Delete | Fix (pin) | `crates/core/src/companion/reducer.rs` already publishes at the end of every `handle`; Task 15 pins it with tests |
 | 18 | SP10 | import/export a preset file by hand | Checklist | row U3 |
 | 19 | SP10 | Rename and Details dialogs not presented in tests | Checklist | row U4 |
-| 20 | SP10 | two Duplicates in one main-loop turn share an id | Issue | Task 16 issue D |
-| 21 | SP10 | Gtk-CRITICAL `gtk_widget_get_parent` lines in the a11y test | Issue | Task 16 issue E |
+| 20 | SP10 | two Duplicates in one main-loop turn share an id | Issue | #18 |
+| 21 | SP10 | Gtk-CRITICAL `gtk_widget_get_parent` lines in the a11y test | Issue | #19 |
 | 22 | SP11 | `RulePreset::{Known, Missing}` if `RuleRowModel` changes | None | conditional on a future change |
 | 23 | SP11 | create the `po/` catalogue | Fix | Tasks 4–6, 11 |
 | 24 | SP11 | trivial rebases | None | merged |
 | 25 | SP11 | local branch deleted by hand | None | informational |
-| 26 | SP12 | fold SP10 test helpers into shared support | Issue | Task 16 issue F |
+| 26 | SP12 | fold SP10 test helpers into shared support | Issue | #20 |
 | 27 | SP12 | notification default action `app.show-battery` → battery page | None | `crates/app/src/application.rs` `show-battery` → `crates/app/src/runtime.rs::Runtime::show_battery` |
 | 28 | SP12 | extract a page-clock helper if more timed pages appear | None | conditional |
 | 29 | SP0 | §7 items 1–5 (persistence, events, echoes, readback, `35`) | Checklist | rows H1–H5 |
@@ -167,28 +167,28 @@ the evidence.
 | 43 | SP4 | check the first full nightly `cargo mutants` | Fix (verify) | Task 16 dispatches `nightly.yml`; survivors become issue G |
 | 44 | SP5 | sidetone write + 30 min soak with the headset on | Checklist | row H14 |
 | 45 | SP5 | plug the dongle in with the rule; no permission dialog flash | Checklist | row F3 |
-| 46 | SP5 | `check-doc-paths` learns `macro_rules` names | Issue | Task 16 issue H |
-| 47 | SP5 | nothing catches a scenario missing from `scenario_tests!` | Issue | Task 16 issue I |
+| 46 | SP5 | `check-doc-paths` learns `macro_rules` names | Issue | #21 |
+| 47 | SP5 | nothing catches a scenario missing from `scenario_tests!` | Issue | #22 |
 | 48 | SP5 | manifest must grant `--device=all` | Fix | Tasks 7–8 |
 | 49 | SP6 | `snapshot.presets.active` | None | done |
 | 50 | SP6 | `Intent::RetryWrite` | None | done |
 | 51 | SP6 | withdraw of a gone notification is a no-op | None | `gio::Application::withdraw_notification` is a no-op for unknown ids |
 | 52 | SP6 | `Phase::is_present`/`is_connecting` | None | informational |
-| 53 | SP6 | banner 2 instead of 3 after a restart with the headset off (Deviation 36) | Issue | Task 16 issue J |
+| 53 | SP6 | banner 2 instead of 3 after a restart with the headset off (Deviation 36) | Issue | #23 |
 | 54 | SP6 | local coverage needs llvm-tools | None | CI enforces |
 | 55 | SP7 | transient `DefaultSink`; re-check insert/remove end to end | Checklist | row B2 (needs Bluetooth) |
 | 56 | SP7 | combined main CI after the rebase | None | push-to-main runs are green (`gh run list`) |
 | 57 | SP7 | ManagerDenied inside the Flatpak | Checklist | row B3 |
 | 58 | SP7 | owned pw timer source | None | waits on upstream |
 | 59 | SP8 | `auto-power-off` is an enum | None | the extension reads no GSettings (grep of `extension/`) |
-| 60 | SP8 | shared `testkit::companion` helpers in `crates/core/tests/companion/support.rs` | Issue | Task 16 issue K |
+| 60 | SP8 | shared `testkit::companion` helpers in `crates/core/tests/companion/support.rs` | Issue | #24 |
 | 61 | SP8 | end-to-end lists are exact | None | informational |
-| 62 | SP8 | two outstanding Background portal requests | Issue | Task 16 issue L |
+| 62 | SP8 | two outstanding Background portal requests | Issue | #25 |
 | 63 | SP8 | SP14 owns `setlocale`/`bindtextdomain`; D-Bus error strings English | Fix / None | Task 13; error strings travel on the wire and the extension only logs them (`lib/failures.js`) |
 | 64 | SP10 | header buttons are icon-only; re-measure 360 px if labels are added | None | conditional on a future label |
 | 65 | SP5 + SP14 §5 | 300 ms readback has no measurement in the soak output | Fix | Task 15A, then checklist row A1 |
 
-Issue A (offline Flatpak sources and Flathub metadata) comes from Deviation 1, not from the list.
+Issue A (#16, offline Flatpak sources and Flathub metadata) comes from Deviation 1, not from the list.
 
 ## Decisions (pt_BR)
 
@@ -220,7 +220,7 @@ extension:
 
 | # | Deviation | Why |
 |---|---|---|
-| 1 | The manifest keeps `build-args: --share=network` and no `cargo-sources.json`; the release ships a GitHub bundle, not a Flathub submission | the spec asks for a bundle on tag; offline vendoring needs `flatpak-cargo-generator` kept in step with `Cargo.lock` for every change. Issue A tracks it |
+| 1 | The manifest keeps `build-args: --share=network` and no `cargo-sources.json`; the release ships a GitHub bundle, not a Flathub submission | the spec asks for a bundle on tag; offline vendoring needs `flatpak-cargo-generator` kept in step with `Cargo.lock` for every change. Issue A (#16) tracks it |
 | 2 | No root `README.md`; install steps live in `docs/architecture/packaging.md`, the metainfo and the permission dialog | the engineering rules allow only diagram-rich `docs/architecture/*.md` |
 | 3 | New root module `crates/core/src/l10n.rs` (`msgid`, `forms`), not in the spec's module tree | `xgettext --language=Rust` matches only bare calls; `Text::plain("…")` is invisible to it (checked with gettext 0.26). A `const fn` identity marker is the Rust `N_()` |
 | 4 | `Text::plural` callers pass `forms(singular, plural)` instead of an array literal | `--keyword=forms:1,2` extracts both forms |
