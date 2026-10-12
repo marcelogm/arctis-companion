@@ -2,6 +2,7 @@ use super::text::{Text, preset_arg, preset_title, saturating_count};
 use crate::companion::per_path::PATHS;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::preset::{Preset, PresetId, PresetKind};
+use crate::l10n::{forms, msgid};
 use crate::messages::audio::SoundPath;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -38,7 +39,7 @@ pub fn presets_page(snapshot: &Snapshot) -> PresetsPageModel {
     PresetsPageModel {
         custom_description: custom
             .is_empty()
-            .then(|| Text::plain("Duplicate or import a preset to customize it")),
+            .then(|| Text::plain(msgid("Duplicate or import a preset to customize it"))),
         built_in: built_in.into_iter().map(item).collect(),
         custom: custom.into_iter().map(item).collect(),
     }
@@ -74,31 +75,31 @@ pub fn deleted_toast(snapshot: &Snapshot, preset: &Preset) -> Text {
 
 const fn unruled_msgid(paths: &[SoundPath]) -> &'static str {
     match paths {
-        [] => "Deleted “{preset}”",
-        [SoundPath::Dongle] => "Deleted “{preset}”. Used by the 2.4 GHz preset",
-        [SoundPath::Bluetooth] => "Deleted “{preset}”. Used by the Bluetooth preset",
-        _ => "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets",
+        [] => msgid("Deleted “{preset}”"),
+        [SoundPath::Dongle] => msgid("Deleted “{preset}”. Used by the 2.4 GHz preset"),
+        [SoundPath::Bluetooth] => msgid("Deleted “{preset}”. Used by the Bluetooth preset"),
+        _ => msgid("Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets"),
     }
 }
 
 const fn ruled_msgids(paths: &[SoundPath]) -> [&'static str; 2] {
     match paths {
-        [] => [
+        [] => forms(
             "Deleted “{preset}”. Used by {n} app rule",
             "Deleted “{preset}”. Used by {n} app rules",
-        ],
-        [SoundPath::Dongle] => [
+        ),
+        [SoundPath::Dongle] => forms(
             "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rule",
             "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rules",
-        ],
-        [SoundPath::Bluetooth] => [
+        ),
+        [SoundPath::Bluetooth] => forms(
             "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rule",
             "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rules",
-        ],
-        _ => [
+        ),
+        _ => forms(
             "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app rule",
             "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app rules",
-        ],
+        ),
     }
 }
 

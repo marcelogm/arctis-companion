@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use arctis_core::l10n::msgid;
 use arctis_core::view::text::Text;
 use gtk::prelude::*;
 use gtk::{gio, glib};
@@ -33,13 +34,13 @@ pub struct PortalFiles;
 
 impl PresetFiles for PortalFiles {
     fn open(&self, parent: &gtk::Widget, done: Picked) {
-        let dialog = preset_dialog(&Text::plain("Import Preset"));
+        let dialog = preset_dialog(&Text::plain(msgid("Import Preset")));
         let window = parent.root().and_downcast::<gtk::Window>();
         glib::spawn_future_local(deliver(dialog, window, done));
     }
 
     fn save(&self, parent: &gtk::Widget, export: Export) {
-        let dialog = preset_dialog(&Text::plain("Export Preset"));
+        let dialog = preset_dialog(&Text::plain(msgid("Export Preset")));
         dialog.set_initial_name(Some(&export.suggested_name));
         let window = parent.root().and_downcast::<gtk::Window>();
         glib::spawn_future_local(async move {
@@ -55,7 +56,7 @@ pub fn portal_files() -> Rc<dyn PresetFiles> {
 
 fn preset_dialog(title: &Text) -> gtk::FileDialog {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&resolve(&Text::plain("Presets"))));
+    filter.set_name(Some(&resolve(&Text::plain(msgid("Presets")))));
     for pattern in PATTERNS {
         filter.add_pattern(pattern);
     }

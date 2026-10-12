@@ -4,6 +4,7 @@ use crate::eq::curve::MAX_FILTERS;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
 use crate::eq::preset::{Preset, PresetId, PresetKind};
 use crate::eq::response::response;
+use crate::l10n::{forms, msgid};
 
 pub const GRAPH_POINTS: u16 = 96;
 const GRAPH_LOW_HZ: f32 = 20.0;
@@ -104,12 +105,12 @@ pub fn band_title(filter: Filter) -> Text {
     let frequency = ("frequency", Arg::Hertz(filter.hz()));
     if filter.kind().has_gain() {
         return Text::format(
-            "{frequency} · {gain}",
+            msgid("{frequency} · {gain}"),
             vec![frequency, ("gain", Arg::Decibels(filter.gain()))],
         );
     }
     Text::format(
-        "{frequency} · {kind}",
+        msgid("{frequency} · {kind}"),
         vec![
             frequency,
             ("kind", Arg::Msgid(kind_name(filter.kind()).to_owned())),
@@ -120,11 +121,11 @@ pub fn band_title(filter: Filter) -> Text {
 #[must_use]
 pub const fn kind_name(kind: FilterKind) -> &'static str {
     match kind {
-        FilterKind::Peaking => "Peak",
-        FilterKind::LowShelf => "Low Shelf",
-        FilterKind::HighShelf => "High Shelf",
-        FilterKind::LowPass => "Low-Pass",
-        FilterKind::HighPass => "High-Pass",
+        FilterKind::Peaking => msgid("Peak"),
+        FilterKind::LowShelf => msgid("Low Shelf"),
+        FilterKind::HighShelf => msgid("High Shelf"),
+        FilterKind::LowPass => msgid("Low-Pass"),
+        FilterKind::HighPass => msgid("High-Pass"),
     }
 }
 
@@ -173,10 +174,10 @@ fn graph(preset: &Preset) -> GraphModel {
             .map(|(hz, db)| GraphPoint { hz, db })
             .collect(),
         description: Text::plural(
-            [
+            forms(
                 "Nominal frequency response of {preset}, with {n} active band",
                 "Nominal frequency response of {preset}, with {n} active bands",
-            ],
+            ),
             saturating_count(active),
             vec![("preset", preset_arg(preset))],
         ),

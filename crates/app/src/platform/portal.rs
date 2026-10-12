@@ -1,3 +1,4 @@
+use arctis_core::l10n::msgid;
 use arctis_core::view::text::Text;
 use arctis_ui::text::resolve;
 use ashpd::desktop::background::{Background, BackgroundProxy, SetStatusOptions};
@@ -9,7 +10,7 @@ use crate::logging::{LOG_DOMAIN, warn};
 const AUTOSTART: bool = true;
 const COMMAND: [&str; 2] = ["arctis-companion", "--gapplication-service"];
 const REASON: &str =
-    "Keep battery warnings, battery history and app presets working with the window closed";
+    msgid("Keep battery warnings, battery history and app presets working with the window closed");
 
 pub struct AshpdPortal;
 

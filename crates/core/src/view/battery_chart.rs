@@ -3,6 +3,7 @@ use super::text::{Arg, Text};
 use crate::battery::sample::UnixSeconds;
 use crate::battery::series::{Point, Series, Span, Window, last_full_charge, series};
 use crate::companion::snapshot::Snapshot;
+use crate::l10n::msgid;
 use crate::settings::values::Percent;
 
 const FULL: f64 = 100.0;
@@ -54,15 +55,15 @@ pub fn battery_page(snapshot: &Snapshot, window: Window, now: UnixSeconds) -> Ba
     BatteryPageModel {
         content,
         last_full_charge: last_full_charge(&battery.history).map_or_else(
-            || Text::plain("Never"),
-            |at| Text::format("{time}", vec![("time", Arg::Time(at))]),
+            || Text::plain(msgid("Never")),
+            |at| Text::format(msgid("{time}"), vec![("time", Arg::Time(at))]),
         ),
         current_level: battery
             .reading
             .filter(|reading| reading.is_connected())
             .map(|reading| {
                 Text::format(
-                    "{percent}",
+                    msgid("{percent}"),
                     vec![("percent", Arg::Percent(reading.percent))],
                 )
             }),
@@ -118,14 +119,14 @@ fn chart_description(series: &Series, window: Window) -> Text {
     let low = levels.clone().min_by_key(|level| level.get());
     let high = levels.max_by_key(|level| level.get());
     match (low.zip(high), window) {
-        (None, Window::Day) => Text::plain("No battery readings in the last day"),
-        (None, Window::Week) => Text::plain("No battery readings in the last week"),
+        (None, Window::Day) => Text::plain(msgid("No battery readings in the last day")),
+        (None, Window::Week) => Text::plain(msgid("No battery readings in the last week")),
         (Some(range), Window::Day) => range_text(
-            "Battery level over the last day, between {low} and {high}",
+            msgid("Battery level over the last day, between {low} and {high}"),
             range,
         ),
         (Some(range), Window::Week) => range_text(
-            "Battery level over the last week, between {low} and {high}",
+            msgid("Battery level over the last week, between {low} and {high}"),
             range,
         ),
     }
@@ -141,8 +142,8 @@ fn range_text(msgid: &str, (low, high): (Percent, Percent)) -> Text {
 fn no_history() -> StatusPageModel {
     StatusPageModel::new(
         "battery-symbolic",
-        "No Battery History Yet",
-        "History appears after the headset has been connected for a while",
+        msgid("No Battery History Yet"),
+        msgid("History appears after the headset has been connected for a while"),
         None,
     )
 }

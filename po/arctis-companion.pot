@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 14:29-0300\n"
+"POT-Creation-Date: 2026-10-12 14:32-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -16,10 +16,553 @@ msgstr ""
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
 "Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=INTEGER; plural=EXPRESSION;\n"
 
-#: crates/ui/resources/add_rule_dialog.blp
+#: crates/app/src/platform/background.rs
+#, rust-format
+msgid "Headset connected, {percent}"
+msgstr ""
+
+#: crates/app/src/platform/background.rs
+msgid "No headset"
+msgstr ""
+
+#: crates/app/src/platform/portal.rs
+msgid ""
+"Keep battery warnings, battery history and app presets working with the "
+"window closed"
+msgstr ""
+
+#: crates/core/src/companion/alerts.rs
+msgid "Headset Battery Critical"
+msgstr ""
+
+#: crates/core/src/companion/alerts.rs
+msgid "Headset Battery Low"
+msgstr ""
+
+#: crates/core/src/companion/alerts.rs
+#, rust-format
+msgid "{percent} remaining"
+msgstr ""
+
+#: crates/core/src/companion/alerts.rs
+#, rust-format
+msgid "{percent} remaining. Charge the headset soon."
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Bass Boost"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Bass Reduction"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Flat"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Footsteps"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Late Night"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Movie Night"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Podcast"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Treble Soften"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "V-Shape"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
+msgid "Vocal Clarity"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs crates/ui/resources/add_rule_dialog.blp
 #: crates/ui/resources/app_presets_page.blp
 msgid "Add Rule"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid "Automatic App Presets is off"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid "Choose a preset that applies while an app plays sound"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid "Flatpak app id, application id or binary name"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid "No App Presets"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid ""
+"On the 2.4 GHz connection the headset keeps an app's preset if this computer "
+"stops unexpectedly"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid "Other App…"
+msgstr ""
+
+#: crates/core/src/view/app_presets.rs
+msgid "Preset missing"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+#, rust-format
+msgid "Battery level over the last day, between {low} and {high}"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+#, rust-format
+msgid "Battery level over the last week, between {low} and {high}"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+msgid "History appears after the headset has been connected for a while"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs crates/core/src/view/headset_rows.rs
+msgid "Never"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+msgid "No Battery History Yet"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+msgid "No battery readings in the last day"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+msgid "No battery readings in the last week"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs crates/core/src/view/headset_page.rs
+#, rust-format
+msgid "{percent}"
+msgstr ""
+
+#: crates/core/src/view/battery_chart.rs
+#, rust-format
+msgid "{time}"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+msgid "High Shelf"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+msgid "High-Pass"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+msgid "Low Shelf"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+msgid "Low-Pass"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+#, rust-format
+msgid "Nominal frequency response of {preset}, with {n} active band"
+msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/eq_editor.rs
+msgid "Peak"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+#, rust-format
+msgid "{frequency} · {gain}"
+msgstr ""
+
+#: crates/core/src/view/eq_editor.rs
+#, rust-format
+msgid "{frequency} · {kind}"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+#: crates/ui/resources/equalizer_group.blp
+msgid "2.4 GHz Preset"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+msgid "App presets unavailable: audio service not reachable"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+msgid "Applies when this computer plays to the headset over Bluetooth"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+#: crates/ui/resources/equalizer_group.blp
+msgid "Bluetooth from This Computer"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+msgid "Choose “Arctis Nova 5 (Equalizer)” as output in Sound settings"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+msgid "EasyEffects is processing audio; the system equalizer is off"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+msgid "Use Route Preset"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+#, rust-format
+msgid "{preset}, chosen by hand"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+#, rust-format
+msgid "{preset}, chosen for {app}"
+msgstr ""
+
+#: crates/core/src/view/equalizer_rows.rs
+#, rust-format
+msgid "{preset}, until {app} stops"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+#, rust-format
+msgid "Battery level unknown. {route}"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+#, rust-format
+msgid "Battery {percent}. {route}"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Charged"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Charging"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Connect the wireless dongle or pair the headset over Bluetooth"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Connect the wireless dongle to change headset settings"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Connecting…"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change Automatic Power Off"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change Extended Range"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change Microphone Volume"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change Mute Light Brightness"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change Sidetone"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change Volume Limiter"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Could Not Change the Headset Equalizer"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Discharging"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Headset is off. Changes apply when it turns on."
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "No Headset Connected"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Not this computer's sound output"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+#: crates/ui/resources/permission_dialog.blp
+msgid "Permission Required"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Permission is needed to use the wireless dongle"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Reconnecting…"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Show Instructions"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Sound from this computer over 2.4 GHz"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Sound from this computer over Bluetooth"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "The wireless dongle needs a udev rule before the app can use it"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+msgid "Turn on the headset to read its settings"
+msgstr ""
+
+#: crates/core/src/view/headset_page.rs
+#, rust-format
+msgid "{percent} · {state}"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Automatic Power Off"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Extended Range"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "High"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Increases range, lowers microphone quality"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Low"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Medium"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Mute Light Brightness"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Not applied"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Off"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+#, rust-format
+msgid "Receiver {receiver}, headset {headset}"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Sidetone"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Unknown"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Untested model"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Volume"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+msgid "Volume Limiter"
+msgstr ""
+
+#: crates/core/src/view/headset_rows.rs
+#, rust-format
+msgid "{n} minute"
+msgid_plural "{n} minutes"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/headset_rows.rs
+#, rust-format
+msgid "{value} of {max}"
+msgstr ""
+
+#: crates/core/src/view/preferences.rs
+msgid "Allow it in Settings → Apps → Arctis Companion"
+msgstr ""
+
+#: crates/core/src/view/preset_edits.rs
+#, rust-format
+msgid "Saved “{preset}”"
+msgstr ""
+
+#: crates/core/src/view/preset_edits.rs
+#, rust-format
+msgid "{preset} (Copy)"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "Could not export “{preset}”"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "Could not read line {line} of “{file}”"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "Filter {filter}: {field}"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+msgid "Frequency"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+msgid "Gain"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "Imported “{preset}”"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "Imported “{preset}”. {n} value was changed to fit the headset"
+msgid_plural "Imported “{preset}”. {n} values were changed to fit the headset"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "Line {line} of “{file}” uses a filter type the headset does not support"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs crates/ui/resources/eq_band_row.blp
+msgid "Q"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "“{file}” has no filters"
+msgstr ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "“{file}” has {n} filter; the headset takes at most {max}"
+msgid_plural "“{file}” has {n} filters; the headset takes at most {max}"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/preset_files.rs
+#, rust-format
+msgid "“{file}” is not a preset file"
+msgstr ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”"
+msgstr ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets"
+msgstr ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid ""
+"Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app "
+"rule"
+msgid_plural ""
+"Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app "
+"rules"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”. Used by the 2.4 GHz preset"
+msgstr ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rule"
+msgid_plural "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rules"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”. Used by the Bluetooth preset"
+msgstr ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rule"
+msgid_plural ""
+"Deleted “{preset}”. Used by the Bluetooth preset and {n} app rules"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/presets.rs
+#, rust-format
+msgid "Deleted “{preset}”. Used by {n} app rule"
+msgid_plural "Deleted “{preset}”. Used by {n} app rules"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/presets.rs
+msgid "Duplicate or import a preset to customize it"
 msgstr ""
 
 #: crates/ui/resources/add_rule_dialog.blp
@@ -81,10 +624,6 @@ msgid "Gain (dB)"
 msgstr ""
 
 #: crates/ui/resources/eq_band_row.blp
-msgid "Q"
-msgstr ""
-
-#: crates/ui/resources/eq_band_row.blp
 msgid "Remove Band"
 msgstr ""
 
@@ -133,15 +672,7 @@ msgid "_Rename…"
 msgstr ""
 
 #: crates/ui/resources/equalizer_group.blp
-msgid "2.4 GHz Preset"
-msgstr ""
-
-#: crates/ui/resources/equalizer_group.blp
 msgid "Automatic App Presets"
-msgstr ""
-
-#: crates/ui/resources/equalizer_group.blp
-msgid "Bluetooth from This Computer"
 msgstr ""
 
 #: crates/ui/resources/equalizer_group.blp
@@ -153,6 +684,7 @@ msgid "Now Playing"
 msgstr ""
 
 #: crates/ui/resources/equalizer_group.blp crates/ui/resources/presets_page.blp
+#: crates/ui/src/preset_files.rs
 msgid "Presets"
 msgstr ""
 
@@ -190,10 +722,6 @@ msgstr ""
 
 #: crates/ui/resources/permission_dialog.blp
 msgid "Copy Rule"
-msgstr ""
-
-#: crates/ui/resources/permission_dialog.blp
-msgid "Permission Required"
 msgstr ""
 
 #: crates/ui/resources/permission_dialog.blp
@@ -264,6 +792,50 @@ msgstr ""
 
 #: crates/ui/resources/window.blp
 msgid "_Preferences"
+msgstr ""
+
+#: crates/ui/src/eq_editor_page/header.rs
+msgid "Name"
+msgstr ""
+
+#: crates/ui/src/eq_editor_page/header.rs
+msgid "Rename Preset"
+msgstr ""
+
+#: crates/ui/src/eq_editor_page/header.rs
+msgid "_Cancel"
+msgstr ""
+
+#: crates/ui/src/eq_editor_page/header.rs
+msgid "_Rename"
+msgstr ""
+
+#: crates/ui/src/preset_files.rs
+msgid "Export Preset"
+msgstr ""
+
+#: crates/ui/src/preset_files.rs
+msgid "Import Preset"
+msgstr ""
+
+#: crates/ui/src/services.rs
+msgid "Changed to Fit the Headset"
+msgstr ""
+
+#: crates/ui/src/services.rs
+msgid "Details"
+msgstr ""
+
+#: crates/ui/src/services.rs
+msgid "Undo"
+msgstr ""
+
+#: crates/ui/src/services.rs
+msgid "_Close"
+msgstr ""
+
+#: crates/ui/src/toasts.rs
+msgid "Retry"
 msgstr ""
 
 #: data/io.github.marcelogm.ArctisCompanion.desktop.in

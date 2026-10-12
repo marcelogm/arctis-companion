@@ -3,6 +3,7 @@ use super::status_page::StatusPageModel;
 use super::text::Text;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::preset::PresetId;
+use crate::l10n::msgid;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct RuleRowModel {
@@ -54,11 +55,11 @@ pub fn app_presets(snapshot: &Snapshot) -> AppPresetsModel {
         AppPresetsContent::Rules(rows)
     };
     AppPresetsModel {
-        description: Text::plain(
+        description: Text::plain(msgid(
             "On the 2.4 GHz connection the headset keeps an app's preset if this computer stops unexpectedly",
-        ),
+        )),
         automatic_off: (!snapshot.presets.automatic)
-            .then(|| Text::plain("Automatic App Presets is off")),
+            .then(|| Text::plain(msgid("Automatic App Presets is off"))),
         presets: preset_items(snapshot),
         content,
     }
@@ -80,8 +81,8 @@ pub fn add_rule_dialog(snapshot: &Snapshot) -> AddRuleModel {
                 subtitle: Text::verbatim(&app.key),
             })
             .collect(),
-        other_title: Text::plain("Other App…"),
-        other_hint: Text::plain("Flatpak app id, application id or binary name"),
+        other_title: Text::plain(msgid("Other App…")),
+        other_hint: Text::plain(msgid("Flatpak app id, application id or binary name")),
     }
 }
 
@@ -99,7 +100,7 @@ fn rule_row(snapshot: &Snapshot, identifier: &str, preset: &PresetId) -> RuleRow
         subtitle: if known {
             Text::verbatim(identifier)
         } else {
-            Text::plain("Preset missing")
+            Text::plain(msgid("Preset missing"))
         },
         preset: known.then(|| preset.clone()),
     }
@@ -108,8 +109,8 @@ fn rule_row(snapshot: &Snapshot, identifier: &str, preset: &PresetId) -> RuleRow
 fn no_rules() -> StatusPageModel {
     StatusPageModel::new(
         "applications-multimedia-symbolic",
-        "No App Presets",
-        "Choose a preset that applies while an app plays sound",
-        Some("Add Rule"),
+        msgid("No App Presets"),
+        msgid("Choose a preset that applies while an app plays sound"),
+        Some(msgid("Add Rule")),
     )
 }

@@ -2,6 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
 use arctis_core::companion::Snapshot;
+use arctis_core::l10n::msgid;
 use arctis_core::view::preferences::Background;
 use arctis_core::view::text::{Arg, Text};
 use arctis_ui::text::resolve;
@@ -176,9 +177,9 @@ pub fn status_text(snapshot: &Snapshot) -> Text {
         .filter(|reading| reading.is_connected() && snapshot.dongle.is_present());
     match connected {
         Some(reading) => Text::format(
-            "Headset connected, {percent}",
+            msgid("Headset connected, {percent}"),
             vec![("percent", Arg::Percent(reading.percent))],
         ),
-        None => Text::plain("No headset"),
+        None => Text::plain(msgid("No headset")),
     }
 }
