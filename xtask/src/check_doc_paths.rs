@@ -7,18 +7,43 @@ use crate::rust_tokens::code_tokens;
 
 const DECLARATIONS: [&str; 4] = ["fn", "struct", "enum", "trait"];
 
+const CODE_LINE: &str = "- Code:";
+
+#[derive(Clone, Copy)]
+enum Scope {
+    Everything,
+    CodeLines,
+}
+
 pub fn run(root: &Path) -> Report {
     documents(root)
         .iter()
-        .map(|document| check_document(root, document))
+        .map(|(document, scope)| check_document(root, document, *scope))
         .fold(Report::default(), Report::merged)
 }
 
-fn documents(root: &Path) -> Vec<PathBuf> {
-    let mut documents = markdown_under(&root.join("docs/architecture"));
-    documents.push(root.join("CONTEXT.md"));
-    documents.retain(|document| document.is_file());
+fn documents(root: &Path) -> Vec<(PathBuf, Scope)> {
+    let mut documents: Vec<(PathBuf, Scope)> = markdown_under(&root.join("docs/architecture"))
+        .into_iter()
+        .map(|path| (path, Scope::Everything))
+        .collect();
+    documents.push((root.join("CONTEXT.md"), Scope::Everything));
+    documents.extend(adrs(root).into_iter().map(|path| (path, Scope::CodeLines)));
+    documents.retain(|(document, _)| document.is_file());
     documents
+}
+
+fn adrs(root: &Path) -> Vec<PathBuf> {
+    markdown_under(&root.join("docs/adr"))
+        .into_iter()
+        .filter(|path| is_numbered(path))
+        .collect()
+}
+
+fn is_numbered(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|name| name.to_str())
+        .is_some_and(|name| name.starts_with(|first: char| first.is_ascii_digit()))
 }
 
 fn markdown_under(dir: &Path) -> Vec<PathBuf> {
@@ -43,7 +68,7 @@ fn expand(path: PathBuf) -> Vec<PathBuf> {
     }
 }
 
-fn check_document(root: &Path, document: &Path) -> Report {
+fn check_document(root: &Path, document: &Path, scope: Scope) -> Report {
     let label = document
         .strip_prefix(root)
         .unwrap_or(document)
@@ -52,10 +77,24 @@ fn check_document(root: &Path, document: &Path) -> Report {
     let Ok(text) = fs::read_to_string(document) else {
         return Report::failed(format!("{label}: unreadable"));
     };
-    let problems = doc_refs(&text).into_iter().filter_map(|doc_ref| {
-        problem(root, &doc_ref).map(|problem| format!("{label}:{}: {problem}", doc_ref.line))
-    });
+    let lines: Vec<&str> = text.lines().collect();
+    let problems = doc_refs(&text)
+        .into_iter()
+        .filter(|doc_ref| in_scope(scope, &lines, doc_ref.line))
+        .filter_map(|doc_ref| {
+            problem(root, &doc_ref).map(|problem| format!("{label}:{}: {problem}", doc_ref.line))
+        });
     Report::from_errors(problems)
+}
+
+fn in_scope(scope: Scope, lines: &[&str], line: usize) -> bool {
+    match scope {
+        Scope::Everything => true,
+        Scope::CodeLines => line
+            .checked_sub(1)
+            .and_then(|index| lines.get(index))
+            .is_some_and(|text| text.trim_start().starts_with(CODE_LINE)),
+    }
 }
 
 fn problem(root: &Path, doc_ref: &DocRef) -> Option<String> {

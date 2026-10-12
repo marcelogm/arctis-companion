@@ -106,3 +106,44 @@ fn specs_are_exempt() {
         .succeeded()
     );
 }
+
+#[test]
+fn adr_code_line_with_a_missing_path_fails() {
+    let outcome = outcome_for(
+        "docs/adr/0001-example.md",
+        "# Example\n\n- Code: `crates/core/src/gone.rs`.\n",
+    );
+    assert!(!outcome.succeeded());
+    assert!(
+        outcome.stderr.contains("docs/adr/0001-example.md:3"),
+        "{}",
+        outcome.stderr
+    );
+}
+
+#[test]
+fn adr_code_line_with_an_existing_symbol_passes() {
+    let outcome = outcome_for(
+        "docs/adr/0001-example.md",
+        "- Code: `crates/core/src/time.rs::Millis`.\n",
+    );
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
+fn adr_prose_is_not_checked() {
+    let outcome = outcome_for(
+        "docs/adr/0001-example.md",
+        "Superseded `scripts/check-line-limit.sh`.\n",
+    );
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
+fn review_log_is_not_an_adr() {
+    let outcome = outcome_for(
+        "docs/adr/review-log.md",
+        "- Code: `crates/core/src/gone.rs`\n",
+    );
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}

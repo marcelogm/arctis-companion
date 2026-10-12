@@ -16,5 +16,5 @@ One list of generated files (`Cargo.lock`, `cargo-sources.json`, `*.po`, `*.pot`
 
 - `cargo xtask install-hooks` replaces the existing hooks and script.
 - Rule fixtures are built in tempdirs by `xtask/tests`, never tracked.
-- Specs, proposals and research are dated records and exempt from the doc-path check; `docs/architecture/`, `CONTEXT.md` and ADR "Code:" lines are checked. ADR "Code:" lines join the check in SP14, once every cited path exists.
+- Specs, proposals and research are dated records and exempt from the doc-path check; `docs/architecture/`, `CONTEXT.md` and ADR "Code:" lines are checked.
 - Code: `xtask/src/check_rules/`, `xtask/src/check_commits.rs`, `xtask/src/check_doc_paths.rs`.
