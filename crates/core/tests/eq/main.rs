@@ -1,5 +1,6 @@
 mod biquad;
 mod coefficients;
+mod crossfade;
 mod curve;
 mod equalizer;
 mod filter;
