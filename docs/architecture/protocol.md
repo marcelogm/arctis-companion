@@ -8,7 +8,7 @@ audio thread seams. All of it lives in `crates/core/` and does no I/O. Design ra
 
 ```mermaid
 flowchart BT
-    B["bounded.rs<br/>range-checked newtypes"]
+    B["bounded.rs<br/>OutOfRange, bounded! newtypes, raw_enum! byte enums"]
     V["settings::values<br/>MicVolume Sidetone Percent MuteLight WirelessMode AutoPowerOff"]
     E["eq::filter, eq::curve<br/>Filter, Curve (SP3 owns their behaviour)"]
     H["settings::headset_settings<br/>HeadsetSettings Setting SettingChange"]
@@ -20,14 +20,14 @@ flowchart BT
 
 | Module | Code |
 |---|---|
-| Range-checked values | `crates/core/src/bounded.rs`, `crates/core/src/settings/values.rs::OutOfRange`, `crates/core/src/settings/values.rs::MuteLight`, `crates/core/src/settings/values.rs::WirelessMode`, `crates/core/src/settings/values.rs::AutoPowerOff` |
+| Range-checked values | `crates/core/src/bounded.rs::OutOfRange` and the `bounded!` and `raw_enum!` macros in `crates/core/src/bounded.rs`; `MuteLight` and `WirelessMode` in `crates/core/src/settings/values.rs`, `crates/core/src/settings/values.rs::AutoPowerOff` |
 | Filters and curves | `crates/core/src/eq/filter.rs::Filter`, `crates/core/src/eq/filter.rs::FilterKind`, `crates/core/src/eq/curve.rs::Curve` |
 | Headset settings | `crates/core/src/settings/headset_settings.rs::HeadsetSettings`, `crates/core/src/settings/headset_settings.rs::Setting`, `crates/core/src/settings/headset_settings.rs::SettingChange`, `crates/core/src/settings/headset_settings.rs::apply` |
-| Frames | `crates/core/src/protocol/frame.rs::Frame`, `crates/core/src/protocol/frame.rs::DecodeError` |
+| Frames | `crates/core/src/protocol/frame.rs::Frame`, `crates/core/src/protocol/frame.rs::DecodeError`, `crates/core/src/protocol/frame.rs::expect_frame` |
 | Commands | `crates/core/src/protocol/command.rs::Command`, `crates/core/src/protocol/command.rs::Query`, `crates/core/src/protocol/command.rs::encode`, `crates/core/src/protocol/command.rs::readback` |
-| Equalizer bands | `crates/core/src/protocol/eq_wire.rs::encode_curve`, `crates/core/src/protocol/eq_wire.rs::decode_curve` |
+| Equalizer bands | `crates/core/src/protocol/eq_wire.rs::encode_curve`, `crates/core/src/protocol/eq_wire.rs::decode_curve`, `crates/core/src/protocol/eq_wire.rs::band`, `crates/core/src/eq/curve.rs::from_slots` |
 | Replies | `crates/core/src/protocol/reply.rs::decode_reply`, `crates/core/src/protocol/reply.rs::Reply`, `crates/core/src/protocol/reply.rs::observed_settings` |
-| Status and firmware | `crates/core/src/protocol/status.rs::Status`, `crates/core/src/protocol/status.rs::Link`, `crates/core/src/protocol/firmware.rs::Firmware`, `crates/core/src/protocol/firmware.rs::Version` |
+| Status and firmware | `crates/core/src/protocol/status.rs::Status`, `Link` and `Charging` in `crates/core/src/protocol/status.rs`, `crates/core/src/protocol/firmware.rs::Firmware`, `crates/core/src/protocol/firmware.rs::Version`, `crates/core/src/protocol/firmware.rs::decode_firmware` |
 | Events | `crates/core/src/protocol/event.rs::decode_event`, `crates/core/src/protocol/event.rs::DeviceEvent` |
 | Models | `crates/core/src/protocol/model.rs::Model`, `crates/core/src/protocol/model.rs::lookup`, `crates/core/src/protocol/model.rs::ModelLookup`, `crates/core/src/protocol/model.rs::Capabilities`, `data/udev/70-arctis-companion.rules` |
 | Device seam | `crates/core/src/messages/device.rs::Change`, `crates/core/src/messages/device.rs::SyncPolicy`, `crates/core/src/messages/device.rs::Phase`, `crates/core/src/messages/device.rs::DeviceUpdate` |
@@ -117,16 +117,20 @@ flowchart LR
 
 ## Tests
 
+The SP2 integration tests build into one test binary, `crates/core/tests/protocol/main.rs`, so the helpers in
+`crates/core/tests/protocol/support.rs` and `crates/core/tests/protocol/strategies.rs` are shared without copies.
+The udev rule test stays a file of its own at the path the device spec names.
+
 | What | Where |
 |---|---|
 | SP0 captures, one 64-byte frame per file | `crates/core/tests/golden/` |
-| Golden loader shared by the golden tests | `crates/core/tests/support/mod.rs` |
-| The golden set, captured curves and setter frames | `crates/core/tests/golden_frames.rs` |
-| Every captured reply decodes to its expectation | `crates/core/tests/golden_replies.rs` |
-| Command bytes, readbacks, allow-list proptest | `crates/core/tests/command.rs` |
-| Band encoding, round-trip and no-panic proptests | `crates/core/tests/eq_wire.rs`, `crates/core/tests/strategies/mod.rs` |
-| Replies, firmware slots, no-panic and stale-tail proptests | `crates/core/tests/reply.rs` |
-| Events, no-panic proptest | `crates/core/tests/event.rs` |
-| Models and the udev rule | `crates/core/tests/model.rs`, `crates/core/tests/udev_rule.rs` |
-| Value ranges | `crates/core/tests/values.rs`, `crates/core/tests/status.rs`, `crates/core/tests/eq_types.rs`, `crates/core/tests/headset_settings.rs` |
-| Frozen message contract | `crates/core/tests/messages.rs` |
+| Golden loader and shared builders | `crates/core/tests/protocol/support.rs` |
+| The golden set, captured curves and setter frames | `crates/core/tests/protocol/golden_frames.rs` |
+| Every captured reply decodes to its expectation | `crates/core/tests/protocol/golden_replies.rs` |
+| Command bytes, readbacks, allow-list proptest | `crates/core/tests/protocol/command.rs` |
+| Band encoding, round-trip and no-panic proptests | `crates/core/tests/protocol/eq_wire.rs`, `crates/core/tests/protocol/strategies.rs` |
+| Replies, firmware slots, no-panic and stale-tail proptests | `crates/core/tests/protocol/reply.rs` |
+| Events, no-panic proptest | `crates/core/tests/protocol/event.rs` |
+| Models and the udev rule | `crates/core/tests/protocol/model.rs`, `crates/core/tests/udev_rule.rs` |
+| Value ranges | `crates/core/tests/protocol/values.rs`, `crates/core/tests/protocol/status.rs`, `crates/core/tests/protocol/eq_types.rs`, `crates/core/tests/protocol/headset_settings.rs` |
+| Frozen message contract: exhaustive matches that stop compiling when a variant or payload type changes | `crates/core/tests/protocol/messages.rs` |
