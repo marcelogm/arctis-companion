@@ -151,7 +151,7 @@ impl Session {
 
     pub(super) fn enter(&mut self, stage: Stage) {
         if matches!(stage, Stage::Syncing(_)) {
-            self.reconciler.clear_failures();
+            self.reconciler.start_syncing();
         }
         self.stage = stage;
         self.announce();

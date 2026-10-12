@@ -8,5 +8,6 @@ mod rebinding;
 mod reconcile;
 mod scenarios;
 mod testkit;
+mod unreadable;
 mod verify;
 mod wireless;

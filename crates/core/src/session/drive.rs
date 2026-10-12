@@ -42,9 +42,12 @@ impl Session {
     }
 
     fn unanswered(&mut self, unanswered: Unanswered) {
-        if self.reconciler.requeue_within_grace(unanswered) {
-            return;
+        if !self.reconciler.requeue_within_grace(unanswered) {
+            self.lost_contact();
         }
+    }
+
+    pub(super) fn lost_contact(&mut self) {
         if matches!(
             self.stage,
             Stage::Probing | Stage::Syncing(_) | Stage::Ready
