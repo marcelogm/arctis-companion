@@ -75,20 +75,20 @@ fn easy_effects_chain(plugins: u32) -> Graph {
     scene.link(previous, 7).build()
 }
 
+fn plugins_for(hops: usize) -> u32 {
+    u32::try_from(hops - 2).expect("a small hop limit")
+}
+
 #[test]
 fn an_easy_effects_chain_within_the_hop_limit_is_followed() {
-    assert_eq!(MAX_HOPS, 4);
-    assert_eq!(
-        follow(&easy_effects_chain(2), 11)
-            .expect("chain")
-            .terminal(),
-        7
-    );
+    let chain = easy_effects_chain(plugins_for(MAX_HOPS));
+    assert_eq!(follow(&chain, 11).expect("chain").terminal(), 7);
 }
 
 #[test]
 fn a_chain_longer_than_the_hop_limit_is_not_followed() {
-    assert_eq!(follow(&easy_effects_chain(3), 11), None);
+    let chain = easy_effects_chain(plugins_for(MAX_HOPS + 1));
+    assert_eq!(follow(&chain, 11), None);
 }
 
 #[test]

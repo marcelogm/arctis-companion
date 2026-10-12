@@ -1,7 +1,7 @@
 use crate::graph::{AUDIO_SINK, Graph, INPUT_STREAM, OUTPUT_STREAM, ObjectId};
+use crate::keys::LINK_GROUP;
 
 pub const MAX_HOPS: usize = 4;
-pub const LINK_GROUP: &str = "node.link-group";
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Chain {

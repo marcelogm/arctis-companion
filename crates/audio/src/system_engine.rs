@@ -5,21 +5,22 @@ use arctis_core::eq::Curve;
 use pipewire::core::CoreRc;
 use pipewire::spa::pod::Pod;
 
+use crate::eq_names::EQ_SINK_NAME;
 use crate::eq_sink::{EqSink, OnVolume, Replaced};
-use crate::outputs::{EQ_SINK_NAME, InsertStep, Outputs, RemoveStep};
+use crate::insertion::{InsertStep, Insertion, RemoveStep};
 use crate::registry::Registry;
 use crate::volume::{VolumeChange, VolumeMirror, props_pod};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Inserted {
     Created,
-    Unchanged,
+    NotCreated,
 }
 
 pub struct SystemEngine {
     core: CoreRc,
     registry: Rc<Registry>,
-    outputs: RefCell<Outputs>,
+    insertion: RefCell<Insertion>,
     sink: RefCell<Option<EqSink>>,
     mirror: Rc<RefCell<VolumeMirror>>,
 }
@@ -30,35 +31,40 @@ impl SystemEngine {
         Self {
             core,
             registry,
-            outputs: RefCell::default(),
+            insertion: RefCell::default(),
             sink: RefCell::default(),
             mirror: Rc::default(),
         }
     }
 
     pub fn insert(&self, curve: &Curve) -> Inserted {
-        let step = self.outputs.borrow_mut().insert(&self.registry.graph());
+        let step = self.insertion.borrow().plan_insert(&self.registry.graph());
         match step {
-            InsertStep::Create { replaced } => self.create(curve, &replaced),
+            InsertStep::Create { replaced } => self.create(curve, replaced),
             InsertStep::Retarget => {
                 self.retarget(curve);
-                Inserted::Unchanged
+                Inserted::NotCreated
             }
-            InsertStep::Skip => Inserted::Unchanged,
+            InsertStep::Skip => Inserted::NotCreated,
         }
     }
 
-    fn create(&self, curve: &Curve, replaced: &str) -> Inserted {
-        let forwarder = forwarder(Rc::downgrade(&self.registry), self.mirror.clone(), replaced);
-        let replaced = Replaced {
-            name: replaced.to_owned(),
-            volume: self.registry.graph().volume_of(replaced),
+    fn create(&self, curve: &Curve, replaced: String) -> Inserted {
+        let forwarder = forwarder(
+            Rc::downgrade(&self.registry),
+            self.mirror.clone(),
+            &replaced,
+        );
+        let volume = self.registry.graph().volume_of(&replaced);
+        let target = Replaced {
+            name: replaced.clone(),
+            volume,
         };
-        let Ok(sink) = EqSink::create(&self.core, curve, replaced, forwarder) else {
-            self.outputs.borrow_mut().remove(&self.registry.graph());
-            return Inserted::Unchanged;
+        let Ok(sink) = EqSink::create(&self.core, curve, target, forwarder) else {
+            return Inserted::NotCreated;
         };
         *self.sink.borrow_mut() = Some(sink);
+        self.insertion.borrow_mut().commit(replaced);
         self.registry.write_default_sink(EQ_SINK_NAME);
         Inserted::Created
     }
@@ -69,19 +75,21 @@ impl SystemEngine {
         }
     }
 
-    pub fn remove(&self) {
-        let step = self.outputs.borrow_mut().remove(&self.registry.graph());
+    pub fn remove(&self) -> RemoveStep {
+        let step = self.insertion.borrow_mut().remove(&self.registry.graph());
         if let RemoveStep::Restore(replaced) = &step {
             self.registry.write_default_sink(replaced);
         }
-        let removed = self.sink.borrow_mut().take();
-        drop(removed);
+        drop(self.sink.take());
         *self.mirror.borrow_mut() = VolumeMirror::default();
+        step
     }
 
     #[must_use]
     pub fn manager_denied(&self) -> bool {
-        self.outputs.borrow().manager_denied(&self.registry.graph())
+        self.insertion
+            .borrow()
+            .manager_denied(&self.registry.graph())
     }
 }
 

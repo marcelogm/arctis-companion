@@ -13,31 +13,42 @@ use pw::main_loop::{MainLoopRc, MainLoopWeak};
 use pw::properties::properties;
 use pw::spa::utils::result::AsyncSeq;
 
-use crate::changes::Published;
-use crate::outputs::EQ_SINK_NAME;
+use crate::changes::{Published, Settling, Ticket};
+use crate::eq_names::EQ_SINK_NAME;
+use crate::insertion::RemoveStep;
 use crate::registry::Registry;
 use crate::system_engine::{Inserted, SystemEngine};
 
-pub const RECONNECT_AFTER: Duration = Duration::from_secs(2);
-pub const MANAGER_CONFIRM_AFTER: Duration = Duration::from_secs(1);
-pub const SHUTDOWN_GRACE: Duration = Duration::from_secs(1);
+const RECONNECT_AFTER: Duration = Duration::from_secs(2);
+const MANAGER_CONFIRM_AFTER: Duration = Duration::from_secs(1);
+const SETTLE_WITHIN: Duration = Duration::from_secs(1);
+const SHUTDOWN_GRACE: Duration = Duration::from_secs(1);
 const MANAGER_CATEGORY: &str = "Manager";
 
 pub enum Message {
     Command(AudioCommand),
     ConfirmManager,
+    Settled(Ticket),
     Retry,
     Quit,
 }
 
 #[derive(Clone)]
-pub struct Link {
-    pub events: async_channel::Sender<AudioEvent>,
-    pub myself: Sender<Message>,
-    pub announced: Rc<Cell<Option<bool>>>,
+pub struct Outbox {
+    events: async_channel::Sender<AudioEvent>,
+    to_itself: Sender<Message>,
+    announced: Rc<Cell<Option<bool>>>,
 }
 
-impl Link {
+impl Outbox {
+    pub fn new(events: async_channel::Sender<AudioEvent>, to_itself: Sender<Message>) -> Self {
+        Self {
+            events,
+            to_itself,
+            announced: Rc::default(),
+        }
+    }
+
     fn announce(&self, available: bool) {
         if self.announced.replace(Some(available)) != Some(available) {
             self.send(availability(available));
@@ -49,10 +60,10 @@ impl Link {
     }
 
     fn send_later(&self, delay: Duration, message: Message) {
-        let myself = self.myself.clone();
+        let to_itself = self.to_itself.clone();
         thread::spawn(move || {
             thread::sleep(delay);
-            let _ = myself.send(message);
+            let _ = to_itself.send(message);
         });
     }
 }
@@ -71,10 +82,10 @@ enum Outcome {
     Quit,
 }
 
-pub fn run(commands: Receiver<Message>, link: &Link) {
+pub fn run(commands: Receiver<Message>, outbox: &Outbox) {
     let mut commands = commands;
     loop {
-        let (returned, outcome) = session(commands, link);
+        let (returned, outcome) = session(commands, outbox);
         if outcome == Outcome::Quit {
             return;
         }
@@ -82,15 +93,15 @@ pub fn run(commands: Receiver<Message>, link: &Link) {
     }
 }
 
-fn session(commands: Receiver<Message>, link: &Link) -> (Receiver<Message>, Outcome) {
+fn session(commands: Receiver<Message>, outbox: &Outbox) -> (Receiver<Message>, Outcome) {
     let Ok(main_loop) = MainLoopRc::new(None) else {
         return (commands, Outcome::Quit);
     };
     let outcome = Rc::new(Cell::new(Outcome::Lost));
-    let connection = Connection::open(&main_loop, link).ok();
+    let connection = Connection::open(&main_loop, outbox).ok();
     if connection.is_none() {
-        link.announce(false);
-        link.send_later(RECONNECT_AFTER, Message::Retry);
+        outbox.announce(false);
+        outbox.send_later(RECONNECT_AFTER, Message::Retry);
     }
     let dispatcher = Dispatcher {
         main_loop: main_loop.downgrade(),
@@ -106,7 +117,7 @@ fn session(commands: Receiver<Message>, link: &Link) -> (Receiver<Message>, Outc
     let commands = attached.deattach();
     drop(connection);
     if outcome.get() == Outcome::Lost {
-        link.announce(false);
+        outbox.announce(false);
     }
     (commands, outcome.get())
 }
@@ -131,7 +142,9 @@ impl Dispatcher {
             (Message::Retry, None) => self.quit(),
             (Message::Command(command), Some(worker)) => worker.command(command),
             (Message::ConfirmManager, Some(worker)) => worker.confirm_manager(),
-            _ => {}
+            (Message::Settled(ticket), Some(worker)) => worker.stop_settling(ticket),
+            (Message::Command(_) | Message::ConfirmManager | Message::Settled(_), None)
+            | (Message::Retry, Some(_)) => {}
         }
     }
 
@@ -149,7 +162,7 @@ struct Connection {
 }
 
 impl Connection {
-    fn open(main_loop: &MainLoopRc, link: &Link) -> Result<Self, pw::Error> {
+    fn open(main_loop: &MainLoopRc, outbox: &Outbox) -> Result<Self, pw::Error> {
         let context = ContextRc::new(main_loop, None)?;
         let core = context.connect_rc(Some(properties! {
             *pw::keys::MEDIA_CATEGORY => MANAGER_CATEGORY,
@@ -162,12 +175,12 @@ impl Connection {
                 engine: SystemEngine::new(core.clone(), registry.clone()),
                 registry,
                 core: core.clone(),
-                link: link.clone(),
+                outbox: outbox.clone(),
                 state: WorkerState::default(),
             }
         });
         let core_listener = listen_core(&core, &worker);
-        worker.state.initial.set(Some(core.sync(0)?));
+        worker.state.globals_listed.set(Some(core.sync(0)?));
         Ok(Self {
             worker,
             _core_listener: core_listener,
@@ -179,7 +192,7 @@ impl Connection {
 fn publisher(worker: Weak<Worker>) -> Rc<dyn Fn()> {
     Rc::new(move || {
         if let Some(worker) = worker.upgrade() {
-            worker.publish();
+            worker.on_graph_changed();
         }
     })
 }
@@ -190,7 +203,7 @@ fn listen_core(core: &CoreRc, worker: &Rc<Worker>) -> pw::core::Listener {
     core.add_listener_local()
         .done(move |_, seq| {
             if let Some(worker) = on_done.upgrade() {
-                worker.done(seq);
+                worker.on_roundtrip_done(seq);
             }
         })
         .error(move |id, _, _, _| {
@@ -203,9 +216,9 @@ fn listen_core(core: &CoreRc, worker: &Rc<Worker>) -> pw::core::Listener {
 
 #[derive(Default)]
 struct WorkerState {
-    initial: Cell<Option<AsyncSeq>>,
-    settling: Cell<Option<AsyncSeq>>,
-    closing: Cell<bool>,
+    globals_listed: Cell<Option<AsyncSeq>>,
+    infos_received: Cell<Option<AsyncSeq>>,
+    restoring_default: Cell<bool>,
     ready: Cell<bool>,
     published: RefCell<Published>,
 }
@@ -215,28 +228,32 @@ struct Worker {
     core: CoreRc,
     registry: Rc<Registry>,
     engine: SystemEngine,
-    link: Link,
+    outbox: Outbox,
     state: WorkerState,
 }
 
 impl Worker {
-    fn done(&self, seq: AsyncSeq) {
+    fn on_roundtrip_done(&self, seq: AsyncSeq) {
         let seq = Some(seq);
-        if self.state.initial.get() == seq {
-            self.state.settling.set(self.core.sync(0).ok());
-        } else if self.state.settling.get() == seq {
+        if self.state.globals_listed.get() == seq {
+            self.state.infos_received.set(self.core.sync(0).ok());
+        } else if self.state.infos_received.get() == seq {
             self.become_ready();
         }
     }
 
     fn become_ready(&self) {
         self.state.ready.set(true);
-        self.link.announce(true);
+        self.outbox.announce(true);
+        self.publish();
+    }
+
+    fn on_graph_changed(&self) {
+        self.quit_once_restored();
         self.publish();
     }
 
     fn publish(&self) {
-        self.finish_closing();
         if !self.state.ready.get() {
             return;
         }
@@ -246,7 +263,7 @@ impl Worker {
             .borrow_mut()
             .changes(&self.registry.graph());
         for event in events {
-            self.link.send(event);
+            self.outbox.send(event);
         }
     }
 
@@ -254,36 +271,54 @@ impl Worker {
         match command {
             AudioCommand::InsertEqualizer(curve) => self.insert(&curve),
             AudioCommand::Retarget(curve) => self.engine.retarget(&curve),
-            AudioCommand::RemoveEqualizer => self.engine.remove(),
+            AudioCommand::RemoveEqualizer => self.remove(),
         }
     }
 
     fn insert(&self, curve: &Curve) {
         if self.engine.insert(curve) == Inserted::Created {
-            self.link
+            self.settle(Settling::Insertion);
+            self.outbox
                 .send_later(MANAGER_CONFIRM_AFTER, Message::ConfirmManager);
         }
     }
 
+    fn remove(&self) {
+        if self.engine.remove() != RemoveStep::NothingInserted {
+            self.settle(Settling::Removal);
+        }
+    }
+
+    fn settle(&self, settling: Settling) {
+        let ticket = self.state.published.borrow_mut().settle(settling);
+        self.outbox
+            .send_later(SETTLE_WITHIN, Message::Settled(ticket));
+    }
+
+    fn stop_settling(&self, ticket: Ticket) {
+        self.state.published.borrow_mut().stop_settling(ticket);
+        self.publish();
+    }
+
     fn confirm_manager(&self) {
         if self.engine.manager_denied() {
-            self.link.send(AudioEvent::ManagerDenied);
+            self.outbox.send(AudioEvent::ManagerDenied);
         }
     }
 
     fn shut_down(&self) {
-        if self.state.closing.replace(true) {
+        if self.state.restoring_default.replace(true) {
             self.quit_loop();
             return;
         }
         self.engine.remove();
-        self.link.send_later(SHUTDOWN_GRACE, Message::Quit);
-        self.finish_closing();
+        self.outbox.send_later(SHUTDOWN_GRACE, Message::Quit);
+        self.quit_once_restored();
     }
 
-    fn finish_closing(&self) {
+    fn quit_once_restored(&self) {
         let restored = self.registry.graph().defaults().configured() != Some(EQ_SINK_NAME);
-        if self.state.closing.get() && restored {
+        if self.state.restoring_default.get() && restored {
             self.quit_loop();
         }
     }

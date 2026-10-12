@@ -1,13 +1,12 @@
-use std::io::Cursor;
-
 use pipewire::spa;
 use spa::pod::deserialize::PodDeserializer;
-use spa::pod::serialize::PodSerializer;
 use spa::pod::{Object, Pod, Property, PropertyFlags, Value, ValueArray};
 use spa::sys::{
     SPA_PARAM_Props, SPA_PROP_channelVolumes, SPA_PROP_mute, SPA_PROP_softMute,
     SPA_PROP_softVolumes, SPA_TYPE_OBJECT_Props,
 };
+
+use crate::pod::pod_bytes;
 
 pub const CHANNEL_VOLUMES: u32 = SPA_PROP_channelVolumes;
 pub const MUTE: u32 = SPA_PROP_mute;
@@ -103,14 +102,11 @@ pub fn props_pod(volume: &Volume) -> Vec<u8> {
 }
 
 fn serialize_props(properties: Vec<Property>) -> Vec<u8> {
-    let props = Value::Object(Object {
+    pod_bytes(&Value::Object(Object {
         type_: SPA_TYPE_OBJECT_Props,
         id: SPA_PARAM_Props,
         properties,
-    });
-    PodSerializer::serialize(Cursor::new(Vec::new()), &props)
-        .map(|(cursor, _)| cursor.into_inner())
-        .unwrap_or_default()
+    }))
 }
 
 fn property(key: u32, value: Value) -> Property {

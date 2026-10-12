@@ -1,5 +1,6 @@
-use crate::lab::{BLUEZ, EQ_SINK, Lab, eventually, flat};
-use crate::tone::{Tone, level_db};
+use crate::lab::{BLUEZ, EQ_SINK_NAME, Lab, eventually, flat};
+use crate::meter::level_db;
+use crate::tone::Tone;
 use crate::tools;
 
 const UNITY_TOLERANCE_DB: f64 = 0.5;
@@ -13,11 +14,17 @@ fn close(found: &[f64], expected: f64) -> bool {
 fn volume_and_mute_reach_the_bluez_node() {
     let lab = Lab::open();
     lab.insert(flat());
-    tools::set_props(EQ_SINK, "{ channelVolumes = [ 0.25, 0.25 ], mute = true }");
+    tools::set_props(
+        EQ_SINK_NAME,
+        "{ channelVolumes = [ 0.25, 0.25 ], mute = true }",
+    );
     eventually("the bluez node at 0.25 and muted", || {
         tools::volume_of(BLUEZ).is_some_and(|(channels, mute)| close(&channels, 0.25) && mute)
     });
-    tools::set_props(EQ_SINK, "{ channelVolumes = [ 1.0, 1.0 ], mute = false }");
+    tools::set_props(
+        EQ_SINK_NAME,
+        "{ channelVolumes = [ 1.0, 1.0 ], mute = false }",
+    );
     eventually("the bluez node back at 1.0", || {
         tools::volume_of(BLUEZ).is_some_and(|(channels, mute)| close(&channels, 1.0) && !mute)
     });
@@ -30,7 +37,7 @@ fn the_equalizer_sink_processes_at_unity() {
     lab.insert(flat());
     let _tone = Tone::play(Vec::new(), Vec::new());
     let full = level_db(BLUEZ);
-    tools::set_props(EQ_SINK, "{ channelVolumes = [ 0.5, 0.5 ] }");
+    tools::set_props(EQ_SINK_NAME, "{ channelVolumes = [ 0.5, 0.5 ] }");
     eventually("the bluez node at 0.5", || {
         tools::volume_of(BLUEZ).is_some_and(|(channels, _)| close(&channels, 0.5))
     });
@@ -51,7 +58,7 @@ fn inserting_keeps_the_bluez_volume() {
     });
     lab.insert(flat());
     eventually("the equalizer sink at the bluez volume", || {
-        tools::volume_of(EQ_SINK).is_some_and(|(channels, _)| close(&channels, 0.3))
+        tools::volume_of(EQ_SINK_NAME).is_some_and(|(channels, _)| close(&channels, 0.3))
     });
     assert!(tools::volume_of(BLUEZ).is_some_and(|(channels, _)| close(&channels, 0.3)));
 }

@@ -2,15 +2,20 @@
 
 pub mod changes;
 pub mod designer;
-pub mod eq_sink;
+pub mod eq_names;
+mod eq_sink;
 pub mod graph;
 pub mod handle;
+pub mod insertion;
+pub mod keys;
 pub mod links;
-pub mod outputs;
-pub mod registry;
+pub mod metadata_value;
+pub mod pod;
+mod registry;
 pub mod samples;
+pub mod sinks;
 pub mod streams;
-pub mod system_engine;
+mod system_engine;
 pub mod volume;
 mod worker;
 
