@@ -1,10 +1,12 @@
 use super::effect::Effect;
 use super::exchange::{Expiry, Outgoing, Unanswered};
 use super::phase::Stage;
+use super::rebind::RebindStep;
 use super::reconcile::drift;
 use super::reducer::Session;
 use super::timing::{HEADSET_OFF_POLL, STATUS_SAFETY_POLL};
 use super::verify::Transaction;
+use crate::messages::device::Phase;
 use crate::protocol::Query;
 use crate::settings::headset_settings::SettingChange;
 use crate::time::Millis;
@@ -42,11 +44,33 @@ impl Session {
     }
 
     fn expire_stage(&mut self) {
-        if let Stage::Settling { until } = self.stage
-            && self.now >= until
-        {
-            self.enter(Stage::Probing);
+        let now = self.now;
+        match &mut self.stage {
+            Stage::Settling { until } if now >= *until => {
+                self.enter(Stage::Probing);
+            }
+            Stage::Rebinding(rebinding) => {
+                let step = rebinding.step(now);
+                self.rebinding_step(step);
+            }
+            _ => {}
         }
+    }
+
+    fn rebinding_step(&mut self, step: RebindStep) {
+        match step {
+            RebindStep::Wait => {}
+            RebindStep::Notice => self.publish_phase(Phase::Rebinding),
+            RebindStep::GiveUp => self.lost(),
+            RebindStep::Resume(resume) if resume.needs_link() && !self.link_up() => {
+                self.headset_off();
+            }
+            RebindStep::Resume(resume) => self.enter(resume.restart(self.now)),
+        }
+    }
+
+    fn link_up(&self) -> bool {
+        self.status.is_none_or(|status| status.link.is_connected())
     }
 
     pub(super) fn drive(&mut self) {
@@ -164,6 +188,7 @@ impl Session {
     fn stage_deadline(&self) -> Option<Millis> {
         match &self.stage {
             Stage::Settling { until } => Some(*until),
+            Stage::Rebinding(rebinding) => Some(rebinding.deadline()),
             _ => None,
         }
     }
