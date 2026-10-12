@@ -6,9 +6,11 @@ use arctis_core::testkit::snapshots::{snapshot, with};
 use arctis_ui::{HeadsetStatus, PermissionDialog};
 use gtk::{AccessibleProperty, AccessibleRelation, AccessibleRole};
 
+use crate::add_rule_dialog::{rendered_dialog, spotify_seen};
+use crate::app_presets_page::rendered_page;
 use crate::support::{
     descendants, first, has_accessible_text, headset_model, init, rendered_window, rich_snapshot,
-    shown,
+    ruled, shown,
 };
 
 const INTERACTIVE: [AccessibleRole; 8] = [
@@ -42,7 +44,11 @@ fn named_by_menu_button(widget: &gtk::Widget) -> bool {
 }
 
 fn unnamed(root: &impl IsA<gtk::Widget>) -> Vec<String> {
-    descendants(root)
+    unnamed_among(descendants(root))
+}
+
+fn unnamed_among(widgets: Vec<gtk::Widget>) -> Vec<String> {
+    widgets
         .into_iter()
         .filter(needs_name)
         .filter(|widget| !labelled(widget) && !named_by_menu_button(widget))
@@ -112,4 +118,29 @@ fn the_header_has_a_description() {
         AccessibleProperty::Description,
         &english(&headset_model(&s).header.description)
     ));
+}
+
+#[gtk::test]
+fn every_control_of_the_app_presets_page_has_a_name() {
+    for s in [
+        snapshot(),
+        ruled(&[("firefox", "footsteps"), ("mpv", "gone")]),
+    ] {
+        let (page, _, _) = rendered_page(&s);
+        assert!(
+            descendants(&page).iter().any(needs_name),
+            "the walk sees the controls"
+        );
+        assert_eq!(unnamed(&page), Vec::<String>::new());
+    }
+}
+
+#[gtk::test]
+fn every_control_of_the_add_rule_dialog_has_a_name() {
+    for s in [snapshot(), spotify_seen()] {
+        let (dialog, _, _) = rendered_dialog(&s);
+        let widgets = descendants(&dialog);
+        assert!(widgets.iter().any(needs_name), "the walk sees the controls");
+        assert_eq!(unnamed_among(widgets), Vec::<String>::new());
+    }
 }

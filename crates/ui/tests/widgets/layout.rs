@@ -4,7 +4,8 @@ use arctis_core::messages::device::Phase;
 use arctis_core::testkit::snapshots::{snapshot, with};
 use arctis_ui::PermissionDialog;
 
-use crate::support::{descendants, rendered_window, rich_snapshot, shown};
+use crate::app_presets_page::rendered_page;
+use crate::support::{descendants, rendered_window, rich_snapshot, ruled, seen_app, shown};
 
 const NARROWEST: i32 = 360;
 
@@ -51,4 +52,22 @@ fn nothing_shown_scrolls_horizontally() {
     for view in scrolled {
         assert_eq!(view.hscrollbar_policy(), gtk::PolicyType::Never);
     }
+}
+
+#[gtk::test]
+fn the_app_presets_page_and_dialog_fit_the_narrowest_window() {
+    let mut s = ruled(&[("org.mozilla.firefox", "footsteps"), ("mpv", "gone")]);
+    s.presets.seen_apps = vec![seen_app("Spotify", &["com.spotify.Client", "spotify"])];
+    let (page, _, _) = rendered_page(&s);
+    assert!(
+        minimum_width(&page) <= NARROWEST,
+        "{}",
+        minimum_width(&page)
+    );
+    let dialog = page.add_rule_dialog();
+    assert!(
+        minimum_width(&dialog) <= NARROWEST,
+        "{}",
+        minimum_width(&dialog)
+    );
 }
