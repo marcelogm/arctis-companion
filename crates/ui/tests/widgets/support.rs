@@ -47,6 +47,13 @@ pub fn first<T: IsA<gtk::Widget>>(root: &impl IsA<gtk::Widget>) -> T {
 }
 
 fn collect(widget: &gtk::Widget, found: &mut Vec<gtk::Widget>) {
+    if let Some(content) = widget
+        .downcast_ref::<adw::Dialog>()
+        .and_then(adw::Dialog::child)
+    {
+        found.push(content.clone());
+        collect(&content, found);
+    }
     let mut child = widget.first_child();
     while let Some(current) = child {
         found.push(current.clone());
