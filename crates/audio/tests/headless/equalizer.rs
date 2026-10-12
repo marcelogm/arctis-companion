@@ -3,10 +3,11 @@ use std::time::Duration;
 
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, SinkKind};
 
-use crate::lab::{BLUEZ, EQ_SINK, Lab, USB, bluetooth, eventually, flat};
+use crate::lab::{BLUEZ, EQ_SINK_NAME, Lab, USB, bluetooth, eventually, flat};
 use crate::tools;
 
 const QUIET: Duration = Duration::from_secs(1);
+const SETTLED: Duration = Duration::from_secs(3);
 
 #[test]
 #[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
@@ -23,14 +24,14 @@ fn the_bluez_default_is_reported_on_start() {
 fn inserting_makes_the_equalizer_the_default_and_removing_restores_bluez() {
     let lab = Lab::open();
     lab.insert(flat());
-    assert_eq!(tools::configured_default().as_deref(), Some(EQ_SINK));
+    assert_eq!(tools::configured_default().as_deref(), Some(EQ_SINK_NAME));
     lab.send(AudioCommand::RemoveEqualizer);
     lab.wait_for("bluez default again", |event| *event == bluetooth(false));
     eventually("the configured bluez default", || {
         tools::configured_default().as_deref() == Some(BLUEZ)
     });
     eventually("the equalizer sink gone", || {
-        tools::node_id(EQ_SINK).is_none()
+        tools::node_id(EQ_SINK_NAME).is_none()
     });
 }
 
@@ -46,7 +47,7 @@ fn a_default_the_user_changed_while_inserted_is_left_alone() {
     );
     lab.send(AudioCommand::RemoveEqualizer);
     eventually("the equalizer sink gone", || {
-        tools::node_id(EQ_SINK).is_none()
+        tools::node_id(EQ_SINK_NAME).is_none()
     });
     assert_eq!(tools::configured_default().as_deref(), Some(USB));
 }
@@ -61,7 +62,7 @@ fn dropping_the_handle_restores_bluez() {
         tools::configured_default().as_deref() == Some(BLUEZ)
     });
     eventually("the equalizer sink gone", || {
-        tools::node_id(EQ_SINK).is_none()
+        tools::node_id(EQ_SINK_NAME).is_none()
     });
 }
 
@@ -85,6 +86,25 @@ fn inserting_over_another_default_changes_nothing() {
     );
     lab.send(AudioCommand::InsertEqualizer(flat()));
     thread::sleep(QUIET);
-    assert_eq!(tools::node_id(EQ_SINK), None);
+    assert_eq!(tools::node_id(EQ_SINK_NAME), None);
     assert_eq!(tools::configured_default().as_deref(), Some(USB));
+}
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn inserting_reports_only_the_equalizer_route() {
+    let lab = Lab::open();
+    lab.wait_for("bluez default", |event| *event == bluetooth(false));
+    lab.send(AudioCommand::InsertEqualizer(flat()));
+    assert_eq!(lab.default_sinks_during(SETTLED), [bluetooth(true)]);
+}
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn removing_reports_only_the_bluez_route() {
+    let lab = Lab::open();
+    lab.insert(flat());
+    lab.default_sinks_during(SETTLED);
+    lab.send(AudioCommand::RemoveEqualizer);
+    assert_eq!(lab.default_sinks_during(SETTLED), [bluetooth(false)]);
 }

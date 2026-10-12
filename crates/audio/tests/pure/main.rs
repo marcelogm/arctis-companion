@@ -1,9 +1,10 @@
 mod changes;
 mod designer;
 mod graph;
+mod insertion;
 mod links;
-mod outputs;
 mod samples;
+mod sinks;
 mod streams;
 mod support;
 mod volume;

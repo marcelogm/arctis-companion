@@ -2,7 +2,7 @@ use std::process::{Child, Command};
 
 use arctis_core::messages::audio::{AudioEvent, SoundPath, StreamInfo};
 
-use crate::lab::{EQ_SINK, Lab, eventually, flat};
+use crate::lab::{EQ_SINK_NAME, Lab, eventually, flat};
 use crate::tone::Tone;
 use crate::tools;
 
@@ -56,12 +56,15 @@ impl Drop for Loopback {
 }
 
 fn intermediate_filter() -> Loopback {
+    let playback = format!(
+        "{{ node.name = chain_filter_out target.object = {EQ_SINK_NAME} node.dont-reconnect = true audio.position = [ FL FR ] }}"
+    );
     let child = Command::new("pw-loopback")
         .args([
             "--capture-props",
             "{ media.class = Audio/Sink node.name = chain_filter audio.position = [ FL FR ] }",
             "--playback-props",
-            "{ node.name = chain_filter_out target.object = arctis_companion_eq node.dont-reconnect = true audio.position = [ FL FR ] }",
+            &playback,
         ])
         .spawn()
         .expect("pw-loopback");
@@ -87,5 +90,5 @@ fn a_stream_behind_an_intermediate_node_is_on_the_bluetooth_path() {
     lab.wait_for("the chained player", |event| {
         on_bluetooth(event, "org.example.Chained").is_some()
     });
-    assert!(tools::node_id(EQ_SINK).is_some());
+    assert!(tools::node_id(EQ_SINK_NAME).is_some());
 }

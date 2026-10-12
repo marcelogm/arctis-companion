@@ -1,12 +1,10 @@
-use std::cell::Cell;
 use std::io;
-use std::rc::Rc;
 use std::thread::{self, JoinHandle};
 
 use arctis_core::messages::audio::{AudioCommand, AudioEvent};
 use pipewire as pw;
 
-use crate::worker::{self, Link, Message};
+use crate::worker::{self, Message, Outbox};
 
 const THREAD_NAME: &str = "audio";
 
@@ -31,17 +29,10 @@ impl AudioHandle {
         crate::init();
         let (commands, mailbox) = pw::channel::channel();
         let (publisher, events) = async_channel::unbounded();
-        let myself = commands.clone();
+        let to_itself = commands.clone();
         let thread = thread::Builder::new()
             .name(THREAD_NAME.to_owned())
-            .spawn(move || {
-                let link = Link {
-                    events: publisher,
-                    myself,
-                    announced: Rc::new(Cell::new(None)),
-                };
-                worker::run(mailbox, &link);
-            })?;
+            .spawn(move || worker::run(mailbox, &Outbox::new(publisher, to_itself)))?;
         Ok(Self {
             commands: AudioCommands(commands),
             events,

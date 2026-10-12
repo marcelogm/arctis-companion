@@ -1,6 +1,6 @@
-use arctis_audio::graph::{
-    CONFIGURED_AUDIO_SINK, DEFAULT_AUDIO_SINK, Defaults, Graph, Link, json_for_name, name_from_json,
-};
+use arctis_audio::graph::{Defaults, Graph, Link};
+use arctis_audio::keys::{CONFIGURED_AUDIO_SINK, DEFAULT_AUDIO_SINK};
+use arctis_audio::metadata_value::{json_for_name, name_from_json};
 
 use crate::support::{BLUEZ, SPEAKERS, Scene, props, quoted};
 
@@ -21,17 +21,38 @@ fn a_node_keeps_its_running_state_when_its_props_change() {
 }
 
 #[test]
-fn removing_an_id_forgets_it_whatever_its_kind() {
-    let mut graph = Scene::default()
-        .usb(7, 3, "0x2232")
-        .client(9, &[("application.name", "x")])
-        .link(7, 8)
-        .build();
-    for id in [7, 3, 9, 1000] {
+fn removing_a_node_or_a_link_forgets_it() {
+    let mut graph = Scene::default().usb(7, 3, "0x2232").link(7, 8).build();
+    for id in [7, 1000] {
         graph.remove(id);
     }
     assert_eq!(graph.nodes().count(), 0);
     assert_eq!(graph.inputs_fed_by(7).count(), 0);
+}
+
+#[test]
+fn removing_a_device_or_a_client_forgets_it() {
+    let mut graph = Scene::default()
+        .usb(7, 3, "0x2232")
+        .client(9, &[("application.name", "x")])
+        .stream(11, &[("client.id", "9")])
+        .build();
+    graph.remove(3);
+    graph.remove(9);
+    let usb = graph.node(7).expect("usb sink");
+    let stream = graph.node(11).expect("stream");
+    assert_eq!(graph.device_of(usb), None);
+    assert_eq!(graph.client_of(stream), None);
+}
+
+#[test]
+fn removing_the_metadata_that_set_the_defaults_clears_them() {
+    let mut graph = Scene::default().default_sink(BLUEZ).build();
+    graph.take_defaults_from(40);
+    graph.remove(41);
+    assert_eq!(graph.defaults().current(), Some(BLUEZ));
+    graph.remove(40);
+    assert_eq!(graph.defaults(), &Defaults::default());
 }
 
 #[test]
@@ -59,9 +80,9 @@ fn written_names_read_back() {
 #[test]
 fn defaults_follow_their_metadata_keys() {
     let mut graph = Graph::default();
-    graph.set_default(Some(DEFAULT_AUDIO_SINK), Some(&quoted(BLUEZ)));
-    graph.set_default(Some(CONFIGURED_AUDIO_SINK), Some(&quoted(SPEAKERS)));
-    graph.set_default(Some("default.audio.source"), Some(&quoted("mic")));
+    graph.set_default(DEFAULT_AUDIO_SINK, Some(&quoted(BLUEZ)));
+    graph.set_default(CONFIGURED_AUDIO_SINK, Some(&quoted(SPEAKERS)));
+    graph.set_default("default.audio.source", Some(&quoted("mic")));
     assert_eq!(
         graph.defaults(),
         &Defaults {
@@ -69,9 +90,9 @@ fn defaults_follow_their_metadata_keys() {
             configured_audio_sink: Some(SPEAKERS.to_owned()),
         }
     );
-    graph.set_default(Some(DEFAULT_AUDIO_SINK), None);
+    graph.set_default(DEFAULT_AUDIO_SINK, None);
     assert_eq!(graph.defaults().audio_sink, None);
-    graph.set_default(None, None);
+    graph.clear_defaults();
     assert_eq!(graph.defaults(), &Defaults::default());
 }
 

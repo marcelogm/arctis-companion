@@ -14,14 +14,14 @@ use pw::spa::pod::Pod;
 use pw::spa::utils::dict::DictRef;
 use pw::types::ObjectType;
 
-use crate::graph::{CONFIGURED_AUDIO_SINK, Graph, Link, ObjectId, Props, json_for_name};
+use crate::graph::{Graph, Link, ObjectId, Props};
+use crate::keys::{CONFIGURED_AUDIO_SINK, LINK_INPUT_NODE, LINK_OUTPUT_NODE, METADATA_NAME};
+use crate::metadata_value::json_for_name;
 use crate::volume::volume_change;
 
-const METADATA_NAME: &str = "metadata.name";
 const DEFAULT_METADATA: &str = "default";
 const JSON_TYPE: &str = "Spa:String:JSON";
-const LINK_OUTPUT_NODE: &str = "link.output.node";
-const LINK_INPUT_NODE: &str = "link.input.node";
+const HANDLED: i32 = 0;
 
 pub type Changed = Rc<dyn Fn()>;
 
@@ -35,7 +35,7 @@ pub struct Registry {
 #[derive(Default)]
 struct Proxies {
     nodes: HashMap<ObjectId, Node>,
-    metadata: Option<Metadata>,
+    metadata: Option<(ObjectId, Metadata)>,
     others: HashMap<ObjectId, Box<dyn ProxyT>>,
     listeners: HashMap<ObjectId, Box<dyn Listener>>,
 }
@@ -45,6 +45,13 @@ impl Proxies {
         self.listeners.remove(&id);
         self.nodes.remove(&id);
         self.others.remove(&id);
+        if self
+            .metadata
+            .as_ref()
+            .is_some_and(|(metadata, _)| *metadata == id)
+        {
+            self.metadata = None;
+        }
     }
 }
 
@@ -84,7 +91,7 @@ impl Registry {
     }
 
     pub fn write_default_sink(&self, name: &str) {
-        if let Some(metadata) = &self.proxies.borrow().metadata {
+        if let Some((_, metadata)) = &self.proxies.borrow().metadata {
             metadata.set_property(
                 0,
                 CONFIGURED_AUDIO_SINK,
@@ -149,9 +156,12 @@ impl Watcher {
 
     fn metadata_property(&self, subject: u32, key: Option<&str>, value: Option<&str>) -> i32 {
         if subject == 0 {
-            self.update(|graph| graph.set_default(key, value));
+            self.update(|graph| match key {
+                Some(key) => graph.set_default(key, value),
+                None => graph.clear_defaults(),
+            });
         }
-        0
+        HANDLED
     }
 }
 
@@ -209,36 +219,40 @@ impl Binder {
         self.proxies.borrow_mut().nodes.insert(id, node);
     }
 
-    fn bind_device(&self, global: &GlobalObject<&DictRef>) {
-        let Some(device) = self.bound::<Device>(global) else {
+    fn bind_other<T: ProxyT + 'static>(
+        &self,
+        global: &GlobalObject<&DictRef>,
+        listen: impl FnOnce(&T, Watcher, ObjectId) -> Box<dyn Listener>,
+    ) {
+        let Some(proxy) = self.bound::<T>(global) else {
             return;
         };
-        let (id, watcher) = (global.id, self.watcher.clone());
-        let listener = device
-            .add_listener_local()
-            .info(move |info| watcher.device_info(id, info))
-            .register();
-        self.keep(id, Box::new(listener));
+        let listener = listen(&proxy, self.watcher.clone(), global.id);
+        self.keep(global.id, listener);
         self.proxies
             .borrow_mut()
             .others
-            .insert(id, Box::new(device));
+            .insert(global.id, Box::new(proxy));
+    }
+
+    fn bind_device(&self, global: &GlobalObject<&DictRef>) {
+        self.bind_other(global, |device: &Device, watcher, id| {
+            let listener = device
+                .add_listener_local()
+                .info(move |info| watcher.device_info(id, info))
+                .register();
+            Box::new(listener)
+        });
     }
 
     fn bind_client(&self, global: &GlobalObject<&DictRef>) {
-        let Some(client) = self.bound::<Client>(global) else {
-            return;
-        };
-        let (id, watcher) = (global.id, self.watcher.clone());
-        let listener = client
-            .add_listener_local()
-            .info(move |info| watcher.client_info(id, info))
-            .register();
-        self.keep(id, Box::new(listener));
-        self.proxies
-            .borrow_mut()
-            .others
-            .insert(id, Box::new(client));
+        self.bind_other(global, |client: &Client, watcher, id| {
+            let listener = client
+                .add_listener_local()
+                .info(move |info| watcher.client_info(id, info))
+                .register();
+            Box::new(listener)
+        });
     }
 
     fn add_link(&self, global: &GlobalObject<&DictRef>) {
@@ -261,7 +275,9 @@ impl Binder {
             .property(move |subject, key, _, value| watcher.metadata_property(subject, key, value))
             .register();
         self.keep(global.id, Box::new(listener));
-        self.proxies.borrow_mut().metadata = Some(metadata);
+        self.proxies.borrow_mut().metadata = Some((global.id, metadata));
+        let id = global.id;
+        self.watcher.update(|graph| graph.take_defaults_from(id));
     }
 }
 

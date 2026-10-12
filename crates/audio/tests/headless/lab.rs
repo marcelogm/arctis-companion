@@ -2,6 +2,7 @@ use std::thread;
 use std::time::{Duration, Instant};
 
 use arctis_audio::AudioHandle;
+pub use arctis_audio::eq_names::EQ_SINK_NAME;
 use arctis_core::eq::{Curve, library};
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, DefaultSink, SinkKind};
 
@@ -10,7 +11,6 @@ use crate::tools;
 pub const HEADLESS: &str = "needs the private PipeWire of crates/audio/tests/headless/run.sh";
 pub const BLUEZ: &str = "bluez_output.AA_BB_CC_DD_EE_FF.1";
 pub const USB: &str = "alsa_output.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.iec958-stereo";
-pub const EQ_SINK: &str = "arctis_companion_eq";
 const FULL_VOLUME: &str = "{ channelVolumes = [ 1.0, 1.0 ], mute = false }";
 const PATIENCE: Duration = Duration::from_secs(5);
 const POLL: Duration = Duration::from_millis(20);
@@ -72,6 +72,18 @@ impl Lab {
 
     fn next_event(&self, deadline: Instant, what: &str) -> Option<AudioEvent> {
         assert!(Instant::now() < deadline, "timed out waiting for {what}");
+        self.poll_event()
+    }
+
+    pub fn default_sinks_during(&self, window: Duration) -> Vec<AudioEvent> {
+        let deadline = Instant::now() + window;
+        std::iter::from_fn(|| (Instant::now() < deadline).then(|| self.poll_event()))
+            .flatten()
+            .filter(|event| matches!(event, AudioEvent::DefaultSink(_)))
+            .collect()
+    }
+
+    fn poll_event(&self) -> Option<AudioEvent> {
         let event = self.audio.events.try_recv().ok();
         if event.is_none() {
             thread::sleep(POLL);

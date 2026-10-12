@@ -1,13 +1,10 @@
 use arctis_core::messages::audio::{AppIdentifiers, SinkKind, SoundPath, StreamInfo};
 
+use crate::eq_names::EQ_OUTPUT_NAME;
 use crate::graph::{Graph, Node, OUTPUT_STREAM, ObjectId, Props};
-use crate::links::{self, LINK_GROUP};
-use crate::outputs::{EQ_OUTPUT_NAME, passes_through_equalizer, sink_kind};
-
-const PORTAL_APP_ID: &str = "pipewire.access.portal.app_id";
-const APPLICATION_ID: &str = "application.id";
-const PROCESS_BINARY: &str = "application.process.binary";
-const APPLICATION_NAME: &str = "application.name";
+use crate::keys::{APPLICATION_ID, APPLICATION_NAME, LINK_GROUP, PORTAL_APP_ID, PROCESS_BINARY};
+use crate::links;
+use crate::sinks::{passes_through_equalizer, sink_kind};
 
 #[must_use]
 pub fn streams(graph: &Graph) -> Vec<StreamInfo> {

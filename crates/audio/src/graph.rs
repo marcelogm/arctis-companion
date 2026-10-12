@@ -1,18 +1,16 @@
 use std::collections::BTreeMap;
 
+use crate::keys::{
+    CLIENT_ID, CONFIGURED_AUDIO_SINK, DEFAULT_AUDIO_SINK, DEVICE_ID, MEDIA_CLASS, NODE_NAME,
+};
+use crate::metadata_value::name_from_json;
 use crate::volume::{Volume, VolumeChange};
 
 pub type ObjectId = u32;
 
-pub const MEDIA_CLASS: &str = "media.class";
-pub const NODE_NAME: &str = "node.name";
 pub const AUDIO_SINK: &str = "Audio/Sink";
 pub const OUTPUT_STREAM: &str = "Stream/Output/Audio";
 pub const INPUT_STREAM: &str = "Stream/Input/Audio";
-pub const DEFAULT_AUDIO_SINK: &str = "default.audio.sink";
-pub const CONFIGURED_AUDIO_SINK: &str = "default.configured.audio.sink";
-const DEVICE_ID: &str = "device.id";
-const CLIENT_ID: &str = "client.id";
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Props(BTreeMap<String, String>);
@@ -96,6 +94,7 @@ pub struct Graph {
     clients: BTreeMap<ObjectId, Props>,
     links: BTreeMap<ObjectId, Link>,
     defaults: Defaults,
+    defaults_source: Option<ObjectId>,
 }
 
 impl Graph {
@@ -138,16 +137,27 @@ impl Graph {
         self.devices.remove(&id);
         self.clients.remove(&id);
         self.links.remove(&id);
+        if self.defaults_source == Some(id) {
+            self.defaults_source = None;
+            self.clear_defaults();
+        }
     }
 
-    pub fn set_default(&mut self, key: Option<&str>, value: Option<&str>) {
+    pub fn take_defaults_from(&mut self, metadata: ObjectId) {
+        self.defaults_source = Some(metadata);
+    }
+
+    pub fn set_default(&mut self, key: &str, value: Option<&str>) {
         let name = value.and_then(name_from_json);
         match key {
-            Some(DEFAULT_AUDIO_SINK) => self.defaults.audio_sink = name,
-            Some(CONFIGURED_AUDIO_SINK) => self.defaults.configured_audio_sink = name,
-            Some(_) => {}
-            None => self.defaults = Defaults::default(),
+            DEFAULT_AUDIO_SINK => self.defaults.audio_sink = name,
+            CONFIGURED_AUDIO_SINK => self.defaults.configured_audio_sink = name,
+            _ => {}
         }
+    }
+
+    pub fn clear_defaults(&mut self) {
+        self.defaults = Defaults::default();
     }
 
     #[must_use]
@@ -187,31 +197,4 @@ impl Graph {
             .filter(move |link| link.output == id)
             .map(|link| link.input)
     }
-}
-
-#[must_use]
-pub fn name_from_json(value: &str) -> Option<String> {
-    let after_key = value.split_once("\"name\"")?.1;
-    let after_colon = after_key.trim_start().strip_prefix(':')?;
-    let quoted = after_colon.trim_start().strip_prefix('"')?;
-    unescape_until_quote(quoted)
-}
-
-fn unescape_until_quote(text: &str) -> Option<String> {
-    let mut name = String::new();
-    let mut chars = text.chars();
-    while let Some(next) = chars.next() {
-        match next {
-            '"' => return Some(name),
-            '\\' => name.push(chars.next()?),
-            _ => name.push(next),
-        }
-    }
-    None
-}
-
-#[must_use]
-pub fn json_for_name(name: &str) -> String {
-    let escaped = name.replace('\\', "\\\\").replace('"', "\\\"");
-    format!("{{\"name\":\"{escaped}\"}}")
 }

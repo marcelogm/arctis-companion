@@ -1,13 +1,11 @@
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
 use arctis_core::protocol::model::{Model, ModelLookup, VENDOR_ID};
 
+use crate::eq_names::EQ_SINK_NAME;
 use crate::graph::{AUDIO_SINK, Graph, Node, ObjectId, Props};
+use crate::keys::{DEVICE_API, DEVICE_PRODUCT_ID, DEVICE_VENDOR_ID, NODE_DESCRIPTION};
 use crate::links::{self, Chain};
 
-pub const EQ_SINK_NAME: &str = "arctis_companion_eq";
-pub const EQ_OUTPUT_NAME: &str = "arctis_companion_eq_out";
-pub const EQ_DESCRIPTION: &str = "Arctis Nova 5 (Equalizer)";
-pub const EQ_LINK_GROUP: &str = "arctis-companion-eq";
 const BLUETOOTH_API: &str = "bluez5";
 const NOVA_DESCRIPTION: &str = "Arctis Nova 5";
 const EASY_EFFECTS_PREFIX: &str = "ee_";
@@ -32,16 +30,16 @@ pub fn sink_kind(graph: &Graph, id: ObjectId) -> SinkKind {
 }
 
 fn is_nova_bluetooth(sink: &Node) -> bool {
-    sink.props.get("device.api") == Some(BLUETOOTH_API)
+    sink.props.get(DEVICE_API) == Some(BLUETOOTH_API)
         && sink
             .props
-            .get("node.description")
+            .get(NODE_DESCRIPTION)
             .is_some_and(|description| description.starts_with(NOVA_DESCRIPTION))
 }
 
 fn is_nova_dongle(device: &Props) -> bool {
-    let vendor = device.get("device.vendor.id").and_then(parse_hex);
-    let product = device.get("device.product.id").and_then(parse_hex);
+    let vendor = device.get(DEVICE_VENDOR_ID).and_then(parse_hex);
+    let product = device.get(DEVICE_PRODUCT_ID).and_then(parse_hex);
     vendor == Some(VENDOR_ID)
         && product.is_some_and(|pid| matches!(Model::lookup(pid), ModelLookup::Supported(_)))
 }
@@ -61,13 +59,27 @@ pub fn has_nova_bluetooth(graph: &Graph) -> bool {
 }
 
 #[must_use]
-pub fn default_sink(graph: &Graph) -> DefaultSink {
+pub fn default_sink(graph: &Graph) -> Option<DefaultSink> {
+    (!effective_default_missing(graph)).then(|| route(graph))
+}
+
+fn effective_default_missing(graph: &Graph) -> bool {
     graph
         .defaults()
-        .current()
-        .and_then(|name| graph.node_named(name))
+        .audio_sink
+        .as_deref()
+        .is_some_and(|name| graph.node_named(name).is_none())
+}
+
+fn route(graph: &Graph) -> DefaultSink {
+    default_node(graph)
         .and_then(|id| links::follow(graph, id))
         .map_or(UNKNOWN, |chain| describe(graph, &chain))
+}
+
+#[must_use]
+pub fn default_node(graph: &Graph) -> Option<ObjectId> {
+    graph.node_named(graph.defaults().current()?)
 }
 
 fn describe(graph: &Graph, chain: &Chain) -> DefaultSink {
@@ -89,66 +101,4 @@ fn chain_has(graph: &Graph, chain: &Chain, test: impl Fn(&str) -> bool) -> bool 
         .iter()
         .filter_map(|id| graph.node(*id)?.name())
         .any(test)
-}
-
-#[must_use]
-pub fn insertion_target(graph: &Graph) -> Option<String> {
-    let name = graph.defaults().current()?;
-    let id = graph.node_named(name)?;
-    (sink_kind(graph, id) == SinkKind::NovaBluetooth).then(|| name.to_owned())
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum InsertStep {
-    Create { replaced: String },
-    Retarget,
-    Skip,
-}
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub enum RemoveStep {
-    Restore(String),
-    LeaveDefault,
-    NothingInserted,
-}
-
-#[derive(Debug, Default)]
-pub struct Outputs {
-    replaced: Option<String>,
-}
-
-impl Outputs {
-    pub fn insert(&mut self, graph: &Graph) -> InsertStep {
-        if self.replaced.is_some() {
-            return InsertStep::Retarget;
-        }
-        let Some(replaced) = insertion_target(graph) else {
-            return InsertStep::Skip;
-        };
-        self.replaced = Some(replaced.clone());
-        InsertStep::Create { replaced }
-    }
-
-    pub fn remove(&mut self, graph: &Graph) -> RemoveStep {
-        match self.replaced.take() {
-            None => RemoveStep::NothingInserted,
-            Some(replaced) if graph.defaults().mentions(EQ_SINK_NAME) => {
-                RemoveStep::Restore(replaced)
-            }
-            Some(_) => RemoveStep::LeaveDefault,
-        }
-    }
-
-    #[must_use]
-    pub fn manager_denied(&self, graph: &Graph) -> bool {
-        let defaults = graph.defaults();
-        self.replaced.as_deref().is_some_and(|replaced| {
-            defaults.configured() != Some(EQ_SINK_NAME) && defaults.current() == Some(replaced)
-        })
-    }
-
-    #[must_use]
-    pub fn is_inserted(&self) -> bool {
-        self.replaced.is_some()
-    }
 }

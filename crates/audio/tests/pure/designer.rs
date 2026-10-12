@@ -1,12 +1,7 @@
-use std::io::Cursor;
-
 use arctis_audio::designer::{Designer, INITIAL_RATE, rate_of};
+use arctis_audio::pod::format_pod;
 use arctis_core::eq::{Coefficients, Curve, PresetId, library};
-use pipewire::spa;
-use spa::param::audio::{AudioFormat, AudioInfoRaw};
-use spa::pod::serialize::PodSerializer;
-use spa::pod::{Object, Pod, Value};
-use spa::sys::{SPA_PARAM_Format, SPA_TYPE_OBJECT_Format};
+use pipewire::spa::pod::Pod;
 
 fn curve(id: &str) -> Curve {
     library::find(&PresetId::new(id))
@@ -15,26 +10,10 @@ fn curve(id: &str) -> Curve {
         .clone()
 }
 
-fn format_at(rate: u32) -> Vec<u8> {
-    let mut info = AudioInfoRaw::new();
-    info.set_format(AudioFormat::F32LE);
-    info.set_channels(2);
-    info.set_rate(rate);
-    let format = Value::Object(Object {
-        type_: SPA_TYPE_OBJECT_Format,
-        id: SPA_PARAM_Format,
-        properties: info.into(),
-    });
-    PodSerializer::serialize(Cursor::new(Vec::new()), &format)
-        .expect("format pod")
-        .0
-        .into_inner()
-}
-
 #[test]
 fn a_negotiated_format_names_its_rate() {
     for (rate, expected) in [(44_100, Some(44_100)), (48_000, Some(48_000)), (0, None)] {
-        let bytes = format_at(rate);
+        let bytes = format_pod(Some(rate));
         let pod = Pod::from_bytes(&bytes).expect("pod");
         assert_eq!(rate_of(pod), expected, "{rate}");
     }

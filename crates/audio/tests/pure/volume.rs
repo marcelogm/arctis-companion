@@ -28,8 +28,12 @@ fn a_props_pod_reads_back_as_the_same_change() {
 }
 
 #[test]
-fn a_change_without_volume_or_mute_is_empty() {
+fn a_default_change_is_empty() {
     assert!(VolumeChange::default().is_empty());
+}
+
+#[test]
+fn mute_alone_is_a_change() {
     assert!(!read(&props_pod(&volume(&[], true))).is_empty());
 }
 

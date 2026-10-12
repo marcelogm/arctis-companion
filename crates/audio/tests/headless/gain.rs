@@ -3,7 +3,8 @@ use arctis_core::eq::{Curve, Filter, FilterKind, Gain, Hertz, Q};
 use arctis_core::messages::audio::AudioCommand;
 
 use crate::lab::{BLUEZ, Lab, flat};
-use crate::tone::{TONE_HZ, Tone, level_db};
+use crate::meter::level_db;
+use crate::tone::{TONE_HZ, Tone};
 
 const TOLERANCE_DB: f64 = 0.5;
 

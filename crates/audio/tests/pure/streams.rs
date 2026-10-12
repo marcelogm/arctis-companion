@@ -1,3 +1,4 @@
+use arctis_audio::eq_names::EQ_OUTPUT_NAME;
 use arctis_audio::streams::{identifiers, streams};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 
@@ -127,7 +128,7 @@ fn filter_outputs_and_anonymous_streams_are_not_apps() {
         .stream(
             12,
             &[
-                ("node.name", "arctis_companion_eq_out"),
+                ("node.name", EQ_OUTPUT_NAME),
                 ("application.process.binary", "arctis-companion"),
             ],
         )
