@@ -17,6 +17,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [hid.md](hid.md) | HID adapter: sysfs discovery, hidraw ports, the device thread |
 | [battery-page.md](battery-page.md) | battery history page and chart |
 | [presets.md](presets.md) | presets page, equalizer editor, response graph, preset import and export |
+| [app.md](app.md) | app platform: bridge, ports, settings and file stores, Headset1, background, notifications |
 
 ## Workspace
 
@@ -37,7 +38,7 @@ flowchart BT
 | `crates/hid/` | `crates/hid/src/lib.rs`, `crates/hid/src/handle.rs::DeviceHandle`, `crates/hid/src/worker.rs::Worker` |
 | `crates/audio/` | `crates/audio/src/lib.rs::init`, `crates/audio/src/handle.rs::AudioHandle` |
 | `crates/ui/` | `crates/ui/src/lib.rs::register_resources`, `crates/ui/src/window.rs::Window`, `crates/ui/src/text.rs::resolve`, `crates/ui/src/intents.rs::IntentSink` |
-| `crates/app/` | `crates/app/src/main.rs::main`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::build` |
+| `crates/app/` | `crates/app/src/main.rs::main`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::build`, `crates/app/src/runtime.rs::Runtime`, `crates/app/src/bridge.rs::Bridge` |
 | `xtask/` | `xtask/src/main.rs::run` |
 
 Workspace manifest and lint policy: `Cargo.toml`, `clippy.toml`, `rustfmt.toml`, `.cargo/config.toml`.
@@ -49,12 +50,10 @@ sequenceDiagram
     participant M as main
     participant A as application::run
     participant U as arctis_ui
-    M->>M: arctis_audio::init()
     M->>A: run()
     A->>U: register_resources()
     alt resources registered
-        A->>A: build().run()
-        A->>U: activate: Window::new(app).present()
+        A->>A: build(Threads::system).run(), see app.md
     else bundle invalid
         A-->>M: g_critical, ExitCode::FAILURE
     end
@@ -92,7 +91,7 @@ flowchart LR
 flowchart LR
     PR["pull_request, push to main"] --> R["rules: fmt, check-rules, check-doc-paths,<br/>check-pure, check-commits"]
     R --> T["test: clippy -D warnings, cargo test,<br/>llvm-cov 90 % on core"]
-    R --> G["ui: weston headless, cargo test -p arctis-ui"]
+    R --> G["ui: weston headless, dbus-daemon,<br/>cargo test -p arctis-ui -p arctis-app"]
     R --> X["extension: eslint, gjs tests,<br/>catalogue check, pack"]
     T --> F["flatpak: flatpak-builder"]
     T --> A["audio-integration: private PipeWire + WirePlumber,<br/>crates/audio/tests/headless/run.sh"]
