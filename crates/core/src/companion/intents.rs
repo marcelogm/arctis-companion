@@ -110,17 +110,26 @@ impl Companion {
         preset: Option<PresetId>,
         out: &mut Vec<Action>,
     ) {
-        match &preset {
-            Some(chosen) => self
-                .settings
-                .app_rules
-                .set(identifier.clone(), chosen.clone()),
-            None => self.settings.app_rules.remove(&identifier),
-        }
+        let replaced = self.store_app_rule(&identifier, preset.as_ref());
+        let removals = replaced.into_iter().map(|stored| PersistedChange::AppRule {
+            identifier: stored,
+            preset: None,
+        });
+        out.extend(removals.map(Action::Persist));
         out.push(Action::Persist(PersistedChange::AppRule {
             identifier,
             preset,
         }));
+    }
+
+    fn store_app_rule(&mut self, identifier: &str, preset: Option<&PresetId>) -> Vec<String> {
+        let Some(chosen) = preset else {
+            self.settings.app_rules.remove(identifier);
+            return Vec::new();
+        };
+        self.settings
+            .app_rules
+            .set(identifier.to_owned(), chosen.clone())
     }
 
     fn start_preview(&mut self, preset: PresetId) {
