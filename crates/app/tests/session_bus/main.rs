@@ -6,6 +6,7 @@ mod notification_service;
 mod notifications;
 mod portal;
 mod portal_service;
+mod service;
 mod window;
 
 use std::env;
@@ -51,6 +52,10 @@ const SCENARIOS: &[Scenario] = &[
     (
         "the window slot presents one window",
         window::presents_one_window_with_the_latest_state,
+    ),
+    (
+        "runs windowless as a service",
+        service::runs_windowless_as_a_service,
     ),
 ];
 

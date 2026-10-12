@@ -6,7 +6,10 @@ use std::rc::Rc;
 
 use arctis_app::platform::background::{BackgroundController, BackgroundView, Hold, Portal};
 use arctis_app::ports::SnapshotView;
+use arctis_app::runtime::{Destination, destination};
+use arctis_core::companion::Input;
 use arctis_core::companion::routing::Route;
+use arctis_core::intent::Intent;
 use arctis_core::messages::device::Phase;
 use arctis_core::testkit::snapshots::{snapshot, with};
 use arctis_core::view::preferences::Background;
@@ -179,5 +182,17 @@ fn the_status_line_follows_the_snapshot_when_it_changes() {
     assert_eq!(
         *s.portal.statuses.borrow(),
         ["Headset connected, 73 %", "No headset"]
+    );
+}
+
+#[test]
+fn the_run_in_background_switch_goes_to_the_controller() {
+    assert_eq!(
+        destination(Intent::SetRunInBackground(false)),
+        Destination::Background(false)
+    );
+    assert_eq!(
+        destination(Intent::SetAutomaticPresets(false)),
+        Destination::Companion(Input::Intent(Intent::SetAutomaticPresets(false)))
     );
 }
