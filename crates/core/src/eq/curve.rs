@@ -25,6 +25,12 @@ impl Curve {
         }
     }
 
+    pub(crate) fn from_slots(slots: [Option<Filter>; MAX_FILTERS]) -> Self {
+        Self {
+            filters: slots.into_iter().flatten().collect(),
+        }
+    }
+
     #[must_use]
     pub fn filters(&self) -> &[Filter] {
         &self.filters

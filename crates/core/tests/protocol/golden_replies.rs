@@ -1,15 +1,14 @@
-mod support;
-
 use arctis_core::protocol::command::Query;
 use arctis_core::protocol::eq_wire::decode_curve;
-use arctis_core::protocol::firmware::{Firmware, Version};
+use arctis_core::protocol::firmware::Firmware;
 use arctis_core::protocol::reply::{
     AudioReadback, Reply, UxReadback, decode_reply, observed_settings,
 };
 use arctis_core::protocol::status::{Charging, Link, Status};
 use arctis_core::settings::headset_settings::HeadsetSettings;
-use arctis_core::settings::values::{MuteLight, Percent, WirelessMode};
-use support::{auto_off, factory_flat, golden, mic, sidetone};
+use arctis_core::settings::values::{MuteLight, WirelessMode};
+
+use crate::support::{auto_off, factory_flat, golden, mic, percent, sidetone, version};
 
 fn decoded(query: Query, name: &str) -> Reply {
     decode_reply(query, &golden(name)).expect("golden reply decodes")
@@ -34,18 +33,6 @@ fn wireless(name: &str) -> WirelessMode {
         panic!("{name} is not a wireless reply");
     };
     mode
-}
-
-fn percent(value: u8) -> Percent {
-    Percent::try_from(value).expect("percent")
-}
-
-const fn version(major: u8, minor: u8, patch: u8) -> Version {
-    Version {
-        major,
-        minor,
-        patch,
-    }
 }
 
 #[test]

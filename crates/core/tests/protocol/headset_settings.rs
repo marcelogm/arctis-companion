@@ -1,28 +1,17 @@
-use arctis_core::eq::{Curve, Filter, FilterKind};
-use arctis_core::settings::headset_settings::{HeadsetSettings, Setting, SettingChange};
-use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
+use arctis_core::eq::{Curve, FilterKind};
+use arctis_core::settings::headset_settings::{Setting, SettingChange};
+use arctis_core::settings::values::{AutoPowerOff, MuteLight, WirelessMode};
 
-fn sample_settings() -> HeadsetSettings {
-    HeadsetSettings {
-        mic_volume: MicVolume::try_from(15).expect("mic volume"),
-        sidetone: Sidetone::try_from(0).expect("sidetone"),
-        mute_light: MuteLight::High,
-        volume_limiter: true,
-        wireless_mode: WirelessMode::Standard,
-        auto_power_off: AutoPowerOff::try_from(30).expect("auto power off"),
-        equalizer: Curve::default(),
-    }
-}
+use crate::support::{filter, mic, sample_settings, sidetone};
 
 fn bass_curve() -> Curve {
-    let filter = Filter::from_parts(FilterKind::LowShelf, 80, 7, 707).expect("filter in envelope");
-    Curve::from_array([filter])
+    Curve::from_array([filter(FilterKind::LowShelf, 80, 7, 707)])
 }
 
 fn changed(setting: Setting) -> SettingChange {
     match setting {
-        Setting::MicVolume => SettingChange::MicVolume(MicVolume::try_from(7).expect("mic")),
-        Setting::Sidetone => SettingChange::Sidetone(Sidetone::try_from(6).expect("sidetone")),
+        Setting::MicVolume => SettingChange::MicVolume(mic(7)),
+        Setting::Sidetone => SettingChange::Sidetone(sidetone(6)),
         Setting::MuteLight => SettingChange::MuteLight(MuteLight::Low),
         Setting::VolumeLimiter => SettingChange::VolumeLimiter(false),
         Setting::WirelessMode => SettingChange::WirelessMode(WirelessMode::ExtendedRange),

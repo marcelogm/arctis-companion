@@ -1,5 +1,3 @@
-mod strategies;
-
 use arctis_core::eq::Curve;
 use arctis_core::protocol::command::{Command, Query, encode};
 use arctis_core::settings::headset_settings::SettingChange;
@@ -7,19 +5,14 @@ use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone
 use proptest::prelude::*;
 use proptest::sample::select;
 
+use crate::strategies;
+use crate::support::{DISABLED_BAND, mic, sidetone};
+
 const ALLOWED_IDS: [u8; 12] = [
     0xB0, 0x10, 0x20, 0xA0, 0x36, 0x37, 0x39, 0x27, 0x33, 0xAE, 0xA3, 0x35,
 ];
 const FORBIDDEN_IDS: [u8; 5] = [0x09, 0xA5, 0xA7, 0x22, 0x34];
 const SET_WIRELESS_MODE: u8 = 0x35;
-
-fn mic(level: u8) -> MicVolume {
-    MicVolume::try_from(level).expect("mic volume")
-}
-
-fn sidetone(level: u8) -> Sidetone {
-    Sidetone::try_from(level).expect("sidetone")
-}
 
 fn empty_curve() -> Curve {
     Curve::default()
@@ -69,7 +62,7 @@ fn setters_encode_to_their_cited_bytes() {
 fn set_equalizer_carries_ten_bands_after_its_id() {
     let frame = encode(&Command::SetEqualizer(empty_curve()));
     assert_eq!(frame.payload()[0], 0x33);
-    assert_eq!(frame.payload()[1..7], [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03]);
+    assert_eq!(frame.payload()[1..7], DISABLED_BAND);
     assert_eq!(frame.payload()[61..], [0, 0, 0]);
 }
 
@@ -155,11 +148,20 @@ fn command() -> impl Strategy<Value = Command> {
     ]
 }
 
-fn argument_len(command: &Command) -> usize {
+const fn argument_len(command: &Command) -> usize {
     match command {
+        Command::QueryStatus
+        | Command::QueryFirmware
+        | Command::QueryAudio
+        | Command::QueryUx
+        | Command::QueryWireless => 0,
         Command::SetEqualizer(_) => 60,
-        other if other.readback().is_none() => 0,
-        _ => 1,
+        Command::SetMicVolume(_)
+        | Command::SetSidetone(_)
+        | Command::SetVolumeLimiter(_)
+        | Command::SetMuteLight(_)
+        | Command::SetAutoPowerOff(_)
+        | Command::SetWirelessMode(_) => 1,
     }
 }
 

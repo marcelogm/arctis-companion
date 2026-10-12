@@ -1,17 +1,12 @@
-mod strategies;
-
 use arctis_core::eq::curve::MAX_FILTERS;
-use arctis_core::eq::{Curve, Filter, FilterKind};
+use arctis_core::eq::{Curve, FilterKind};
 use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
 use arctis_core::protocol::frame::DecodeError;
 use proptest::collection::vec;
 use proptest::prelude::*;
 
-const DISABLED_BAND: [u8; 6] = [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03];
-
-fn filter(kind: FilterKind, hz: u16, half_db: i8, milli_q: u16) -> Filter {
-    Filter::from_parts(kind, hz, half_db, milli_q).expect("filter in envelope")
-}
+use crate::strategies;
+use crate::support::{DISABLED_BAND, filter};
 
 fn frame_with_bands(bands: &[[u8; 6]]) -> Vec<u8> {
     let mut frame = vec![0x20];

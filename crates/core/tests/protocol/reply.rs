@@ -1,12 +1,14 @@
 use arctis_core::protocol::command::Query;
-use arctis_core::protocol::firmware::{Firmware, Version};
+use arctis_core::protocol::firmware::Firmware;
 use arctis_core::protocol::frame::DecodeError;
 use arctis_core::protocol::reply::{Reply, UxReadback, decode_reply};
 use arctis_core::protocol::status::{Charging, Link, Status};
-use arctis_core::settings::values::{AutoPowerOff, MuteLight, Percent, WirelessMode};
+use arctis_core::settings::values::{MuteLight, WirelessMode};
 use proptest::collection::vec;
 use proptest::prelude::*;
 use proptest::sample::select;
+
+use crate::support::{DISABLED_BAND, auto_off, percent, version};
 
 const DOCUMENTED_REPLIES: [(Query, &[u8]); 4] = [
     (Query::Status, &[0xB0, 0x03, 0x03, 0x25, 0x03]),
@@ -14,8 +16,6 @@ const DOCUMENTED_REPLIES: [(Query, &[u8]); 4] = [
     (Query::Ux, &[0xA0, 0x1e, 0x0a]),
     (Query::Wireless, &[0x36, 0x01]),
 ];
-
-const DISABLED_BAND: [u8; 6] = [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03];
 
 fn frame(id: u8, fields: &[(usize, u8)]) -> Vec<u8> {
     let mut bytes = vec![0; 64];
@@ -45,14 +45,6 @@ fn firmware(receiver: &[u8; 12], headset: &[u8; 12]) -> Firmware {
         panic!("firmware frame does not decode");
     };
     firmware
-}
-
-const fn version(major: u8, minor: u8, patch: u8) -> Version {
-    Version {
-        major,
-        minor,
-        patch,
-    }
 }
 
 #[test]
@@ -96,7 +88,7 @@ fn a_reply_of_exactly_its_documented_length_decodes() {
     assert_eq!(
         decode_reply(Query::Ux, &[0xA0, 0x1e, 0x0a]),
         Ok(Reply::Ux(UxReadback {
-            auto_power_off: AutoPowerOff::try_from(30).expect("choice"),
+            auto_power_off: auto_off(30),
             mute_light: MuteLight::High,
         }))
     );
@@ -107,7 +99,7 @@ fn a_status_reply_reads_link_battery_and_charging() {
     let bytes = frame(0xB0, &[(1, 3), (3, 73), (4, 1)]);
     let expected = Status {
         link: Link::Connected,
-        battery: Percent::try_from(73).expect("percent"),
+        battery: percent(73),
         charging: Charging::Charging,
     };
     assert_eq!(

@@ -2,7 +2,7 @@ use super::command::{AUTO_POWER_OFF, MIC_VOLUME, MUTE_LIGHT, SIDETONE, VOLUME_LI
 use super::frame::flag;
 use super::status::{Charging, ChatMix, Link};
 use crate::settings::headset_settings::SettingChange;
-use crate::settings::values::{AutoPowerOff, MuteLight, Percent};
+use crate::settings::values::{AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone};
 
 const CHAT_MIX: u8 = 0x45;
 const BATTERY: u8 = 0xB7;
@@ -44,8 +44,8 @@ fn setting_change(id: u8, bytes: &[u8]) -> Option<SettingChange> {
     let raw = *bytes.get(1)?;
     match id {
         VOLUME_LIMITER => flag(raw).map(SettingChange::VolumeLimiter),
-        MIC_VOLUME => value(bytes, 1).map(SettingChange::MicVolume),
-        SIDETONE => value(bytes, 1).map(SettingChange::Sidetone),
+        MIC_VOLUME => MicVolume::try_from(raw).ok().map(SettingChange::MicVolume),
+        SIDETONE => Sidetone::try_from(raw).ok().map(SettingChange::Sidetone),
         AUTO_POWER_OFF => Some(SettingChange::AutoPowerOff(AutoPowerOff::nearest(raw))),
         MUTE_LIGHT => Some(SettingChange::MuteLight(MuteLight::from_raw(raw))),
         _ => None,

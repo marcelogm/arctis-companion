@@ -1,72 +1,28 @@
-use crate::bounded::bounded;
-
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub struct OutOfRange;
+pub use crate::bounded::OutOfRange;
+use crate::bounded::{bounded, raw_enum};
 
 bounded!(MicVolume, u8, 0, 15);
 bounded!(Sidetone, u8, 0, 10);
 bounded!(Percent, u8, 0, 100);
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum MuteLight {
-    Off,
-    Low,
-    Medium,
-    High,
-}
+raw_enum!(MuteLight {
+    Off = 0,
+    Low = 1,
+    Medium = 4,
+    High = 10,
+});
 
 impl MuteLight {
-    pub const ALL: [Self; 4] = [Self::Off, Self::Low, Self::Medium, Self::High];
-
     #[must_use]
-    pub const fn raw(self) -> u8 {
-        match self {
-            Self::Off => 0,
-            Self::Low => 1,
-            Self::Medium => 4,
-            Self::High => 10,
-        }
-    }
-
-    #[must_use]
-    pub const fn from_raw(raw: u8) -> Self {
-        match raw {
-            0 => Self::Off,
-            1 => Self::Low,
-            10 => Self::High,
-            _ => Self::Medium,
-        }
+    pub fn from_raw(raw: u8) -> Self {
+        Self::try_from(raw).unwrap_or(Self::Medium)
     }
 }
 
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
-pub enum WirelessMode {
-    ExtendedRange,
-    Standard,
-}
-
-impl WirelessMode {
-    pub const ALL: [Self; 2] = [Self::ExtendedRange, Self::Standard];
-
-    #[must_use]
-    pub const fn raw(self) -> u8 {
-        match self {
-            Self::ExtendedRange => 0,
-            Self::Standard => 1,
-        }
-    }
-}
-
-impl TryFrom<u8> for WirelessMode {
-    type Error = OutOfRange;
-
-    fn try_from(raw: u8) -> Result<Self, OutOfRange> {
-        Self::ALL
-            .into_iter()
-            .find(|mode| mode.raw() == raw)
-            .ok_or(OutOfRange)
-    }
-}
+raw_enum!(WirelessMode {
+    ExtendedRange = 0,
+    Standard = 1,
+});
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct AutoPowerOff(u8);

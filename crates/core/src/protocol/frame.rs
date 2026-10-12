@@ -5,10 +5,11 @@ pub const REPORT_LEN: usize = PAYLOAD_LEN + 1;
 pub struct Frame([u8; REPORT_LEN]);
 
 impl Frame {
-    pub(crate) fn new(id: u8, args: &[u8]) -> Self {
+    pub(crate) fn new<const A: usize>(id: u8, args: &[u8; A]) -> Self {
+        const { assert!(A < PAYLOAD_LEN) };
         let mut bytes = [0; REPORT_LEN];
         bytes[1] = id;
-        bytes[2..2 + args.len()].copy_from_slice(args);
+        bytes[2..2 + A].copy_from_slice(args);
         Self(bytes)
     }
 
@@ -30,23 +31,29 @@ pub enum DecodeError {
     InvalidValue { offset: usize },
 }
 
-pub(crate) fn expect_frame(bytes: &[u8], id: u8, needed: usize) -> Result<&[u8], DecodeError> {
-    let frame = bytes.get(..needed).ok_or(DecodeError::TooShort {
-        needed,
+pub(crate) fn expect_frame<const N: usize>(bytes: &[u8], id: u8) -> Result<&[u8; N], DecodeError> {
+    let frame = bytes.first_chunk::<N>().ok_or(DecodeError::TooShort {
+        needed: N,
         got: bytes.len(),
     })?;
-    if frame[0] == id {
-        Ok(frame)
-    } else {
-        Err(DecodeError::UnexpectedId {
-            expected: id,
-            got: frame[0],
-        })
+    match frame.first() {
+        Some(&got) if got != id => Err(DecodeError::UnexpectedId { expected: id, got }),
+        _ => Ok(frame),
     }
 }
 
-pub(crate) fn field<T: TryFrom<u8>>(frame: &[u8], offset: usize) -> Result<T, DecodeError> {
-    T::try_from(frame[offset]).map_err(|_| DecodeError::InvalidValue { offset })
+pub(crate) fn byte<const N: usize>(frame: &[u8; N], offset: usize) -> Result<u8, DecodeError> {
+    frame.get(offset).copied().ok_or(DecodeError::TooShort {
+        needed: offset + 1,
+        got: N,
+    })
+}
+
+pub(crate) fn field<T: TryFrom<u8>, const N: usize>(
+    frame: &[u8; N],
+    offset: usize,
+) -> Result<T, DecodeError> {
+    T::try_from(byte(frame, offset)?).map_err(|_| DecodeError::InvalidValue { offset })
 }
 
 pub(crate) const fn flag(raw: u8) -> Option<bool> {
@@ -57,6 +64,9 @@ pub(crate) const fn flag(raw: u8) -> Option<bool> {
     }
 }
 
-pub(crate) fn flag_field(frame: &[u8], offset: usize) -> Result<bool, DecodeError> {
-    flag(frame[offset]).ok_or(DecodeError::InvalidValue { offset })
+pub(crate) fn flag_field<const N: usize>(
+    frame: &[u8; N],
+    offset: usize,
+) -> Result<bool, DecodeError> {
+    flag(byte(frame, offset)?).ok_or(DecodeError::InvalidValue { offset })
 }

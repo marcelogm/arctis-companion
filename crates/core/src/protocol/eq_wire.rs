@@ -4,10 +4,16 @@ use crate::eq::{Curve, EnvelopeError, Filter, FilterKind, Gain, Hertz, Q};
 
 pub const BAND_LEN: usize = 6;
 pub const BANDS_LEN: usize = BAND_LEN * MAX_FILTERS;
-const FIRST_BAND: usize = 1;
+pub(crate) const FIRST_BAND: usize = 1;
 const DISABLED_HZ: u16 = 20_001;
-const DISABLED_BAND: [u8; BAND_LEN] = [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03];
+const DISABLED_MILLI_Q: u16 = 1000;
 const FLAT_GAIN_BYTE: i8 = 20;
+const DISABLED_BAND: [u8; BAND_LEN] = band(
+    DISABLED_HZ,
+    kind_code(FilterKind::Peaking),
+    FLAT_GAIN_BYTE.cast_unsigned(),
+    DISABLED_MILLI_Q,
+);
 const NO_GAIN: Gain = match Gain::from_half_db(0) {
     Ok(gain) => gain,
     Err(_) => panic!("a flat gain is inside the envelope"),
@@ -30,42 +36,49 @@ pub fn encode_curve(curve: &Curve) -> [u8; BANDS_LEN] {
 
 pub fn decode_curve(frame: &[u8]) -> Result<Curve, DecodeError> {
     let bands = frame
-        .get(FIRST_BAND..FIRST_BAND + BANDS_LEN)
+        .get(FIRST_BAND..)
+        .and_then(<[u8]>::first_chunk::<BANDS_LEN>)
         .ok_or(DecodeError::TooShort {
             needed: FIRST_BAND + BANDS_LEN,
             got: frame.len(),
         })?;
-    let (bands, _) = bands.as_chunks::<BAND_LEN>();
-    let mut filters = Vec::with_capacity(MAX_FILTERS);
-    for (slot, band) in bands.iter().enumerate() {
-        filters.extend(decode_band(*band, FIRST_BAND + slot * BAND_LEN)?);
+    let mut slots = [None; MAX_FILTERS];
+    for (index, (slot, band)) in slots
+        .iter_mut()
+        .zip(bands.as_chunks::<BAND_LEN>().0)
+        .enumerate()
+    {
+        *slot = decode_band(*band, FIRST_BAND + index * BAND_LEN)?;
     }
-    at(Curve::new(filters), FIRST_BAND)
+    Ok(Curve::from_slots(slots))
+}
+
+const fn band(hz: u16, kind: u8, gain: u8, milli_q: u16) -> [u8; BAND_LEN] {
+    let [hz_low, hz_high] = hz.to_le_bytes();
+    let [q_low, q_high] = milli_q.to_le_bytes();
+    [hz_low, hz_high, kind, gain, q_low, q_high]
 }
 
 fn encode_filter(filter: Filter) -> [u8; BAND_LEN] {
-    let [hz_low, hz_high] = filter.hz().get().to_le_bytes();
-    let [q_low, q_high] = filter.q().milli().to_le_bytes();
-    [
-        hz_low,
-        hz_high,
+    band(
+        filter.hz().get(),
         kind_code(filter.kind()),
         gain_byte(filter.gain()),
-        q_low,
-        q_high,
-    ]
+        filter.q().milli(),
+    )
 }
 
 fn decode_band(band: [u8; BAND_LEN], offset: usize) -> Result<Option<Filter>, DecodeError> {
-    let hz = u16::from_le_bytes([band[0], band[1]]);
+    let [hz_low, hz_high, kind, gain, q_low, q_high] = band;
+    let hz = u16::from_le_bytes([hz_low, hz_high]);
     if hz == DISABLED_HZ {
         return Ok(None);
     }
     let hz = at(Hertz::new(hz), offset)?;
-    let kind = kind_from_code(band[2]).ok_or(DecodeError::InvalidValue { offset: offset + 2 })?;
-    let gain = at(gain_from_byte(band[3], kind), offset + 3)?;
+    let kind = kind_from_code(kind).ok_or(DecodeError::InvalidValue { offset: offset + 2 })?;
+    let gain = at(gain_from_byte(gain, kind), offset + 3)?;
     let q = at(
-        Q::from_milli(u16::from_le_bytes([band[4], band[5]])),
+        Q::from_milli(u16::from_le_bytes([q_low, q_high])),
         offset + 4,
     )?;
     at(Filter::new(kind, hz, gain, q), offset).map(Some)
