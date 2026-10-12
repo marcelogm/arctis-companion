@@ -3161,7 +3161,7 @@ git push
 - Modify: `crates/core/src/companion/adoption.rs` (add `AdoptionStatus`), `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/selection.rs`, `crates/core/tests/companion/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod selection;` to `crates/core/tests/companion/main.rs`.
 
@@ -3392,12 +3392,12 @@ fn the_picked_path_is_the_route_else_the_dongle() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion selection`
 Expected: FAIL to compile (`companion::selection` and `AdoptionStatus` missing).
 
-- [ ] **Step 3: Add `AdoptionStatus` to `adoption.rs`**
+- [x] **Step 3: Add `AdoptionStatus` to `adoption.rs`**
 
 Append to `crates/core/src/companion/adoption.rs`:
 
@@ -3410,7 +3410,7 @@ pub enum AdoptionStatus {
 }
 ```
 
-- [ ] **Step 4: Implement `selection`**
+- [x] **Step 4: Implement `selection`**
 
 `crates/core/src/companion/selection.rs`:
 
@@ -3699,12 +3699,12 @@ pub fn picked_path(route: Route, dongle_present: bool, adoption: AdoptionStatus)
 
 Add `pub mod selection;` to `crates/core/src/companion/mod.rs`.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion selection`
 Expected: PASS, 14 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
