@@ -257,7 +257,10 @@ fn plain_text_json_and_hex_dumps_are_accepted() {
 
 #[test]
 fn csv_data_is_plain_text() {
-    assert_accepted("crates/core/data/curve.csv", "freq_hz,spl_db\n20.00,-4.25\n");
+    assert_accepted(
+        "crates/core/data/curve.csv",
+        "freq_hz,spl_db\n20.00,-4.25\n",
+    );
 }
 
 #[test]
