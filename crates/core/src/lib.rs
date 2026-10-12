@@ -6,6 +6,7 @@ pub mod battery;
 pub mod companion;
 pub mod eq;
 pub mod messages;
+pub mod ports;
 pub mod protocol;
 pub mod settings;
 #[cfg(feature = "testkit")]
