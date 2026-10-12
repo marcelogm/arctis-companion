@@ -3,6 +3,7 @@ pub mod battery_store;
 pub mod files;
 pub mod notifications;
 pub mod persisted;
+pub mod portal;
 pub mod preset_store;
 pub mod seen_apps_store;
 pub mod settings_keys;

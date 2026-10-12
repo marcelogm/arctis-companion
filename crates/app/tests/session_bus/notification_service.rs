@@ -4,7 +4,7 @@ use std::rc::Rc;
 use gtk::gio;
 use gtk::glib;
 
-use crate::bus::{Bus, wait_until};
+use crate::bus::{Bus, own_name};
 
 const NAME: &str = "org.gtk.Notifications";
 const PATH: &str = "/org/gtk/Notifications";
@@ -41,7 +41,7 @@ impl NotificationService {
             })
             .build()
             .expect("notification server registered");
-        let owner = own(&connection);
+        let owner = own_name(&connection, NAME);
         Self {
             connection,
             owner: Some(owner),
@@ -74,20 +74,6 @@ fn answer(
 ) {
     log.borrow_mut().extend(record(method, parameters));
     invocation.return_value(None);
-}
-
-fn own(connection: &gio::DBusConnection) -> gio::OwnerId {
-    let acquired = Rc::new(std::cell::Cell::new(false));
-    let flag = Rc::clone(&acquired);
-    let owner = gio::bus_own_name_on_connection(
-        connection,
-        NAME,
-        gio::BusNameOwnerFlags::NONE,
-        move |_, _| flag.set(true),
-        |_, _| {},
-    );
-    wait_until("org.gtk.Notifications to be owned", || acquired.get());
-    owner
 }
 
 fn record(method: &str, parameters: &glib::Variant) -> Option<Shown> {
