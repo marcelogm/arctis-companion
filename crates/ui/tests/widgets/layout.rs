@@ -6,9 +6,10 @@ use arctis_core::testkit::snapshots::{snapshot, with};
 use arctis_ui::PermissionDialog;
 
 use crate::app_presets_page::rendered_page;
+use crate::battery_history::{shown_battery_page, synthetic_week, with_history};
 use crate::support::{
-    custom_preset, descendants, filter, open_editor, open_presets, rendered_window, rich_snapshot,
-    ruled, seen_app, shown, with_preset,
+    custom_preset, descendants, filter, open_editor, open_page, open_presets, rendered_window,
+    rich_snapshot, ruled, seen_app, shown, with_preset,
 };
 
 const NARROWEST: i32 = 360;
@@ -44,15 +45,13 @@ fn the_dialogs_fit_the_narrowest_window() {
     assert!(minimum_width(&PermissionDialog::default()) <= NARROWEST);
 }
 
-#[gtk::test]
-fn nothing_shown_scrolls_horizontally() {
-    let (window, _) = rendered_window(rich_snapshot());
-    let scrolled: Vec<gtk::ScrolledWindow> = descendants(&window)
+fn assert_never_scrolls_horizontally(root: &impl IsA<gtk::Widget>, what: &str) {
+    let scrolled: Vec<gtk::ScrolledWindow> = descendants(root)
         .into_iter()
         .filter(shown)
         .filter_map(|widget| widget.downcast::<gtk::ScrolledWindow>().ok())
         .collect();
-    assert!(!scrolled.is_empty(), "the headset page scrolls vertically");
+    assert!(!scrolled.is_empty(), "{what} scrolls vertically");
     for view in scrolled {
         assert_eq!(view.hscrollbar_policy(), gtk::PolicyType::Never);
     }
@@ -128,4 +127,39 @@ fn the_editor_never_scrolls_horizontally() {
     for view in scrolled {
         assert_eq!(view.hscrollbar_policy(), gtk::PolicyType::Never);
     }
+}
+
+#[gtk::test]
+fn nothing_shown_scrolls_horizontally() {
+    let (window, _) = rendered_window(rich_snapshot());
+    assert_never_scrolls_horizontally(&window, "the headset page");
+}
+
+#[gtk::test]
+fn the_battery_page_fits_the_narrowest_window() {
+    for s in [snapshot(), with_history(synthetic_week())] {
+        let page = shown_battery_page(s);
+        assert!(
+            minimum_width(&page) <= NARROWEST,
+            "{}",
+            minimum_width(&page)
+        );
+    }
+}
+
+#[gtk::test]
+fn the_opened_battery_page_fits_the_narrowest_window() {
+    let (window, _) = rendered_window(with_history(synthetic_week()));
+    open_page(&window, "battery");
+    assert!(
+        content_width(&window) <= NARROWEST,
+        "{}",
+        content_width(&window)
+    );
+}
+
+#[gtk::test]
+fn the_battery_page_never_scrolls_horizontally() {
+    let page = shown_battery_page(with_history(synthetic_week()));
+    assert_never_scrolls_horizontally(&page, "the battery page");
 }

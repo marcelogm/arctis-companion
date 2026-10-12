@@ -122,6 +122,11 @@ pub fn rendered_window(snapshot: Snapshot) -> (Window, Log) {
     (window, log)
 }
 
+pub fn open_page(window: &Window, tag: &str) {
+    WidgetExt::activate_action(window, "win.show-page", Some(&tag.to_variant()))
+        .expect("the action exists");
+}
+
 pub fn shown(widget: &gtk::Widget) -> bool {
     (is_toplevel(widget) || widget.get_visible() && widget.is_child_visible())
         && widget.parent().is_none_or(|parent| shown(&parent))
@@ -296,8 +301,7 @@ pub fn open_editor(window: &Window, preset: &str) -> EqEditorPage {
 }
 
 pub fn open_presets(window: &Window) {
-    WidgetExt::activate_action(window, "win.show-page", Some(&"presets".to_variant()))
-        .expect("the action exists");
+    open_page(window, "presets");
 }
 
 pub fn visible_tag(window: &Window) -> Option<String> {

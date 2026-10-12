@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use adw::prelude::*;
 use adw::subclass::prelude::*;
+use arctis_core::battery::sample::UnixSeconds;
 use arctis_core::companion::Snapshot;
 use arctis_core::eq::preset::PresetId;
 use arctis_core::intent::Intent;
@@ -21,6 +22,9 @@ use crate::services::Services;
 use crate::text::resolve;
 
 const PERMISSION_ACTION: &str = "win.permission-instructions";
+const MICROS_PER_SECOND: i64 = 1_000_000;
+const BATTERY_PAGE: &str = "battery";
+const BATTERY_REFRESH_SECONDS: u32 = 60;
 
 mod imp {
     use std::cell::{Cell, OnceCell, RefCell};
@@ -34,6 +38,7 @@ mod imp {
 
     use crate::app_dialogs::{about_dialog, shortcuts_dialog};
     use crate::app_presets_page::AppPresetsPage;
+    use crate::battery_page::BatteryPage;
     use crate::eq_editor_page::EqEditorPage;
     use crate::headset_page::HeadsetPage;
     use crate::intents::IntentSink;
@@ -62,6 +67,8 @@ mod imp {
         #[template_child]
         pub app_presets_page: TemplateChild<AppPresetsPage>,
         #[template_child]
+        pub battery_page: TemplateChild<BatteryPage>,
+        #[template_child]
         pub presets_page: TemplateChild<PresetsPage>,
         #[template_child]
         pub eq_editor_page: TemplateChild<EqEditorPage>,
@@ -69,6 +76,7 @@ mod imp {
         pub sink: IntentSink,
         pub toast_feed: ToastFeed,
         pub snapshot: RefCell<Option<Rc<Snapshot>>>,
+        pub battery_clock: RefCell<Option<glib::SourceId>>,
         pub background: Cell<Background>,
         pub preferences: OnceCell<PreferencesDialog>,
     }
@@ -83,6 +91,7 @@ mod imp {
             StatusView::ensure_type();
             HeadsetPage::ensure_type();
             AppPresetsPage::ensure_type();
+            BatteryPage::ensure_type();
             PresetsPage::ensure_type();
             EqEditorPage::ensure_type();
             klass.bind_template();
@@ -131,6 +140,7 @@ mod imp {
             self.parent_constructed();
             self.headset_page.connect_intents(&self.sink);
             self.app_presets_page.connect_intents(&self.sink);
+            self.obj().keep_battery_current_while_shown();
             self.obj().connect_preset_pages();
         }
     }
@@ -169,6 +179,55 @@ impl Window {
             self.render_preferences();
             self.render_preset_pages(snapshot);
         });
+        if self.battery_page_is_visible() {
+            self.refresh_battery();
+        }
+    }
+
+    fn battery_page_is_visible(&self) -> bool {
+        let visible = self.imp().navigation.visible_page();
+        visible.and_then(|page| page.tag()).as_deref() == Some(BATTERY_PAGE)
+    }
+
+    #[must_use]
+    pub fn is_refreshing_battery(&self) -> bool {
+        self.imp().battery_clock.borrow().is_some()
+    }
+
+    fn keep_battery_current_while_shown(&self) {
+        let page = &self.imp().battery_page;
+        let window = self.downgrade();
+        page.connect_showing(move |_| {
+            window.upgrade().inspect(Self::start_battery_clock);
+        });
+        let window = self.downgrade();
+        page.connect_hiding(move |_| {
+            window.upgrade().inspect(Self::stop_battery_clock);
+        });
+    }
+
+    fn start_battery_clock(&self) {
+        self.stop_battery_clock();
+        self.refresh_battery();
+        let window = self.downgrade();
+        let clock = glib::timeout_add_seconds_local(BATTERY_REFRESH_SECONDS, move || {
+            refresh_battery_of(&window)
+        });
+        self.imp().battery_clock.replace(Some(clock));
+    }
+
+    fn stop_battery_clock(&self) {
+        if let Some(clock) = self.imp().battery_clock.take() {
+            clock.remove();
+        }
+    }
+
+    fn refresh_battery(&self) {
+        let imp = self.imp();
+        let snapshot = imp.snapshot.borrow().clone();
+        if let Some(snapshot) = snapshot {
+            imp.battery_page.display_history(snapshot, current_time());
+        }
     }
 
     pub fn set_background(&self, background: Background) {
@@ -292,4 +351,18 @@ const fn status_action(kind: StatusKind) -> Option<&'static str> {
         StatusKind::PermissionRequired => Some(PERMISSION_ACTION),
         StatusKind::NoHeadset => None,
     }
+}
+
+fn refresh_battery_of(window: &glib::WeakRef<Window>) -> glib::ControlFlow {
+    match window.upgrade() {
+        Some(window) => {
+            window.refresh_battery();
+            glib::ControlFlow::Continue
+        }
+        None => glib::ControlFlow::Break,
+    }
+}
+
+fn current_time() -> UnixSeconds {
+    u64::try_from(glib::real_time() / MICROS_PER_SECOND).map_or(UnixSeconds(0), UnixSeconds)
 }
