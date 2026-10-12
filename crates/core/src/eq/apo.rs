@@ -1,6 +1,9 @@
 use super::curve::Curve;
-use super::decimal::{parse_thousandths, rounded_quotient};
+use super::decimal::{parse_thousandths, render_thousandths, rounded_quotient, thousandths_of};
 use super::filter::{Filter, FilterKind, Gain, Hertz, Q};
+use super::response::preamp_db;
+
+const THOUSANDTHS_PER_HALF_DB: i64 = 500;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {
@@ -50,6 +53,19 @@ pub fn parse(text: &str) -> Result<Import, ApoError> {
 }
 
 #[must_use]
+pub fn render(curve: &Curve) -> String {
+    let preamp = format!("Preamp: {} dB\n", preamp_text(curve));
+    curve
+        .filters()
+        .iter()
+        .enumerate()
+        .fold(preamp, |mut text, (index, filter)| {
+            text.push_str(&filter_line(index + 1, *filter));
+            text
+        })
+}
+
+#[must_use]
 pub const fn kind_name(kind: FilterKind) -> &'static str {
     match kind {
         FilterKind::Peaking => "PK",
@@ -58,6 +74,27 @@ pub const fn kind_name(kind: FilterKind) -> &'static str {
         FilterKind::LowPass => "LPQ",
         FilterKind::HighPass => "HPQ",
     }
+}
+
+fn filter_line(number: usize, filter: Filter) -> String {
+    let state = if filter.is_enabled() { "ON" } else { "OFF" };
+    let kind = kind_name(filter.kind());
+    let hz = filter.hz().get();
+    let gain = if filter.kind().has_gain() {
+        format!(" Gain {} dB", decibels(filter.gain()))
+    } else {
+        String::new()
+    };
+    let q = render_thousandths(i64::from(filter.q().milli()));
+    format!("Filter {number}: {state} {kind} Fc {hz} Hz{gain} Q {q}\n")
+}
+
+fn decibels(gain: Gain) -> String {
+    render_thousandths(i64::from(gain.half_db()) * THOUSANDTHS_PER_HALF_DB)
+}
+
+fn preamp_text(curve: &Curve) -> String {
+    render_thousandths(thousandths_of(preamp_db(curve)).unwrap_or(0))
 }
 
 fn filter_lines(text: &str) -> impl Iterator<Item = (usize, &str)> {
@@ -117,7 +154,7 @@ impl RawFilter {
     }
 
     fn half_db(&self) -> (i64, bool) {
-        let half_db = rounded_quotient(self.gain, 500);
+        let half_db = rounded_quotient(self.gain, THOUSANDTHS_PER_HALF_DB);
         if self.kind.has_gain() {
             within(half_db, Gain::MIN_HALF_DB.into(), Gain::MAX_HALF_DB.into())
         } else {
