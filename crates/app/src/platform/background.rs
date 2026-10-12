@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::rc::{Rc, Weak};
 
 use arctis_core::companion::Snapshot;
@@ -7,13 +7,14 @@ use arctis_core::view::text::{Arg, Text};
 use arctis_ui::text::resolve;
 use gtk::gio;
 use gtk::gio::prelude::*;
+use gtk::glib;
 
 use super::settings_keys::{BACKGROUND_REQUESTED, RUN_IN_BACKGROUND};
 use crate::logging::warn;
 use crate::ports::SnapshotView;
 
 pub trait Portal {
-    fn request(&self, autostart: bool, answer: Box<dyn FnOnce(bool)>);
+    fn request(&self, answer: Box<dyn FnOnce(bool)>);
     fn set_status(&self, message: String);
 }
 
@@ -32,6 +33,8 @@ pub struct BackgroundController {
     hold: Rc<dyn Hold>,
     view: Rc<dyn BackgroundView>,
     status: RefCell<Option<String>>,
+    held: Cell<bool>,
+    watch: RefCell<Option<glib::SignalHandlerId>>,
     myself: Weak<Self>,
 }
 
@@ -43,14 +46,36 @@ impl BackgroundController {
         hold: Rc<dyn Hold>,
         view: Rc<dyn BackgroundView>,
     ) -> Rc<Self> {
-        Rc::new_cyclic(|myself| Self {
+        let controller = Rc::new_cyclic(|myself| Self {
             settings,
             portal,
             hold,
             view,
             status: RefCell::default(),
+            held: Cell::new(false),
+            watch: RefCell::default(),
             myself: myself.clone(),
-        })
+        });
+        controller.follow_the_key();
+        controller
+    }
+
+    fn follow_the_key(&self) {
+        let controller = self.myself.clone();
+        let handler = self
+            .settings
+            .connect_changed(Some(RUN_IN_BACKGROUND), move |_, _| {
+                key_changed(&controller);
+            });
+        self.watch.replace(Some(handler));
+    }
+
+    fn key_changed(&self) {
+        match (self.is_enabled(), self.held.get()) {
+            (true, false) => self.keep_running(),
+            (false, true) => self.stop_running(Background::Off),
+            _ => {}
+        }
     }
 
     pub fn start(&self) {
@@ -80,11 +105,13 @@ impl BackgroundController {
     }
 
     fn keep_running(&self) {
+        self.held.set(true);
         self.hold.hold();
         self.view.show_background(Background::On);
     }
 
     fn stop_running(&self, state: Background) {
+        self.held.set(false);
         self.hold.release();
         self.view.show_background(state);
     }
@@ -92,12 +119,12 @@ impl BackgroundController {
     fn ask(&self) {
         let controller = self.myself.clone();
         self.portal
-            .request(true, Box::new(move |granted| answer(&controller, granted)));
+            .request(Box::new(move |granted| answer(&controller, granted)));
     }
 
     fn answered(&self, granted: bool) {
         self.store(BACKGROUND_REQUESTED, true);
-        if !granted {
+        if !granted && self.is_enabled() {
             self.store(RUN_IN_BACKGROUND, false);
             self.stop_running(Background::Denied);
         }
@@ -110,6 +137,14 @@ impl BackgroundController {
     }
 }
 
+impl Drop for BackgroundController {
+    fn drop(&mut self) {
+        if let Some(handler) = self.watch.take() {
+            self.settings.disconnect(handler);
+        }
+    }
+}
+
 impl SnapshotView for BackgroundController {
     fn publish(&self, snapshot: &Rc<Snapshot>) {
         let message = resolve(&status_text(snapshot));
@@ -118,6 +153,12 @@ impl SnapshotView for BackgroundController {
         }
         self.status.replace(Some(message.clone()));
         self.portal.set_status(message);
+    }
+}
+
+fn key_changed(controller: &Weak<BackgroundController>) {
+    if let Some(controller) = controller.upgrade() {
+        controller.key_changed();
     }
 }
 

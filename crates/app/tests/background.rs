@@ -1,3 +1,7 @@
+#[path = "common/main_context.rs"]
+mod main_context;
+#[path = "common/memory_settings.rs"]
+mod memory_settings;
 #[path = "common/schema.rs"]
 mod schema;
 
@@ -17,13 +21,15 @@ use gtk::gio;
 use gtk::gio::prelude::*;
 use tempfile::TempDir;
 
-use schema::{compiled_dir, memory_pair};
+use main_context::{drain, on_own_context};
+use memory_settings::memory_pair;
+use schema::compiled_dir;
 
 type Answer = Box<dyn FnOnce(bool)>;
 
 #[derive(Default)]
 struct FakePortal {
-    requests: RefCell<Vec<bool>>,
+    requests: Cell<usize>,
     pending: RefCell<Vec<Answer>>,
     statuses: RefCell<Vec<String>>,
 }
@@ -36,8 +42,8 @@ impl FakePortal {
 }
 
 impl Portal for FakePortal {
-    fn request(&self, autostart: bool, answer: Answer) {
-        self.requests.borrow_mut().push(autostart);
+    fn request(&self, answer: Answer) {
+        self.requests.set(self.requests.get() + 1);
         self.pending.borrow_mut().push(answer);
     }
 
@@ -71,6 +77,7 @@ impl BackgroundView for FakeView {
 struct Setup {
     _dir: TempDir,
     settings: gio::Settings,
+    outside: gio::Settings,
     portal: Rc<FakePortal>,
     hold: Rc<FakeHold>,
     view: Rc<FakeView>,
@@ -79,7 +86,7 @@ struct Setup {
 
 fn setup(run_in_background: bool, asked_before: bool) -> Setup {
     let dir = compiled_dir();
-    let (settings, _) = memory_pair(dir.path());
+    let (settings, outside) = memory_pair(dir.path());
     settings
         .set_boolean("run-in-background", run_in_background)
         .expect("run in background");
@@ -96,6 +103,7 @@ fn setup(run_in_background: bool, asked_before: bool) -> Setup {
     Setup {
         _dir: dir,
         settings,
+        outside,
         portal,
         hold,
         view,
@@ -109,7 +117,7 @@ fn the_first_run_holds_and_asks_for_autostart() {
     s.controller.start();
     assert!(s.hold.0.get());
     assert_eq!(*s.view.0.borrow(), [Background::On]);
-    assert_eq!(*s.portal.requests.borrow(), [true]);
+    assert_eq!(s.portal.requests.get(), 1);
 }
 
 #[test]
@@ -126,7 +134,7 @@ fn a_grant_is_remembered_and_not_asked_again() {
         s.view.clone(),
     );
     again.start();
-    assert_eq!(s.portal.requests.borrow().len(), 1);
+    assert_eq!(s.portal.requests.get(), 1);
 }
 
 #[test]
@@ -146,7 +154,7 @@ fn switched_off_at_start_shows_off_without_holding() {
     s.controller.start();
     assert!(!s.hold.0.get());
     assert_eq!(*s.view.0.borrow(), [Background::Off]);
-    assert!(s.portal.requests.borrow().is_empty());
+    assert_eq!(s.portal.requests.get(), 0);
 }
 
 #[test]
@@ -157,7 +165,7 @@ fn turning_it_on_asks_again() {
     assert!(s.settings.boolean("run-in-background"));
     assert!(s.hold.0.get());
     assert_eq!(s.view.0.borrow().last(), Some(&Background::On));
-    assert_eq!(*s.portal.requests.borrow(), [true]);
+    assert_eq!(s.portal.requests.get(), 1);
 }
 
 #[test]
@@ -168,7 +176,39 @@ fn turning_it_off_releases_without_asking() {
     assert!(!s.settings.boolean("run-in-background"));
     assert!(!s.hold.0.get());
     assert_eq!(s.view.0.borrow().last(), Some(&Background::Off));
-    assert!(s.portal.requests.borrow().is_empty());
+    assert_eq!(s.portal.requests.get(), 0);
+}
+
+#[test]
+fn a_denial_after_the_switch_went_off_keeps_it_off() {
+    let s = setup(true, false);
+    s.controller.start();
+    s.controller.set_enabled(false);
+    s.portal.answer(false);
+    assert_eq!(s.view.0.borrow().last(), Some(&Background::Off));
+    assert!(!s.hold.0.get());
+    assert!(s.settings.boolean("background-requested"));
+}
+
+#[test]
+fn an_outside_change_takes_and_releases_the_hold() {
+    on_own_context(|context| {
+        let s = setup(false, true);
+        s.controller.start();
+        s.outside
+            .set_boolean("run-in-background", true)
+            .expect("run in background");
+        drain(context);
+        assert!(s.hold.0.get());
+        assert_eq!(s.view.0.borrow().last(), Some(&Background::On));
+        s.outside
+            .set_boolean("run-in-background", false)
+            .expect("run in background");
+        drain(context);
+        assert!(!s.hold.0.get());
+        assert_eq!(s.view.0.borrow().last(), Some(&Background::Off));
+        assert_eq!(s.portal.requests.get(), 0);
+    });
 }
 
 #[test]
