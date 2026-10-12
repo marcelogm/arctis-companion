@@ -9,6 +9,7 @@ use std::cell::{Cell, RefCell};
 use std::rc::Rc;
 
 use arctis_app::platform::background::{BackgroundController, BackgroundView, Hold, Portal};
+use arctis_app::platform::lifetime::QuitWhenAlone;
 use arctis_app::ports::SnapshotView;
 use arctis_app::runtime::{Destination, destination};
 use arctis_core::companion::Input;
@@ -258,4 +259,62 @@ fn the_run_in_background_switch_goes_to_the_controller() {
         destination(Intent::SetAutomaticPresets(false)),
         Destination::Companion(Input::Intent(Intent::SetAutomaticPresets(false)))
     );
+}
+
+fn quit_when_alone(alone: bool) -> (Rc<FakeHold>, Rc<Cell<u32>>, QuitWhenAlone) {
+    let inner = Rc::<FakeHold>::default();
+    let quits = Rc::new(Cell::new(0));
+    let counter = Rc::clone(&quits);
+    let hold = QuitWhenAlone::new(
+        inner.clone(),
+        Box::new(move || alone),
+        Box::new(move || counter.set(counter.get() + 1)),
+    );
+    (inner, quits, hold)
+}
+
+#[test]
+fn letting_go_with_a_window_open_releases_the_hold() {
+    let (inner, quits, hold) = quit_when_alone(false);
+    hold.hold();
+    hold.release();
+    assert!(!inner.0.get());
+    assert_eq!(quits.get(), 0);
+}
+
+#[test]
+fn letting_go_with_no_window_quits_and_keeps_the_hold() {
+    let (inner, quits, hold) = quit_when_alone(true);
+    hold.hold();
+    hold.release();
+    assert!(inner.0.get());
+    assert_eq!(quits.get(), 1);
+}
+
+#[test]
+fn switched_off_from_outside_with_no_window_quits_through_the_companion() {
+    on_own_context(|context| {
+        let dir = compiled_dir();
+        let (settings, outside) = memory_pair(dir.path());
+        settings
+            .set_boolean("background-requested", true)
+            .expect("requested");
+        settings
+            .set_boolean("run-in-background", true)
+            .expect("run in background");
+        let (inner, quits, hold) = quit_when_alone(true);
+        let controller = BackgroundController::new(
+            settings,
+            Rc::<FakePortal>::default(),
+            Rc::new(hold),
+            Rc::<FakeView>::default(),
+        );
+        controller.start();
+        outside
+            .set_boolean("run-in-background", false)
+            .expect("run in background");
+        drain(context);
+        assert!(inner.0.get());
+        assert_eq!(quits.get(), 1);
+    });
 }

@@ -11,7 +11,7 @@ use crate::bridge::Bridge;
 use crate::dbus::headset_object::HeadsetObject;
 use crate::platform::background::BackgroundController;
 use crate::platform::files::data_dir;
-use crate::platform::lifetime::{AppHold, AppLifetime};
+use crate::platform::lifetime::{AppHold, AppLifetime, QuitWhenAlone};
 use crate::platform::notifications::GioNotifier;
 use crate::platform::persisted::{file_stores, load_persisted, settings_only};
 use crate::platform::portal::AshpdPortal;
@@ -61,11 +61,10 @@ impl Runtime {
         let parts = assemble(application, threads);
         let runtime = Rc::new_cyclic(|myself: &Weak<Self>| {
             let window = WindowSlot::new(intent_handler(myself), close_handler(myself));
-            let hold = Rc::new(AppHold::new(application.upcast_ref()));
             let background = BackgroundController::new(
                 parts.settings,
                 Rc::new(AshpdPortal),
-                hold,
+                hold(application, &window, myself),
                 window.clone(),
             );
             Self {
@@ -135,6 +134,24 @@ fn intent_handler(runtime: &Weak<Runtime>) -> Rc<dyn Fn(Intent)> {
             runtime.deliver(intent);
         }
     })
+}
+
+fn hold(
+    application: &adw::Application,
+    window: &Rc<WindowSlot>,
+    runtime: &Weak<Runtime>,
+) -> Rc<QuitWhenAlone> {
+    let slot = Rc::downgrade(window);
+    let runtime = runtime.clone();
+    Rc::new(QuitWhenAlone::new(
+        Rc::new(AppHold::new(application.upcast_ref())),
+        Box::new(move || slot.upgrade().is_none_or(|slot| slot.window().is_none())),
+        Box::new(move || {
+            if let Some(runtime) = runtime.upgrade() {
+                runtime.quit();
+            }
+        }),
+    ))
 }
 
 fn close_handler(runtime: &Weak<Runtime>) -> Rc<dyn Fn() -> OnClose> {

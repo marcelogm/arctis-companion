@@ -26,7 +26,7 @@ flowchart LR
 
 | Concern | Code |
 |---|---|
-| Application and its actions | `crates/app/src/application.rs::CompanionApplication`, `crates/app/src/application.rs::build`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::install_actions` |
+| Application, its actions and termination signals | `crates/app/src/application.rs::CompanionApplication`, `crates/app/src/application.rs::build`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::install_actions`, `crates/app/src/application.rs::watch_signals` |
 | Wiring | `crates/app/src/runtime.rs::Runtime`, `crates/app/src/runtime.rs::assemble`, `crates/app/src/runtime.rs::deliver`, `crates/app/src/runtime.rs::destination`, `crates/app/src/runtime.rs::closing`, `crates/app/src/window_slot.rs::OnClose` |
 | One input at a time, one port per action | `crates/app/src/bridge.rs::Bridge`, `crates/app/src/bridge.rs::submit`, `crates/app/src/bridge.rs::perform`, `crates/app/src/bridge.rs::attach` |
 | Ports | `crates/app/src/ports.rs::Ports`, `crates/app/src/ports.rs::Stores`, `crates/app/src/ports.rs::SnapshotView`, `crates/app/src/ports.rs::SettingsStore`, `crates/app/src/ports.rs::DevicePort`, `crates/app/src/ports.rs::AudioPort`, `crates/app/src/ports.rs::Notifier`, `crates/app/src/ports.rs::Alarm`, `crates/app/src/ports.rs::Clock`, `crates/app/src/ports.rs::Lifetime` |
@@ -143,16 +143,18 @@ stateDiagram-v2
 
 `crates/app/src/platform/background.rs::BackgroundController` holds the application (through
 `crates/app/src/platform/lifetime.rs::AppHold`) while the `run-in-background` key is on, whoever writes it, and
-ignores a denial that arrives after the switch went off. It sends the status line
+ignores a denial that arrives after the switch went off. When the switch goes off with no window open,
+`crates/app/src/platform/lifetime.rs::QuitWhenAlone` keeps the hold and quits through `Input::Quitting` instead,
+so GApplication never exits without the restore. It sends the status line
 (`crates/app/src/platform/background.rs::status_text`) through `crates/app/src/platform/portal.rs::AshpdPortal`.
 
 ```mermaid
 sequenceDiagram
-    participant U as Ctrl+Q, GNOME background apps, or closing the window with the switch off
+    participant U as Ctrl+Q, GNOME background apps, SIGTERM, SIGINT or SIGHUP,<br/>closing the window or turning the switch off with no window
     participant R as Runtime
     participant C as Companion
     participant L as AppLifetime
-    U->>R: app.quit
+    U->>R: app.quit or watch_signals
     R->>C: Input::Quitting
     C-->>R: SendDevice(route preset), WakeAt(now + QUIT_GRACE)
     alt verified readback
@@ -172,5 +174,5 @@ sequenceDiagram
 | `crates/app/tests/settings_store.rs` | schema keys; load, persist and watch over a memory backend |
 | `crates/app/tests/stores.rs` | the `core::ports` contract suite on tempdirs; file specifics; start-up loading |
 | `crates/app/tests/dbus_properties.rs` | `Headset1` names and values |
-| `crates/app/tests/background.rs` | Run in Background with fakes; the status line; the switch intent routed to the controller |
-| `crates/app/tests/session_bus/main.rs` | on a private `gio::TestDBus`: the contract, `PropertiesChanged`, `ActivatePreset`, notifications, the portal, the window slot, the windowless service, and a second launch that only activates the first |
+| `crates/app/tests/background.rs` | Run in Background with fakes; quitting instead of letting go with no window; the status line; the switch intent routed to the controller |
+| `crates/app/tests/session_bus/main.rs` | on a private `gio::TestDBus`: the contract, `PropertiesChanged`, `ActivatePreset`, notifications, the portal, the window slot, the windowless service, a second launch that only activates the first, and SIGTERM quitting through `Input::Quitting` |
