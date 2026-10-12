@@ -8,6 +8,10 @@ publish.workspace = true
 [dependencies]
 arctis-core.workspace = true
 pipewire.workspace = true
+triple_buffer = "9"
+
+[dev-dependencies]
+allocation-counter = "0.8.1"
 
 [lints]
 workspace = true
