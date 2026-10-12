@@ -79,6 +79,17 @@ fn content_width(window: &arctis_ui::Window) -> i32 {
     minimum_width(&window.content().expect("window content"))
 }
 
+fn widest(window: &arctis_ui::Window) -> String {
+    descendants(window)
+        .iter()
+        .filter(|widget| shown(widget))
+        .map(|widget| (minimum_width(widget), widget.type_().name()))
+        .filter(|(width, _)| *width > NARROWEST - 60)
+        .map(|(width, name)| format!("{name} {width}"))
+        .collect::<Vec<_>>()
+        .join(", ")
+}
+
 fn shown_scrolled_windows(window: &arctis_ui::Window) -> Vec<gtk::ScrolledWindow> {
     descendants(window)
         .into_iter()
@@ -97,12 +108,15 @@ fn the_preset_pages_fit_the_narrowest_window() {
         "{}",
         content_width(&window)
     );
-    open_editor(&window, "mine");
-    assert!(
-        content_width(&window) <= NARROWEST,
-        "{}",
-        content_width(&window)
-    );
+    for preset in ["mine", "flat"] {
+        open_editor(&window, preset);
+        assert!(
+            content_width(&window) <= NARROWEST,
+            "{preset}: {} ({})",
+            content_width(&window),
+            widest(&window)
+        );
+    }
 }
 
 #[gtk::test]
