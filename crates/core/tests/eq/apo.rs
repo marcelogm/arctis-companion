@@ -1,7 +1,9 @@
 use arctis_core::eq::apo::{self, ApoError, Clamp, Field, Import};
-use arctis_core::eq::{Curve, FilterKind};
+use arctis_core::eq::curve::MAX_FILTERS;
+use arctis_core::eq::{Curve, FilterKind, library};
+use proptest::prelude::*;
 
-use crate::support::{filter, peaking};
+use crate::support::{any_filter, filter, peaking};
 
 const AUTOEQ: &str = "Preamp: -6.4 dB
 Filter 1: ON LSC Fc 105 Hz Gain 5.5 dB Q 0.70
@@ -116,5 +118,48 @@ fn unreadable_filters_are_rejected_with_their_line() {
             Err(ApoError::Malformed { line: 1 }),
             "{text}"
         );
+    }
+}
+
+#[test]
+fn render_writes_the_preamp_and_one_line_per_filter() {
+    let curve = Curve::from_array([
+        peaking(1_000, 11, 1_410),
+        filter(FilterKind::LowShelf, 105, -7, 710).with_enabled(false),
+        filter(FilterKind::LowPass, 18_000, 0, 707),
+    ]);
+    let expected = "Preamp: -5.5 dB\n\
+                    Filter 1: ON PK Fc 1000 Hz Gain 5.5 dB Q 1.41\n\
+                    Filter 2: OFF LSC Fc 105 Hz Gain -3.5 dB Q 0.71\n\
+                    Filter 3: ON LPQ Fc 18000 Hz Q 0.707\n";
+    assert_eq!(apo::render(&curve), expected);
+}
+
+#[test]
+fn every_built_in_survives_a_round_trip() {
+    for preset in library::library() {
+        let imported = apo::parse(&apo::render(preset.curve()));
+        let expected = Import {
+            curve: preset.curve().clone(),
+            clamped: Vec::new(),
+        };
+        assert_eq!(imported, Ok(expected), "{}", preset.name());
+    }
+}
+
+fn any_curve() -> impl Strategy<Value = Curve> {
+    proptest::collection::vec((any_filter(), any::<bool>()), 1..=MAX_FILTERS).prop_map(|parts| {
+        let filters = parts
+            .into_iter()
+            .map(|(filter, enabled)| filter.with_enabled(enabled));
+        Curve::new(filters.collect()).expect("at most ten filters")
+    })
+}
+
+proptest! {
+    #[test]
+    fn any_curve_survives_a_round_trip(curve in any_curve()) {
+        let imported = apo::parse(&apo::render(&curve));
+        prop_assert_eq!(imported, Ok(Import { curve, clamped: Vec::new() }));
     }
 }
