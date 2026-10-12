@@ -72,15 +72,15 @@ on the Nova 5) and §2.6 (sidetone marks 0/3/6/10).
 | §3.2 contract: every `Input` and `Action` variant exists with its payload | 13, 15 |
 | companion: adoption by identity (new identity, same identity, firmware change) | 8, 13, 16 |
 | companion: field mapping and "Headset Curve" | 8, 16 |
-| companion: routing from the default sink (bluez, behind our EQ sink, USB, EasyEffects in between, speakers, PipeWire down with dongle Ready) | 6, 17, 19 |
+| companion: routing from the default sink (bluez, behind our EQ sink, USB, EasyEffects in between and appearing after insertion, speakers, PipeWire down with dongle Ready) | 6, 17, 19 |
 | companion: selection: enter, leave, cork and uncork within 10 s, recency by join time | 11, 18 |
-| companion: selection: per-path budget, no write when the observed curve is equivalent | 14, 18 |
+| companion: selection: per-path budget, no budget spent when the observed curve is equivalent, a switch back before the readback still reaches the session | 14, 18 |
 | companion: selection: combo pick and Shell pick with and without ruled apps | 19 |
 | companion: selection: pick then restart, pick then a new ruled app, missing preset id | 7, 11, 15, 18, 19 |
 | companion: never adopted + HeadsetOff | 16, 19, 25 |
 | companion: alerts with hysteresis and `BatteryWarning` | 10, 14, 15, 19, 21 |
 | companion: quit restores the route preset and waits at most `QUIT_GRACE` | 21 |
-| battery: sampling dedupe, CSV round-trip, 8-day retention, series gaps | 3, 4, 5, 14, 15 |
+| battery: sampling dedupe, CSV round-trip, 8-day retention, series gaps (link down, dongle gone, app quit) | 3, 4, 5, 14, 15, 21 |
 | `core::ports` contract suite usable by SP8's stores | 9 |
 | view: every `Phase` × `Route` gives a page model (Absent × Bluetooth has the equalizer rows) | 25 |
 | view: banner priority | 25 |
@@ -106,7 +106,7 @@ crates/core/src/battery/
   series.rs        Window, Point, Span, Series, series, last_full_charge
 crates/core/src/companion/
   mod.rs           module list and re-exports
-  timing.rs        RULE_ENTER RULE_LEAVE auto_switch_min_interval EDITOR_THROTTLE QUIT_GRACE REBIND_NOTICE battery levels
+  timing.rs        RULE_ENTER RULE_LEAVE auto_switch_min_interval EDITOR_THROTTLE QUIT_GRACE battery levels
   app_settings.rs  HeadsetValues, RoutePresets, AppRules, AppSettings, PersistedChange, Persisted
   adoption.rs      DongleIdentity, Adoption, adopt
   catalog.rs       Catalog (built-ins + custom), fresh_id, HEADSET_CURVE_NAME
@@ -117,7 +117,7 @@ crates/core/src/companion/
   engines.rs       Cause, Trigger, Decision, EditorThrottle, Engines
   deadlines.rs     Deadlines, earliest
   dongle.rs        DongleState, AdoptionStatus, WriteFailure
-  battery_watch.rs BatteryWatch (sampler + history + alerts)
+  battery_watch.rs BatteryWatch (sampler + history + alerts + the closing row of a disconnect)
   input.rs         Input
   action.rs        Action, PresetChange
   reducer.rs       Companion: new, handle, device and audio inputs, advance, finish
@@ -172,16 +172,16 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 7 | `Intent` has one variant per headset setting (`SetSidetone(Sidetone)`, as in the design's sequence diagram), `SetExtendedRange(bool)`, `RetryWrite(Setting)`, `UseRoutePreset(SoundPath)` (Now Playing button), `StartPreview`/`EndPreview`, preset, rule and threshold intents; `Intent::from_scale`, `from_switch`, `from_auto_power_off_choice` map widget values | widgets stay trivial and the mapping is tested once |
 | 8 | Adoption: on `Identity` for an identity that is not adopted, `Companion` sends `Change::Desired { settings, Adopt }`; once the phase is Ready and observed settings are known it copies them into desired, maps the curve to a built-in, else to an existing custom preset, else saves "Headset Curve" (id `headset-curve`, then `headset-curve-2`, …; the name is stored in English as user text), stores the identity and sends `Enforce`. For an adopted identity `Identity` sends `Enforce` at once | follows device §5 in order; checking custom presets too avoids a second "Headset Curve" when a second dongle with the same curve is adopted |
 | 9 | `adopted-identity` text is `"{pid:04x}"` or `"{pid:04x}:{uniq}"`; an empty string is "never adopted"; an empty `HID_UNIQ` is no serial | `hardware-findings.md` §2.8: the Nova 5 has no serial, so the identity is the PID |
-| 10 | The switch budget applies to switches not caused by an intent or by quit. A switch whose curve is `equivalent` to the observed headset curve writes nothing and spends no budget. A held switch is re-decided at its deadline from the latest target (coalescing) | audio §4 "later changes coalesce to the latest choice; no write when the observed curve is equivalent"; user picks must feel instant |
+| 10 | The switch budget applies to switches not caused by an intent or by quit. Every switch of the 2.4 GHz target still sends `Change::Desired` (the session's desired must always be the latest target), but one whose curve is `equivalent` to the observed headset curve spends no budget: the session writes only drift, so no `0x33` frame goes out. A held switch is re-decided at its deadline from the latest target (coalescing) | audio §4 "later changes coalesce to the latest choice; no write when the observed curve is equivalent"; skipping the `Change` itself would leave the session enforcing a stale curve when the target returns to the observed curve before the readback (e.g. a pick undone within 400 ms); user picks must feel instant |
 | 11 | A preview is a manual pick flagged `preview`; `EndPreview` ends it, and a ruled-set change or route change ends it like any manual pick | one rule for both (ui §3 Preview, audio §4) |
 | 12 | Deleting a custom preset keeps route-preset and rule ids unchanged; they resolve to Flat (route) or "Preset missing" (rules) until Undo saves the preset back. A member already in the ruled set keeps its id until it leaves | audio §3 "Missing presets"; Undo restores everything with one `SavePreset` |
 | 13 | Alerts: `Charging::Charging` and `PluggedIn` both count as "charging starts"; a reading whose link is not connected keeps the previous warning; reaching Critical withdraws the Low notification; each warning notifies once per discharge | audio §5; one notification on screen at a time |
 | 14 | CSV columns are `unix_seconds,percent,charging,link` with words (`discharging`, `plugged-in`, `connected`, `headset-off`, …); malformed lines are skipped on parse | readable file; one bad line never loses the history |
-| 15 | `series` draws a staircase (each reading holds until the next sample or `now`), carries the last sample before the window to its start, breaks the line on any reading whose link is not connected, shades `Charging` and `PluggedIn` holds, and takes the last full charge as the latest sample at 100 % | audio §5 "line segments broken when the link is not connected, charging spans, last full charge" |
-| 16 | `REBIND_NOTICE` (5 s) lives in `companion/timing.rs`; `Companion` sets `reconnecting` in the snapshot once `Phase::Rebinding` has lasted that long | only the main thread shows "Reconnecting…"; the session needs no notice timer |
+| 15 | `series` draws a staircase (each reading holds until the next sample or `now`), carries the last sample before the window to its start, breaks the line on any reading whose link is not connected, shades `Charging` and `PluggedIn` holds, and takes the last full charge as the latest sample at 100 %. When the dongle leaves (Absent, PermissionDenied) or the app quits, `BatteryWatch::disconnect` records the last reading once more with `Link::HeadsetOff`, so downtime breaks the line instead of holding the old level across it. `parse_log` sorts rows by time | audio §5 "line segments broken when the link is not connected, charging spans, last full charge"; rows are change-only, so without a closing row an unplugged dongle or a stopped app would draw a flat line through hours without data; a wall-clock step back (Deviation 3) can append an older row |
+| 16 | No notice timer in `Companion`: `REBIND_NOTICE` stays in `core::session::timing` and the session publishes `Phase::Rebinding` only once it has passed (SP4 Deviation 5), so the header shows "Reconnecting…" whenever the published phase is Rebinding | a second 5 s timer on the main thread would delay the notice to 10 s and duplicate a session constant |
 | 17 | Ports return `Result<_, StoreError>`; `SeenAppsRepository::record(&SeenApp)` and the store applies `seen_apps::remember` (newest first, at most 50); the contract suite lives in `testkit::repository_contracts` | SP8's file stores and the memory adapters share one rule and one suite |
 | 18 | Tests turn on `testkit` through `arctis-core = { path = ".", features = ["testkit"] }` in `[dev-dependencies]` | integration tests cannot see `cfg(test)` items; cargo accepts the self dev-dependency (checked) and `check-pure` ignores dev-dependencies |
-| 19 | `AppSettings` holds only what `Companion` reads (headset values, route presets, app rules, automatic presets, adopted identity, `bluetooth-sink-seen`, low-battery threshold). Run in Background stays in SP8 | the Background portal is an app concern |
+| 19 | `AppSettings` holds only what `Companion` reads (headset values, route presets, app rules, automatic presets, adopted identity, `bluetooth-sink-seen`, low-battery threshold). Run in Background stays in SP8: `Intent::SetRunInBackground(bool)` exists so the preferences switch (SP9) emits an intent like every widget, and `Companion` ignores it; the bridge acts on it (GSettings and the Background portal) | the Background portal is an app concern; widgets never touch GSettings (ui §1), so the intent must exist in `core::intent`, which SP6 owns |
 | 20 | Now Playing texts: "{preset}, chosen for {app}", "{preset}, until {app} stops", and "{preset}, chosen by hand" for a manual pick with no ruled app (a preview) | ui §2 gives the first two |
 | 21 | A write failure is `Snapshot.dongle.last_failure = Some(WriteFailure { serial, setting })`; the window shows a toast when the serial changes. "Not applied" lasts until observed equals desired for that setting | a snapshot is state; the serial turns the failure edge into state |
 | 22 | `RetryWrite` re-sends the whole desired settings with `Enforce`; the session writes only the drifted fields | device §4 "Retry re-sends the desired value" |
@@ -195,6 +195,10 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 30 | Large models inside enums are boxed (`HeadsetPageModel`, `SettingsArea::Groups`, `AppPresetsContent::Empty`, `BatteryContent::Empty`) | clippy `large_enum_variant` under `-D warnings` |
 | 31 | `Companion` is built incrementally (Tasks 15–21): each task replaces whole functions of `reducer.rs` and adds new ones, so every field and function is used the moment it exists | `-D warnings` rejects dead code, and each behaviour stays test-first |
 | 32 | `AudioState::equalizer` holds the curve the system equalizer runs; a `Retarget` is sent only when the new curve differs from it | the first settle after an insertion would otherwise retarget to the curve just inserted |
+| 33 | EasyEffects in the default sink's chain also removes an equalizer that is already inserted, not only blocks a new insertion | audio §1 "the system equalizer is off" while EasyEffects processes audio; otherwise the two would stack (ADR 0008) |
+| 34 | Delete-toast texts are eight whole-sentence msgids (route paths × with or without app rules), never a sentence with a translated fragment inserted | ui §4 "Msgids are whole sentences …, never concatenated"; translators need the whole sentence for agreement |
+| 35 | The repository contract suite takes `fresh` and `reopen` (`impl Fn(R) -> R`) and reads back only after `reopen`; the memory adapters pass the identity | SP8's file stores must prove that what they write survives a new store over the same directory, which an in-instance check cannot show |
+| 36 | Known cross-sub-project gap, not fixed here: `AdoptionStatus` needs `DeviceUpdate::Identity`, which SP4 publishes on Syncing only (SP4 Deviation 18). After a restart with the headset off, the page therefore shows banner 2 ("Turn on the headset to read its settings") instead of banner 3 until the headset turns on. `Companion` already handles `Identity` in any phase, so it needs no change if the session publishes `Identity` on `Found` (`Firmware` fields are `Option`s) | reported to the orchestrator for SP4/SP8; SP6 cannot invent a dongle identity, and presuming adoption would send a previous dongle's settings to a new one |
 
 ---
 ### Task 1: The `testkit` feature
@@ -865,6 +869,13 @@ fn good_lines_survive_their_bad_neighbours() {
 }
 
 #[test]
+fn rows_written_out_of_time_order_load_in_time_order() {
+    let text = "20,50,discharging,connected\n10,51,discharging,connected\n";
+    let times: Vec<UnixSeconds> = parse_log(text).iter().map(|row| row.at).collect();
+    assert_eq!(times, [UnixSeconds(10), UnixSeconds(20)]);
+}
+
+#[test]
 fn retention_keeps_exactly_eight_days() {
     let now = UnixSeconds(10 * RETENTION_SECONDS);
     let oldest_kept = now.minus(RETENTION_SECONDS).0;
@@ -917,7 +928,9 @@ pub fn render_log(samples: &[Sample]) -> String {
 
 #[must_use]
 pub fn parse_log(text: &str) -> Vec<Sample> {
-    text.lines().filter_map(parse_line).collect()
+    let mut samples: Vec<Sample> = text.lines().filter_map(parse_line).collect();
+    samples.sort_by_key(|sample| sample.at);
+    samples
 }
 
 #[must_use]
@@ -978,7 +991,7 @@ Add `pub mod log_format;` to `crates/core/src/battery/mod.rs` (before `pub mod s
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
-Expected: PASS, 12 tests.
+Expected: PASS, 13 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1259,7 +1272,7 @@ pub use series::{Series, Window, series};
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
-Expected: PASS, 19 tests.
+Expected: PASS, 20 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1306,8 +1319,8 @@ pub fn sink(terminal: SinkKind, via_equalizer: bool, via_easy_effects: bool) -> 
 
 ```rust
 use arctis_core::companion::timing::{
-    BATTERY_HYSTERESIS, CRITICAL_BATTERY, EDITOR_THROTTLE, QUIT_GRACE, REBIND_NOTICE, RULE_ENTER,
-    RULE_LEAVE, auto_switch_min_interval,
+    BATTERY_HYSTERESIS, CRITICAL_BATTERY, EDITOR_THROTTLE, QUIT_GRACE, RULE_ENTER, RULE_LEAVE,
+    auto_switch_min_interval,
 };
 use arctis_core::messages::audio::SoundPath;
 
@@ -1317,7 +1330,6 @@ fn constants_match_the_design() {
     assert_eq!(RULE_LEAVE, 10_000);
     assert_eq!(EDITOR_THROTTLE, 250);
     assert_eq!(QUIT_GRACE, 1_000);
-    assert_eq!(REBIND_NOTICE, 5_000);
     assert_eq!(CRITICAL_BATTERY, 5);
     assert_eq!(BATTERY_HYSTERESIS, 3);
 }
@@ -1423,7 +1435,6 @@ pub const DONGLE_SWITCH_INTERVAL: u64 = 30_000;
 pub const BLUETOOTH_SWITCH_INTERVAL: u64 = 2_000;
 pub const EDITOR_THROTTLE: u64 = 250;
 pub const QUIT_GRACE: u64 = 1_000;
-pub const REBIND_NOTICE: u64 = 5_000;
 pub const CRITICAL_BATTERY: u8 = 5;
 pub const BATTERY_HYSTERESIS: u8 = 3;
 
@@ -2483,19 +2494,29 @@ use arctis_core::testkit::repository_contracts::{
     battery_repository_contract, preset_repository_contract, seen_apps_repository_contract,
 };
 
+const fn same<R>(store: R) -> R {
+    store
+}
+
 #[test]
 fn memory_presets_pass_the_contract() {
-    preset_repository_contract(MemoryPresets::default);
+    preset_repository_contract(MemoryPresets::default, same);
 }
 
 #[test]
 fn memory_battery_passes_the_contract() {
-    battery_repository_contract(MemoryBattery::default);
+    battery_repository_contract(MemoryBattery::default, same);
 }
 
 #[test]
 fn memory_seen_apps_pass_the_contract() {
-    seen_apps_repository_contract(MemorySeenApps::default);
+    seen_apps_repository_contract(MemorySeenApps::default, same);
+}
+
+#[test]
+#[should_panic(expected = "presets survive a reopen")]
+fn a_store_that_forgets_on_reopen_fails_the_contract() {
+    preset_repository_contract(MemoryPresets::default, |_| MemoryPresets::default());
 }
 
 #[test]
@@ -2635,23 +2656,23 @@ use crate::ports::{BatteryRepository, PresetRepository, SeenAppsRepository};
 use crate::protocol::status::{Charging, Link};
 use crate::settings::values::Percent;
 
-pub fn preset_repository_contract<R: PresetRepository>(fresh: impl Fn() -> R) {
+pub fn preset_repository_contract<R: PresetRepository>(fresh: impl Fn() -> R, reopen: impl Fn(R) -> R) {
     assert_eq!(loaded_presets(&fresh()), Vec::new());
-    saved_presets_load_back(fresh());
-    saving_an_id_again_replaces_it(fresh());
-    deleted_presets_are_gone(fresh());
+    saved_presets_load_back(reopen(saved(fresh())));
+    saving_an_id_again_replaces_it(reopen(saved_twice(fresh())));
+    deleted_presets_are_gone(reopen(deleted(fresh())));
 }
 
-pub fn battery_repository_contract<R: BatteryRepository>(fresh: impl Fn() -> R) {
+pub fn battery_repository_contract<R: BatteryRepository>(fresh: impl Fn() -> R, reopen: impl Fn(R) -> R) {
     assert_eq!(fresh().load().expect("samples load"), Vec::new());
-    appended_samples_load_back_in_order(fresh());
-    retention_drops_only_older_samples(fresh());
+    appended_samples_load_back_in_order(reopen(appended(fresh())));
+    retention_drops_only_older_samples(reopen(retained(fresh())));
 }
 
-pub fn seen_apps_repository_contract<R: SeenAppsRepository>(fresh: impl Fn() -> R) {
+pub fn seen_apps_repository_contract<R: SeenAppsRepository>(fresh: impl Fn() -> R, reopen: impl Fn(R) -> R) {
     assert_eq!(fresh().load().expect("seen apps load"), Vec::new());
-    recorded_apps_load_newest_first(fresh());
-    at_most_fifty_apps_are_kept(fresh());
+    recorded_apps_load_newest_first(reopen(recorded(fresh())));
+    at_most_fifty_apps_are_kept(reopen(recorded_many(fresh())));
 }
 
 fn custom(id: &str, name: &str) -> Preset {
@@ -2664,23 +2685,35 @@ fn loaded_presets(store: &impl PresetRepository) -> Vec<Preset> {
     presets
 }
 
-fn saved_presets_load_back(mut store: impl PresetRepository) {
+fn saved<R: PresetRepository>(mut store: R) -> R {
     store.save(&custom("b", "B")).expect("save b");
     store.save(&custom("a", "A")).expect("save a");
-    assert_eq!(loaded_presets(&store), [custom("a", "A"), custom("b", "B")]);
+    store
 }
 
-fn saving_an_id_again_replaces_it(mut store: impl PresetRepository) {
+fn saved_presets_load_back(store: impl PresetRepository) {
+    assert_eq!(loaded_presets(&store), [custom("a", "A"), custom("b", "B")], "presets survive a reopen");
+}
+
+fn saved_twice<R: PresetRepository>(mut store: R) -> R {
     store.save(&custom("a", "A")).expect("save a");
     store.save(&custom("a", "Renamed")).expect("save a again");
+    store
+}
+
+fn saving_an_id_again_replaces_it(store: impl PresetRepository) {
     assert_eq!(loaded_presets(&store), [custom("a", "Renamed")]);
 }
 
-fn deleted_presets_are_gone(mut store: impl PresetRepository) {
+fn deleted<R: PresetRepository>(mut store: R) -> R {
     store.save(&custom("a", "A")).expect("save a");
     store.save(&custom("b", "B")).expect("save b");
     store.delete(&PresetId::new("a")).expect("delete a");
     store.delete(&PresetId::new("a")).expect("delete a twice");
+    store
+}
+
+fn deleted_presets_are_gone(store: impl PresetRepository) {
     assert_eq!(loaded_presets(&store), [custom("b", "B")]);
 }
 
@@ -2695,17 +2728,25 @@ fn row(at: u64, percent: u8) -> Sample {
     }
 }
 
-fn appended_samples_load_back_in_order(mut store: impl BatteryRepository) {
+fn appended<R: BatteryRepository>(mut store: R) -> R {
     store.append(&row(1, 90)).expect("append");
     store.append(&row(2, 89)).expect("append");
+    store
+}
+
+fn appended_samples_load_back_in_order(store: impl BatteryRepository) {
     assert_eq!(store.load().expect("load"), [row(1, 90), row(2, 89)]);
 }
 
-fn retention_drops_only_older_samples(mut store: impl BatteryRepository) {
+fn retained<R: BatteryRepository>(mut store: R) -> R {
     for (at, percent) in [(1, 90), (2, 89), (3, 88)] {
         store.append(&row(at, percent)).expect("append");
     }
     store.retain_since(UnixSeconds(2)).expect("retain");
+    store
+}
+
+fn retention_drops_only_older_samples(store: impl BatteryRepository) {
     assert_eq!(store.load().expect("load"), [row(2, 89), row(3, 88)]);
 }
 
@@ -2717,17 +2758,25 @@ fn app(key: &str) -> SeenApp {
     }
 }
 
-fn recorded_apps_load_newest_first(mut store: impl SeenAppsRepository) {
+fn recorded<R: SeenAppsRepository>(mut store: R) -> R {
     for key in ["a", "b", "a"] {
         store.record(&app(key)).expect("record");
     }
+    store
+}
+
+fn recorded_apps_load_newest_first(store: impl SeenAppsRepository) {
     assert_eq!(store.load().expect("load"), [app("a"), app("b")]);
 }
 
-fn at_most_fifty_apps_are_kept(mut store: impl SeenAppsRepository) {
+fn recorded_many<R: SeenAppsRepository>(mut store: R) -> R {
     for n in 0..=MAX_SEEN_APPS {
         store.record(&app(&format!("app{n}"))).expect("record");
     }
+    store
+}
+
+fn at_most_fifty_apps_are_kept(store: impl SeenAppsRepository) {
     let apps = store.load().expect("load");
     assert_eq!(apps.len(), MAX_SEEN_APPS);
     assert_eq!(apps.first(), Some(&app(&format!("app{MAX_SEEN_APPS}"))));
@@ -2747,7 +2796,7 @@ pub mod repository_contracts;
 - [ ] **Step 6: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test ports`
-Expected: PASS, 4 tests.
+Expected: PASS, 5 tests. SP8 runs the same three contracts on its file stores, with a `reopen` that builds a new store over the same directory.
 
 - [ ] **Step 7: Commit**
 
@@ -3684,6 +3733,7 @@ fn headset_intents_are_setting_changes() {
 fn other_intents_are_not_setting_changes() {
     assert_eq!(Intent::ActivatePreset(id("flat")).setting_change(), None);
     assert_eq!(Intent::EndPreview.setting_change(), None);
+    assert_eq!(Intent::SetRunInBackground(true).setting_change(), None);
 }
 ```
 
@@ -3722,6 +3772,7 @@ pub enum Intent {
     StartPreview(PresetId),
     EndPreview,
     SetLowBatteryThreshold(Percent),
+    SetRunInBackground(bool),
 }
 
 impl Intent {
@@ -3838,19 +3889,15 @@ pub const fn firmware(minor: u8) -> Firmware {
 ```rust
 use arctis_core::companion::adoption::{AdoptionStatus, DongleIdentity};
 use arctis_core::companion::dongle::{DongleState, WriteFailure};
-use arctis_core::companion::timing::REBIND_NOTICE;
 use arctis_core::messages::device::Phase;
 use arctis_core::settings::headset_settings::{Setting, SettingChange};
 use arctis_core::settings::values::Sidetone;
-use arctis_core::time::Millis;
 
 use crate::support::{NOVA_5, curve_of, firmware, nova_5, observed, observed_with};
 
-const T: Millis = Millis(1_000_000);
-
 fn identified() -> DongleState {
     let mut dongle = DongleState::new();
-    dongle.set_phase(Phase::Settling, T);
+    dongle.set_phase(Phase::Settling);
     dongle.identify(nova_5(), None, firmware(16));
     dongle
 }
@@ -3878,22 +3925,19 @@ fn losing_the_dongle_forgets_it() {
     for phase in [Phase::Absent, Phase::PermissionDenied] {
         let mut dongle = identified();
         dongle.observe(observed(), &observed());
-        dongle.set_phase(phase, T);
+        dongle.set_phase(phase);
         assert!(!dongle.is_present());
         assert_eq!((dongle.identity.clone(), dongle.model, dongle.observed.clone()), (None, None, None));
     }
 }
 
 #[test]
-fn rebinding_turns_into_reconnecting_after_the_notice() {
+fn rebinding_keeps_the_dongle() {
     let mut dongle = identified();
-    dongle.set_phase(Phase::Rebinding, T);
-    dongle.set_phase(Phase::Rebinding, T.after(1_000));
-    assert_eq!(dongle.reconnect_notice_at(), Some(T.after(REBIND_NOTICE)));
-    assert!(!dongle.reconnecting(T.after(REBIND_NOTICE - 1)));
-    assert!(dongle.reconnecting(T.after(REBIND_NOTICE)));
-    dongle.set_phase(Phase::Ready, T.after(6_000));
-    assert_eq!(dongle.reconnect_notice_at(), None);
+    dongle.observe(observed(), &observed());
+    dongle.set_phase(Phase::Rebinding);
+    assert!(dongle.is_present());
+    assert_eq!(dongle.observed, Some(observed()));
 }
 
 #[test]
@@ -3940,13 +3984,11 @@ Expected: FAIL to compile (`companion::dongle` missing).
 
 ```rust
 use super::adoption::{AdoptionStatus, DongleIdentity};
-use super::timing::REBIND_NOTICE;
 use crate::eq::curve::equivalent;
 use crate::messages::device::Phase;
 use crate::protocol::firmware::Firmware;
 use crate::protocol::model::Model;
 use crate::settings::headset_settings::{HeadsetSettings, Setting, SettingChange};
-use crate::time::Millis;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct WriteFailure {
@@ -3963,7 +4005,6 @@ pub struct DongleState {
     pub observed: Option<HeadsetSettings>,
     pub not_applied: Vec<Setting>,
     pub last_failure: Option<WriteFailure>,
-    rebinding_since: Option<Millis>,
 }
 
 impl DongleState {
@@ -3977,7 +4018,6 @@ impl DongleState {
             observed: None,
             not_applied: Vec::new(),
             last_failure: None,
-            rebinding_since: None,
         }
     }
 
@@ -4000,11 +4040,7 @@ impl DongleState {
         }
     }
 
-    pub fn set_phase(&mut self, phase: Phase, now: Millis) {
-        self.rebinding_since = match phase {
-            Phase::Rebinding => self.rebinding_since.or(Some(now)),
-            _ => None,
-        };
+    pub fn set_phase(&mut self, phase: Phase) {
         if !is_present(phase) {
             self.forget();
         }
@@ -4037,16 +4073,6 @@ impl DongleState {
             .last_failure
             .map_or(1, |failure| failure.serial.wrapping_add(1));
         self.last_failure = Some(WriteFailure { serial, setting });
-    }
-
-    #[must_use]
-    pub fn reconnect_notice_at(&self) -> Option<Millis> {
-        self.rebinding_since.map(|since| since.after(REBIND_NOTICE))
-    }
-
-    #[must_use]
-    pub fn reconnecting(&self, now: Millis) -> bool {
-        self.reconnect_notice_at().is_some_and(|at| now >= at)
     }
 
     fn forget(&mut self) {
@@ -4149,15 +4175,13 @@ impl From<AlertChange> for Action {
 use super::adoption::AdoptionStatus;
 use super::alerts::BatteryWarning;
 use super::app_settings::{AppRules, HeadsetValues, RoutePresets};
-use super::catalog::fresh_id;
 use super::dongle::WriteFailure;
 use super::routing::{AudioService, Route};
 use super::seen_apps::SeenApp;
-use super::selection::{ActivateError, ActivePreset, picked_path};
+use super::selection::ActivePreset;
 use crate::battery::sample::{Reading, Sample};
-use crate::eq::library::{self, FLAT_ID};
-use crate::eq::preset::{Preset, PresetId};
-use crate::messages::audio::{DefaultSink, SoundPath};
+use crate::eq::preset::Preset;
+use crate::messages::audio::DefaultSink;
 use crate::messages::device::Phase;
 use crate::protocol::firmware::Firmware;
 use crate::protocol::model::Model;
@@ -4174,14 +4198,6 @@ pub struct DongleSnapshot {
     pub observed: Option<HeadsetSettings>,
     pub not_applied: Vec<Setting>,
     pub last_failure: Option<WriteFailure>,
-    pub reconnecting: bool,
-}
-
-impl DongleSnapshot {
-    #[must_use]
-    pub const fn is_present(&self) -> bool {
-        !matches!(self.phase, Phase::Absent | Phase::PermissionDenied)
-    }
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -4204,36 +4220,6 @@ pub struct PresetsSnapshot {
     pub seen_apps: Vec<SeenApp>,
 }
 
-impl PresetsSnapshot {
-    #[must_use]
-    pub const fn active(&self, path: SoundPath) -> &ActivePreset {
-        match path {
-            SoundPath::Dongle => &self.dongle,
-            SoundPath::Bluetooth => &self.bluetooth,
-        }
-    }
-
-    #[must_use]
-    pub fn find(&self, id: &PresetId) -> Option<&Preset> {
-        self.all.iter().find(|preset| preset.id() == id)
-    }
-
-    #[must_use]
-    pub fn resolve(&self, id: &PresetId) -> Preset {
-        self.find(id).cloned().unwrap_or_else(library::flat)
-    }
-
-    #[must_use]
-    pub fn route_preset(&self, path: SoundPath) -> PresetId {
-        let id = self.route_presets.get(path);
-        if self.find(id).is_some() {
-            id.clone()
-        } else {
-            PresetId::new(FLAT_ID)
-        }
-    }
-}
-
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BatterySnapshot {
     pub reading: Option<Reading>,
@@ -4249,18 +4235,10 @@ pub struct Snapshot {
     pub presets: PresetsSnapshot,
     pub battery: BatterySnapshot,
 }
-
-impl Snapshot {
-    pub fn picked_path(&self) -> Result<SoundPath, ActivateError> {
-        picked_path(self.audio.route, self.dongle.is_present(), self.dongle.adoption)
-    }
-
-    #[must_use]
-    pub fn fresh_preset_id(&self, name: &str) -> PresetId {
-        fresh_id(&self.presets.all, name)
-    }
-}
 ```
+
+The snapshot's methods (`DongleSnapshot::is_present`, `PresetsSnapshot::{active, find, resolve, route_preset}`,
+`Snapshot::{picked_path, fresh_preset_id}`) are behaviour, so Task 15 adds them after its failing tests.
 
 `crates/core/src/companion/mod.rs`:
 
@@ -4327,9 +4305,10 @@ use arctis_core::companion::engines::{Cause, Decision, EditorThrottle, Engines, 
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::companion::timing::EDITOR_THROTTLE;
 use arctis_core::messages::audio::SoundPath;
+use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::time::Millis;
 
-use crate::support::{discharging, id, percent};
+use crate::support::{discharging, id, percent, reading};
 
 const T: Millis = Millis(1_760_000_000_000);
 
@@ -4463,8 +4442,25 @@ fn a_new_threshold_re_evaluates_the_last_reading() {
     assert!(watch.threshold_changed(percent(20)).is_empty());
     let _ = watch.observe(discharging(18), T, percent(15));
     assert!(matches!(watch.threshold_changed(percent(20)).as_slice(), [AlertChange::Notify(_)]));
-    watch.forget();
+}
+
+#[test]
+fn a_disconnect_closes_the_line_once() {
+    let mut watch = BatteryWatch::new(Vec::new());
+    let _ = watch.observe(discharging(73), T, percent(15));
+    let gap = watch.disconnect(T.after(60_000)).expect("a closing row");
+    assert_eq!(gap.at, UnixSeconds::from_millis(T.after(60_000)));
+    assert_eq!((gap.reading.percent, gap.reading.link), (percent(73), Link::HeadsetOff));
     assert_eq!(watch.reading(), None);
+    assert_eq!(watch.disconnect(T.after(120_000)), None);
+    assert_eq!(watch.history().len(), 2);
+}
+
+#[test]
+fn a_reading_already_without_a_link_needs_no_closing_row() {
+    let mut watch = BatteryWatch::new(Vec::new());
+    let _ = watch.observe(reading(0, Charging::Unknown, Link::HeadsetOff), T, percent(15));
+    assert_eq!(watch.disconnect(T.after(1_000)), None);
 }
 ```
 
@@ -4663,6 +4659,7 @@ impl Engines {
 use super::alerts::{AlertChange, Alerts, BatteryWarning};
 use crate::battery::log_format::retain_recent;
 use crate::battery::sample::{Reading, Sample, Sampler, UnixSeconds};
+use crate::protocol::status::Link;
 use crate::settings::values::Percent;
 use crate::time::Millis;
 
@@ -4693,14 +4690,8 @@ impl BatteryWatch {
 
     pub fn observe(&mut self, reading: Reading, now: Millis, threshold: Percent) -> BatteryUpdate {
         self.reading = Some(reading);
-        let at = UnixSeconds::from_millis(now);
-        let sample = self.sampler.observe(reading, at);
-        if let Some(sample) = sample {
-            self.history = retain_recent(&self.history, at);
-            self.history.push(sample);
-        }
         BatteryUpdate {
-            sample,
+            sample: self.record(reading, now),
             alerts: self.alerts.update(reading, threshold),
         }
     }
@@ -4712,8 +4703,21 @@ impl BatteryWatch {
         self.alerts.update(reading, threshold)
     }
 
-    pub fn forget(&mut self) {
-        self.reading = None;
+    pub fn disconnect(&mut self, now: Millis) -> Option<Sample> {
+        let last = self.reading.take().filter(|reading| reading.is_connected())?;
+        let closing = Reading {
+            link: Link::HeadsetOff,
+            ..last
+        };
+        self.record(closing, now)
+    }
+
+    fn record(&mut self, reading: Reading, now: Millis) -> Option<Sample> {
+        let at = UnixSeconds::from_millis(now);
+        let sample = self.sampler.observe(reading, at)?;
+        self.history = retain_recent(&self.history, at);
+        self.history.push(sample);
+        Some(sample)
     }
 
     #[must_use]
@@ -4739,7 +4743,7 @@ Add `pub mod battery_watch;`, `pub mod deadlines;` and `pub mod engines;` to `cr
 - [ ] **Step 7: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion engines`
-Expected: PASS, 13 tests.
+Expected: PASS, 15 tests.
 
 - [ ] **Step 8: Commit**
 
@@ -4988,7 +4992,6 @@ use arctis_core::companion::adoption::AdoptionStatus;
 use arctis_core::companion::alerts::AlertId;
 use arctis_core::companion::dongle::WriteFailure;
 use arctis_core::companion::selection::{ActivateError, ActivePreset};
-use arctis_core::companion::timing::REBIND_NOTICE;
 use arctis_core::companion::{Action, Input};
 use arctis_core::messages::audio::SoundPath;
 use arctis_core::messages::device::{DeviceUpdate, Phase};
@@ -5045,7 +5048,11 @@ fn an_absent_dongle_is_forgotten() {
     let mut h = Harness::new(adopted());
     let _ = h.connect(observed());
     let _ = h.device(status(73));
-    let _ = h.device(DeviceUpdate::Phase(Phase::Absent));
+    let gone = h.at(60_000).device(DeviceUpdate::Phase(Phase::Absent));
+    let closing = |action: &Action| {
+        matches!(action, Action::RecordBattery(sample) if sample.reading.link == Link::HeadsetOff)
+    };
+    assert!(gone.iter().any(closing));
     let snapshot = h.snapshot();
     assert_eq!(snapshot.dongle.model, None);
     assert_eq!(snapshot.dongle.adoption, AdoptionStatus::Unknown);
@@ -5053,16 +5060,14 @@ fn an_absent_dongle_is_forgotten() {
 }
 
 #[test]
-fn rebinding_shows_reconnecting_after_the_notice() {
+fn rebinding_keeps_the_dongle_and_schedules_nothing() {
     let mut h = Harness::new(adopted());
     let _ = h.connect(observed());
     let rebinding = h.at(100).device(DeviceUpdate::Phase(Phase::Rebinding));
-    assert_eq!(wakes(&rebinding), [START.after(100 + REBIND_NOTICE)]);
-    assert!(!h.snapshot().dongle.reconnecting);
-    let woke = h.at(100 + REBIND_NOTICE).send(Input::Woke);
-    assert!(published(&woke).expect("published").dongle.reconnecting);
-    let _ = h.at(6_000).device(DeviceUpdate::Phase(Phase::Ready));
-    assert!(!h.snapshot().dongle.reconnecting);
+    assert!(wakes(&rebinding).is_empty());
+    let snapshot = published(&rebinding).expect("published");
+    assert_eq!(snapshot.dongle.phase, Phase::Rebinding);
+    assert_eq!(snapshot.dongle.adoption, AdoptionStatus::Adopted);
 }
 
 #[test]
@@ -5174,7 +5179,6 @@ pub struct Companion {
     pub(super) selection: Selection,
     pub(super) engines: Engines,
     pub(super) battery: BatteryWatch,
-    pub(super) now: Millis,
     deadlines: Deadlines,
     published: Option<Rc<Snapshot>>,
 }
@@ -5191,7 +5195,6 @@ impl Companion {
             selection: Selection::default(),
             engines: Engines::default(),
             battery: BatteryWatch::new(persisted.battery),
-            now: Millis::default(),
             deadlines: Deadlines::default(),
             published: None,
         }
@@ -5200,7 +5203,7 @@ impl Companion {
     pub fn handle(&mut self, input: Input, now: Millis) -> Vec<Action> {
         let mut out = Vec::new();
         self.dispatch(input, now, &mut out);
-        self.finish(now, &mut out);
+        self.finish(&mut out);
         out
     }
 
@@ -5214,7 +5217,7 @@ impl Companion {
 
     fn device(&mut self, update: DeviceUpdate, now: Millis, out: &mut Vec<Action>) {
         match update {
-            DeviceUpdate::Phase(phase) => self.phase_changed(phase, now),
+            DeviceUpdate::Phase(phase) => self.phase_changed(phase, now, out),
             DeviceUpdate::Identity { model, uniq, firmware } => {
                 self.dongle.identify(model, uniq.as_deref(), firmware);
             }
@@ -5231,10 +5234,10 @@ impl Companion {
         }
     }
 
-    fn phase_changed(&mut self, phase: Phase, now: Millis) {
-        self.dongle.set_phase(phase, now);
+    fn phase_changed(&mut self, phase: Phase, now: Millis, out: &mut Vec<Action>) {
+        self.dongle.set_phase(phase);
         if !self.dongle.is_present() {
-            self.battery.forget();
+            out.extend(self.battery.disconnect(now).map(Action::RecordBattery));
         }
     }
 
@@ -5271,10 +5274,8 @@ impl Companion {
         self.selection.path(path).active(&self.route_preset(path))
     }
 
-    fn finish(&mut self, now: Millis, out: &mut Vec<Action>) {
-        self.now = now;
-        let notice = self.dongle.reconnect_notice_at().filter(|at| *at > now);
-        let next = earliest([self.selection.next_deadline(), self.engines.next_deadline(), notice]);
+    fn finish(&mut self, out: &mut Vec<Action>) {
+        let next = earliest([self.selection.next_deadline(), self.engines.next_deadline()]);
         out.extend(self.deadlines.schedule(next));
         let snapshot = self.snapshot();
         if self.published.as_ref() != Some(&snapshot) {
@@ -5287,10 +5288,69 @@ impl Companion {
 
 - [ ] **Step 4: Build the snapshot**
 
-Append to `crates/core/src/companion/snapshot.rs` (add `use std::rc::Rc;` and
-`use super::reducer::Companion;` to its imports):
+Append to `crates/core/src/companion/snapshot.rs` and merge these lines into its imports (`ActivePreset` and
+`Preset` are already there):
 
 ```rust
+use std::rc::Rc;
+
+use super::catalog::fresh_id;
+use super::reducer::Companion;
+use super::selection::{ActivateError, picked_path};
+use crate::eq::library::{self, FLAT_ID};
+use crate::eq::preset::PresetId;
+use crate::messages::audio::SoundPath;
+```
+
+```rust
+impl DongleSnapshot {
+    #[must_use]
+    pub const fn is_present(&self) -> bool {
+        !matches!(self.phase, Phase::Absent | Phase::PermissionDenied)
+    }
+}
+
+impl PresetsSnapshot {
+    #[must_use]
+    pub const fn active(&self, path: SoundPath) -> &ActivePreset {
+        match path {
+            SoundPath::Dongle => &self.dongle,
+            SoundPath::Bluetooth => &self.bluetooth,
+        }
+    }
+
+    #[must_use]
+    pub fn find(&self, id: &PresetId) -> Option<&Preset> {
+        self.all.iter().find(|preset| preset.id() == id)
+    }
+
+    #[must_use]
+    pub fn resolve(&self, id: &PresetId) -> Preset {
+        self.find(id).cloned().unwrap_or_else(library::flat)
+    }
+
+    #[must_use]
+    pub fn route_preset(&self, path: SoundPath) -> PresetId {
+        let id = self.route_presets.get(path);
+        if self.find(id).is_some() {
+            id.clone()
+        } else {
+            PresetId::new(FLAT_ID)
+        }
+    }
+}
+
+impl Snapshot {
+    pub fn picked_path(&self) -> Result<SoundPath, ActivateError> {
+        picked_path(self.audio.route, self.dongle.is_present(), self.dongle.adoption)
+    }
+
+    #[must_use]
+    pub fn fresh_preset_id(&self, name: &str) -> PresetId {
+        fresh_id(&self.presets.all, name)
+    }
+}
+
 impl Companion {
     #[must_use]
     pub fn snapshot(&self) -> Rc<Snapshot> {
@@ -5313,7 +5373,6 @@ impl Companion {
             observed: dongle.observed.clone(),
             not_applied: dongle.not_applied.clone(),
             last_failure: dongle.last_failure,
-            reconnecting: dongle.reconnecting(self.now),
         }
     }
 
@@ -5569,13 +5628,13 @@ Replace `handle` and `device` and add `advance`, `sync_policy`, `headset_changed
         let mut out = Vec::new();
         self.dispatch(input, now, &mut out);
         self.advance(&mut out);
-        self.finish(now, &mut out);
+        self.finish(&mut out);
         out
     }
 
     fn device(&mut self, update: DeviceUpdate, now: Millis, out: &mut Vec<Action>) {
         match update {
-            DeviceUpdate::Phase(phase) => self.phase_changed(phase, now),
+            DeviceUpdate::Phase(phase) => self.phase_changed(phase, now, out),
             DeviceUpdate::Identity { model, uniq, firmware } => {
                 self.dongle.identify(model, uniq.as_deref(), firmware);
                 out.push(self.sync_policy());
@@ -5748,6 +5807,15 @@ fn easy_effects_keeps_the_equalizer_out() {
 }
 
 #[test]
+fn easy_effects_appearing_takes_the_equalizer_out() {
+    let mut h = Harness::new(persisted());
+    let _ = h.audio(default_sink(SinkKind::NovaBluetooth));
+    let actions = h.audio(AudioEvent::DefaultSink(sink(SinkKind::NovaBluetooth, true, true)));
+    assert_eq!(audio_commands(&actions), [AudioCommand::RemoveEqualizer]);
+    assert_eq!(h.snapshot().audio.route, Route::Bluetooth);
+}
+
+#[test]
 fn speakers_are_no_headset_route() {
     let mut h = Harness::new(persisted());
     assert!(audio_commands(&h.audio(default_sink(SinkKind::Other))).is_empty());
@@ -5866,7 +5934,7 @@ Replace `dispatch` and add `audio_event`, `record_seen_apps`, `bluetooth_seen`, 
             let curve = self.active_curve(SoundPath::Bluetooth);
             self.audio.equalizer = Some(curve.clone());
             out.push(Action::SendAudio(AudioCommand::InsertEqualizer(curve)));
-        } else if self.audio.route() != Route::Bluetooth {
+        } else if self.audio.route() != Route::Bluetooth || self.audio.easy_effects_active() {
             self.remove_equalizer(out);
         }
     }
@@ -5880,7 +5948,7 @@ Replace `dispatch` and add `audio_event`, `record_seen_apps`, `bluetooth_seen`, 
 
 `AudioState::equalizer` holds the curve the system equalizer runs (`None` when it is not inserted).
 `AudioState::apply(&AudioEvent::Unavailable)` resets it, so PipeWire going away sends no `RemoveEqualizer` (there
-is nothing left to remove).
+is nothing left to remove). EasyEffects showing up in the chain removes an inserted equalizer (Deviation 33).
 
 - [ ] **Step 4: Run the tests to see them pass**
 
@@ -5963,7 +6031,7 @@ use arctis_core::companion::selection::ActivePreset;
 use arctis_core::messages::audio::{AudioCommand, SinkKind, SoundPath};
 
 use crate::support::{
-    Harness, START, audio_commands, chosen_for, curve_of, default_sink, device_curves, id,
+    Harness, START, audio_commands, chosen_for, curve_of, custom, default_sink, device_curves, id,
     observed, playing, ruled, wakes, with_rules,
 };
 
@@ -6033,13 +6101,36 @@ fn the_headset_switches_at_most_once_per_thirty_seconds() {
 }
 
 #[test]
-fn a_switch_to_the_curve_on_the_headset_writes_nothing_and_spends_no_budget() {
+fn the_same_preset_for_an_app_only_relabels() {
     let mut h = ruled(&[("firefox", "flat"), ("spotify", "podcast")]);
     let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
     assert!(device_curves(&h.at(2_000).send(Input::Woke)).is_empty());
     assert_eq!(h.snapshot().presets.dongle, chosen_for("flat", "firefox"));
     let _ = h.at(5_000).audio(playing(&["firefox", "spotify"], SoundPath::Dongle));
     assert_eq!(device_curves(&h.at(6_000).send(Input::Woke)), [curve_of("podcast")]);
+}
+
+#[test]
+fn a_switch_to_the_curve_on_the_headset_spends_no_budget() {
+    let mut saved = with_rules(&[("firefox", "copy"), ("spotify", "podcast")]);
+    saved.custom_presets = vec![custom("copy", curve_of("flat"))];
+    let mut h = Harness::new(saved);
+    let _ = h.connect(observed());
+    let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
+    assert_eq!(device_curves(&h.at(2_000).send(Input::Woke)), [curve_of("flat")]);
+    assert_eq!(h.snapshot().presets.dongle, chosen_for("copy", "firefox"));
+    let _ = h.at(5_000).audio(playing(&["firefox", "spotify"], SoundPath::Dongle));
+    assert_eq!(device_curves(&h.at(6_000).send(Input::Woke)), [curve_of("podcast")]);
+}
+
+#[test]
+fn a_switch_back_before_the_readback_still_reaches_the_session() {
+    let mut h = ruled(&[("firefox", "footsteps")]);
+    let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
+    assert_eq!(device_curves(&h.at(2_000).send(Input::Woke)), [curve_of("footsteps")]);
+    let _ = h.at(3_000).audio(playing(&[], SoundPath::Dongle));
+    assert!(device_curves(&h.at(13_000).send(Input::Woke)).is_empty());
+    assert_eq!(device_curves(&h.at(32_000).send(Input::Woke)), [curve_of("flat")]);
 }
 
 #[test]
@@ -6085,14 +6176,15 @@ use crate::eq::curve::equivalent;
 ```
 
 Replace `handle`, `dispatch` and `advance`, and add `update_ruled_sets`, `settle`, `apply_curve`,
-`write_headset_curve`, `retarget_system_curve`:
+`write_headset_curve`, `on_headset`, `retarget_system_curve`. `write_headset_curve` always sends the new target to
+the session and reports whether a `0x33` write follows (Deviation 10):
 
 ```rust
     pub fn handle(&mut self, input: Input, now: Millis) -> Vec<Action> {
         let mut out = Vec::new();
         let cause = self.dispatch(input, now, &mut out);
         self.advance(Trigger { now, cause }, &mut out);
-        self.finish(now, &mut out);
+        self.finish(&mut out);
         out
     }
 
@@ -6145,19 +6237,22 @@ Replace `handle`, `dispatch` and `advance`, and add `update_ruled_sets`, `settle
     }
 
     fn write_headset_curve(&self, curve: Curve, out: &mut Vec<Action>) -> bool {
-        let on_headset = self
-            .dongle
-            .observed
-            .as_ref()
-            .is_some_and(|observed| equivalent(&observed.equalizer, &curve));
-        if self.adoption() != AdoptionStatus::Adopted || on_headset {
+        if self.adoption() != AdoptionStatus::Adopted {
             return false;
         }
+        let on_headset = self.on_headset(&curve);
         out.push(Action::SendDevice(Change::Desired {
             settings: self.settings.headset.with_curve(curve),
             policy: SyncPolicy::Enforce,
         }));
-        true
+        !on_headset
+    }
+
+    fn on_headset(&self, curve: &Curve) -> bool {
+        self.dongle
+            .observed
+            .as_ref()
+            .is_some_and(|observed| equivalent(&observed.equalizer, curve))
     }
 
     pub(super) fn retarget_system_curve(&mut self, curve: Curve, out: &mut Vec<Action>) -> bool {
@@ -6427,6 +6522,12 @@ fn a_combo_pick_reaches_the_headset_while_pipewire_is_down() {
 }
 
 #[test]
+fn run_in_background_is_left_to_the_bridge() {
+    let mut h = ready();
+    assert!(h.intent(Intent::SetRunInBackground(false)).is_empty());
+}
+
+#[test]
 fn the_bluetooth_combo_retargets_the_system_equalizer() {
     let mut h = Harness::new(persisted());
     let _ = h.audio(default_sink(SinkKind::NovaBluetooth));
@@ -6480,7 +6581,8 @@ impl Companion {
             | Intent::SetMuteLight(_)
             | Intent::SetVolumeLimiter(_)
             | Intent::SetExtendedRange(_)
-            | Intent::SetAutoPowerOff(_) => {}
+            | Intent::SetAutoPowerOff(_)
+            | Intent::SetRunInBackground(_) => {}
         }
     }
 
@@ -6731,7 +6833,8 @@ use crate::eq::preset::Preset;
 ```
 
 Remove `Intent::SavePreset(_)` and `Intent::DeletePreset(_)` from the last arm of the `match` (it keeps only the six
-headset-setting intents) and add these two arms before it:
+headset-setting intents and `Intent::SetRunInBackground(_)`, which the bridge handles, Deviation 19) and add these two
+arms before it:
 
 ```rust
             Intent::SavePreset(preset) => self.save_preset(preset, out),
@@ -6794,20 +6897,16 @@ Replace `advance`, `apply_curve` and `write_headset_curve`, and add `write_activ
     }
 
     fn write_headset_curve(&mut self, curve: Curve, out: &mut Vec<Action>) -> bool {
-        let on_headset = self
-            .dongle
-            .observed
-            .as_ref()
-            .is_some_and(|observed| equivalent(&observed.equalizer, &curve));
-        if self.adoption() != AdoptionStatus::Adopted || on_headset {
+        if self.adoption() != AdoptionStatus::Adopted {
             return false;
         }
+        let on_headset = self.on_headset(&curve);
         self.engines.editor.cancel();
         out.push(Action::SendDevice(Change::Desired {
             settings: self.settings.headset.with_curve(curve),
             policy: SyncPolicy::Enforce,
         }));
-        true
+        !on_headset
     }
 
     fn write_active_headset_curve(&mut self, out: &mut Vec<Action>) {
@@ -6851,12 +6950,25 @@ use arctis_core::companion::timing::QUIT_GRACE;
 use arctis_core::companion::{Action, Input};
 use arctis_core::messages::audio::{AudioCommand, SinkKind};
 use arctis_core::messages::device::{DeviceUpdate, Phase};
+use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::headset_settings::Setting;
 
 use crate::support::{
     Harness, START, audio_commands, curve_of, default_sink, device_changes, device_curves,
-    firefox_playing, persisted, ready, wakes,
+    firefox_playing, percent, persisted, ready, wakes,
 };
+
+#[test]
+fn quitting_closes_the_battery_line() {
+    let mut h = ready();
+    let status = DeviceUpdate::Status { battery: percent(50), charging: Charging::Discharging, link: Link::Connected };
+    let _ = h.device(status);
+    let quitting = h.at(1_000).send(Input::Quitting);
+    let closing = |action: &Action| {
+        matches!(action, Action::RecordBattery(sample) if !sample.reading.is_connected())
+    };
+    assert!(quitting.iter().any(closing));
+}
 
 #[test]
 fn quitting_with_nothing_to_restore_is_immediate() {
@@ -6994,7 +7106,6 @@ use super::action::Action;
 use super::adoption::AdoptionStatus;
 use super::reducer::Companion;
 use super::timing::QUIT_GRACE;
-use crate::eq::curve::equivalent;
 use crate::messages::audio::SoundPath;
 use crate::settings::headset_settings::Setting;
 use crate::time::Millis;
@@ -7020,6 +7131,7 @@ impl Companion {
         if self.quit == Quit::Running {
             self.quit = Quit::Waiting(now.after(QUIT_GRACE));
             self.remove_equalizer(out);
+            out.extend(self.battery.disconnect(now).map(Action::RecordBattery));
         }
     }
 
@@ -7034,12 +7146,7 @@ impl Companion {
     }
 
     fn awaiting_route_curve(&self) -> bool {
-        let curve = self.active_curve(SoundPath::Dongle);
-        let verified = self
-            .dongle
-            .observed
-            .as_ref()
-            .is_some_and(|observed| equivalent(&observed.equalizer, &curve));
+        let verified = self.on_headset(&self.active_curve(SoundPath::Dongle));
         let failed = self.dongle.not_applied.contains(&Setting::Equalizer);
         self.dongle.is_ready() && self.adoption() == AdoptionStatus::Adopted && !verified && !failed
     }
@@ -7051,7 +7158,7 @@ Add `mod quitting;` to `crates/core/src/companion/mod.rs` (after `mod intents;`)
 - [ ] **Step 4: Wire settings changes and quitting into `reducer.rs`**
 
 Add `use super::quitting::Quit;` to the imports. Add the field `pub(super) quit: Quit,` to `Companion` (after
-`now`) and `quit: Quit::Running,` to `Companion::new`. Make `remove_equalizer` `pub(super)`.
+`battery`) and `quit: Quit::Running,` to `Companion::new`. Make `remove_equalizer` and `on_headset` `pub(super)`.
 
 Replace `dispatch`, `advance`, `target`, `place_equalizer` and `finish`, and add `settings_changed`:
 
@@ -7099,15 +7206,13 @@ Replace `dispatch`, `advance`, `target`, `place_equalizer` and `finish`, and add
             let curve = self.active_curve(SoundPath::Bluetooth);
             self.audio.equalizer = Some(curve.clone());
             out.push(Action::SendAudio(AudioCommand::InsertEqualizer(curve)));
-        } else if self.audio.route() != Route::Bluetooth {
+        } else if self.audio.route() != Route::Bluetooth || self.audio.easy_effects_active() {
             self.remove_equalizer(out);
         }
     }
 
-    fn finish(&mut self, now: Millis, out: &mut Vec<Action>) {
-        self.now = now;
-        let notice = self.dongle.reconnect_notice_at().filter(|at| *at > now);
-        let deadlines = [self.selection.next_deadline(), self.engines.next_deadline(), notice, self.quit.deadline()];
+    fn finish(&mut self, out: &mut Vec<Action>) {
+        let deadlines = [self.selection.next_deadline(), self.engines.next_deadline(), self.quit.deadline()];
         out.extend(self.deadlines.schedule(earliest(deadlines)));
         let snapshot = self.snapshot();
         if self.published.as_ref() != Some(&snapshot) {
@@ -7229,7 +7334,6 @@ fn dongle() -> DongleSnapshot {
         observed: Some(values().with_curve(library::flat().curve().clone())),
         not_applied: Vec::new(),
         last_failure: None,
-        reconnecting: false,
     }
 }
 
@@ -7336,6 +7440,8 @@ fn the_delete_toast_names_the_uses() {
         (false, false, 0, "Deleted “Mine”"),
         (true, false, 0, "Deleted “Mine”. Used by the 2.4 GHz preset"),
         (false, true, 0, "Deleted “Mine”. Used by the Bluetooth preset"),
+        (true, true, 0, "Deleted “Mine”. Used by the 2.4 GHz and Bluetooth presets"),
+        (false, true, 1, "Deleted “Mine”. Used by the Bluetooth preset and 1 app rule"),
         (true, false, 1, "Deleted “Mine”. Used by the 2.4 GHz preset and 1 app rule"),
         (true, true, 2, "Deleted “Mine”. Used by the 2.4 GHz and Bluetooth presets and 2 app rules"),
         (false, false, 1, "Deleted “Mine”. Used by 1 app rule"),
@@ -7384,7 +7490,7 @@ impl StatusPageModel {
 `crates/core/src/view/presets.rs`:
 
 ```rust
-use super::text::{Arg, Text, preset_arg, preset_title};
+use super::text::{Text, preset_arg, preset_title};
 use crate::companion::selection::PATHS;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::preset::{Preset, PresetId, PresetKind};
@@ -7447,44 +7553,40 @@ pub fn preset_uses(snapshot: &Snapshot, id: &PresetId) -> PresetUses {
 #[must_use]
 pub fn deleted_toast(snapshot: &Snapshot, preset: &Preset) -> Text {
     let uses = preset_uses(snapshot, preset.id());
-    let name = ("preset", preset_arg(preset));
-    let Some(paths) = paths_msgid(&uses.paths) else {
-        return rules_only(name, uses.app_rules);
-    };
-    let paths = ("paths", Arg::Msgid(paths.to_owned()));
+    let name = vec![("preset", preset_arg(preset))];
     if uses.app_rules == 0 {
-        return Text::format("Deleted “{preset}”. Used by {paths}", vec![name, paths]);
+        return Text::format(unruled_msgid(&uses.paths), name);
     }
-    Text::plural(
-        [
-            "Deleted “{preset}”. Used by {paths} and {n} app rule",
-            "Deleted “{preset}”. Used by {paths} and {n} app rules",
-        ],
-        uses.app_rules,
-        vec![name, paths],
-    )
+    Text::plural(ruled_msgids(&uses.paths), uses.app_rules, name)
 }
 
-fn rules_only(name: (&'static str, Arg), rules: u32) -> Text {
-    if rules == 0 {
-        return Text::format("Deleted “{preset}”", vec![name]);
+const fn unruled_msgid(paths: &[SoundPath]) -> &'static str {
+    match paths {
+        [] => "Deleted “{preset}”",
+        [SoundPath::Dongle] => "Deleted “{preset}”. Used by the 2.4 GHz preset",
+        [SoundPath::Bluetooth] => "Deleted “{preset}”. Used by the Bluetooth preset",
+        _ => "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets",
     }
-    Text::plural(
-        [
+}
+
+const fn ruled_msgids(paths: &[SoundPath]) -> [&'static str; 2] {
+    match paths {
+        [] => [
             "Deleted “{preset}”. Used by {n} app rule",
             "Deleted “{preset}”. Used by {n} app rules",
         ],
-        rules,
-        vec![name],
-    )
-}
-
-const fn paths_msgid(paths: &[SoundPath]) -> Option<&'static str> {
-    match paths {
-        [] => None,
-        [SoundPath::Dongle] => Some("the 2.4 GHz preset"),
-        [SoundPath::Bluetooth] => Some("the Bluetooth preset"),
-        _ => Some("the 2.4 GHz and Bluetooth presets"),
+        [SoundPath::Dongle] => [
+            "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rule",
+            "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rules",
+        ],
+        [SoundPath::Bluetooth] => [
+            "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rule",
+            "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rules",
+        ],
+        _ => [
+            "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app rule",
+            "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app rules",
+        ],
     }
 }
 
@@ -8450,15 +8552,15 @@ fn the_battery_icon_follows_level_and_charging() {
 #[test]
 fn connecting_and_reconnecting_show_in_the_header() {
     let cases = [
-        (Phase::Settling, false, Some("Connecting…")),
-        (Phase::Syncing, false, Some("Connecting…")),
-        (Phase::Rebinding, false, None),
-        (Phase::Rebinding, true, Some("Reconnecting…")),
-        (Phase::Ready, false, None),
+        (Phase::Settling, Some("Connecting…")),
+        (Phase::Probing, Some("Connecting…")),
+        (Phase::Syncing, Some("Connecting…")),
+        (Phase::Rebinding, Some("Reconnecting…")),
+        (Phase::HeadsetOff, None),
+        (Phase::Ready, None),
     ];
-    for (phase, reconnecting, expected) in cases {
-        let mut s = with(phase, Route::Dongle);
-        s.dongle.reconnecting = reconnecting;
+    for (phase, expected) in cases {
+        let s = with(phase, Route::Dongle);
         let header = headset(headset_page(&s)).header;
         assert_eq!(header.subtitle.map(|text| english(&text)).as_deref(), expected, "{phase:?}");
         assert_eq!(header.busy, expected.is_some());
@@ -8696,7 +8798,7 @@ fn header(snapshot: &Snapshot) -> HeaderModel {
 fn connection_subtitle(snapshot: &Snapshot) -> Option<Text> {
     match snapshot.dongle.phase {
         Phase::Settling | Phase::Probing | Phase::Syncing => Some(Text::plain("Connecting…")),
-        Phase::Rebinding if snapshot.dongle.reconnecting => Some(Text::plain("Reconnecting…")),
+        Phase::Rebinding => Some(Text::plain("Reconnecting…")),
         _ => None,
     }
 }
@@ -9707,7 +9809,8 @@ flowchart LR
 | Snapshot | `crates/core/src/companion/snapshot.rs::Snapshot`, `crates/core/src/companion/snapshot.rs::DongleSnapshot`, `crates/core/src/companion/snapshot.rs::PresetsSnapshot`, `crates/core/src/companion/snapshot.rs::picked_path` |
 
 Timing constants (rule enter 1 s, rule leave 10 s, budgets 30 s and 2 s, editor throttle 250 ms, quit grace 1 s,
-reconnect notice 5 s, battery levels) live in `crates/core/src/companion/timing.rs`.
+battery levels) live in `crates/core/src/companion/timing.rs`. The reconnect notice is the session's: `Companion`
+shows "Reconnecting…" whenever the published phase is Rebinding.
 
 ## One call of `handle`
 
@@ -9736,7 +9839,7 @@ flowchart TD
     T -- "nobody" --> Rp["route preset, Flat when missing"]
     Ma & Ap & Rp --> D{"Engines::decide"}
     D -- "automatic and inside the budget<br/>30 s on 2.4 GHz, 2 s on Bluetooth" --> Ho["hold until the budget allows"]
-    D -- "otherwise" --> Wr["write: Change::Desired on 2.4 GHz,<br/>Retarget on the system equalizer;<br/>nothing when the headset already holds an equivalent curve"]
+    D -- "otherwise" --> Wr["write: Change::Desired on 2.4 GHz,<br/>Retarget on the system equalizer;<br/>no budget spent when the headset already holds an equivalent curve"]
 ```
 
 ## Adoption
@@ -9814,7 +9917,7 @@ flowchart TD
 
 - [ ] **Step 2: Add the README row**
 
-In `docs/architecture/README.md`, add to the pages table (keep alphabetical order):
+In `docs/architecture/README.md`, append a row to the pages table (keep any row another sub-project added, such as SP4's session page):
 
 ```markdown
 | [companion.md](companion.md) | companion reducer, battery history, ports, intents and view models |
