@@ -25,7 +25,9 @@ Spec: `docs/superpowers/specs/2026-10-11-arctis-companion-design.md` §2, §3, �
 
 Every code block below was compiled, linted and tested in a scratch copy of `origin/main` (`b7f88d1`) inside the
 toolbox on 2026-10-12, including the headless suite run three times in a row; Deviations 12, 15 and 17 record what
-that prototype taught.
+that prototype taught. The plan review added Deviations 21 to 24 after the prototype; the code they change (marked
+"review addition" in its step) has not been compiled yet. If one of those snippets does not compile or trips
+clippy, fix the names or split the function, keeping the behaviour its test asserts.
 
 ---
 
@@ -63,13 +65,15 @@ that prototype taught.
 | The EQ sink is removed with the bluez node restored | 3 (rules), 8 (`RemoveEqualizer`), 9 (handle dropped) |
 | A default changed by the user while inserted is left alone | 3 (rules), 8 |
 | Volume and mute forwarded | 6 (pods and mirror), 8 (forwarding and unity) |
+| Inserting never changes the headset's volume: our sink starts at the bluez node's volume (Deviation 22) | 6 (node volumes), 8 (`inserting_keeps_the_bluez_volume`) |
 | Stream detection with identifiers from node and client props | 4 (tables), 10 (headless) |
+| A stream is classified only after its `info` event (audio §4, design §3.1 "info waits"; Deviation 21) | 8 (registry: nodes enter the graph on their first `info`) |
 | Link chain through an intermediate node | 2 (tables), 4 (tables), 10 (headless, `pw-loopback`) |
 | Sine at 1 kHz at the sink monitor within ±0.5 dB of `response()` minus the preamp | 7 (processing), 11 (headless) |
 | Pure table: Nova 5 USB match through the Device object | 3 |
 | Pure table: app identifiers from pulse-style (node) and native-style (client) prop sets | 4 |
 | Pure table: link chains of up to 4 hops with an `ee_soe`-style node | 2, 3 |
-| Pure table: default-sink cases (bluez, USB, speakers, our sink, user changed default while inserted) | 3 |
+| Pure table: default-sink cases (bluez, USB, speakers, our sink, user changed default while inserted, our sink after its bluez node vanished) | 3 (`the_default_sink_is_described_by_its_terminal`) |
 | `AudioEvent` contract: `Available`, `Unavailable`, `DefaultSink`, `Streams`, `ManagerDenied`, `BluetoothNodeSeen` | 3 (`ManagerDenied` rule), 5 (events on change), 8 (`Available`, `Unavailable`) |
 | `AudioCommand` contract: `InsertEqualizer`, `Retarget`, `RemoveEqualizer` | 3 (rules), 8, 11 (`Retarget` audible) |
 | RT safety: coefficients through `triple_buffer`, nothing allocated on the RT path | 7 |
@@ -83,7 +87,7 @@ that prototype taught.
 crates/audio/Cargo.toml                 + triple_buffer, async-channel, pipewire feature v1_2_0; dev serde_json, allocation-counter
 crates/audio/src/
   lib.rs            module list, AudioHandle and AudioCommands re-exports, init
-  graph.rs          Graph, Props, Node, Link, Defaults; default-metadata JSON names (pure)
+  graph.rs          Graph, Props, Node (props, running, last Props volume), Link, Defaults; default-metadata JSON names (pure)
   links.rs          follow: chain from a node to its terminal sink, MAX_HOPS (pure)
   outputs.rs        sink_kind, default_sink, insertion_target, Outputs (insert/remove/manager_denied) (pure)
   streams.rs        streams, identifiers (pure)
@@ -134,6 +138,10 @@ prototype showed:
 | 18 | Headless harness in `crates/audio/tests/headless/`: two null sinks from SP0's spike (the bluez stand-in with `priority.session` 2000 so it is the default), WirePlumber with every hardware monitor off, a private D-Bus session; tests read and change the graph with `pw-dump`, `pw-metadata`, `pw-cli`, `pw-loopback`; the USB stand-in has no Device, so the Dongle path is covered by the tables | SP0 §6.2; a null sink cannot carry a Device |
 | 19 | The gain check is relative to Flat (same stream, same sinks): expected = `response(curve, [1000])` + `preamp_db_at(curve, 48000)`, tolerance ±0.5 dB, with a two-peak curve (1 kHz +6 dB Q 2, 100 Hz +9 dB Q 1) so the preamp is not trivially the 1 kHz gain | cancels stream and sink gains the test does not control |
 | 20 | `--filesystem=xdg-run/pipewire-0` and the other final finish-args stay with SP14's manifest | SP7's checks run in the container job, not in the Flatpak |
+| 21 | Nodes enter the `Graph` on their first `info` event (whose change mask always has `PROPS`), never from the registry global's props; links still come from global props | audio §4 "classified after its info event", design §3.1 "info waits": global props are a filtered subset without `application.*`, so a stream published from them would carry partial identifiers |
+| 22 | The registry subscribes to each node's `Props` param and keeps its last `channelVolumes` and `mute` in the `Graph`. On insertion the system engine copies the bluez node's volume onto our sink through our sink's node proxy (once the registry has bound it), which runs the same `param_changed` path as any other volume change: `keep_unity`, then a forward of the same volume back to the bluez node, a no-op. With no known bluez volume nothing is copied | audio §2 mirrors our sink's volume to the bluez node; a new sink starts at 1.0, so without the copy GNOME's slider would show 100 % and the first slider step or media key would jump the headset to almost full volume |
+| 23 | Tasks 10 and 11 are acceptance scenarios over behaviour Tasks 4, 7 and 8 drove test-first; each gets a "see it fail once" step with a temporary mutation that is reverted with `git checkout` | TDD needs every test seen failing; the mutation proves the scenario can fail |
+| 24 | A `default.configured.audio.sink` that still names our sink after a crash is left to WirePlumber's fallback; the adapter does not rewrite it on start | SP0 §6.3: WirePlumber falls back to the bluez node, so the stale value is harmless, and the replaced node is not known after a restart |
 
 ---
 
@@ -186,7 +194,7 @@ mod support;
 use arctis_audio::graph::{Graph, Link, ObjectId, Props};
 
 pub const BLUEZ: &str = "bluez_output.AA_BB_CC_DD_EE_FF.1";
-pub const USB: &str = "alsa_output.usb-SteelSeries_Arctis_Nova_5-00.iec958-stereo";
+pub const USB: &str = "alsa_output.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.iec958-stereo";
 pub const SPEAKERS: &str = "alsa_output.pci-0000_00_1f.3.analog-stereo";
 
 pub fn props(pairs: &[(&str, &str)]) -> Props {
@@ -1137,6 +1145,24 @@ fn the_default_sink_is_described_by_its_terminal() {
 }
 
 #[test]
+fn a_default_that_no_longer_reaches_bluez_through_our_sink_is_other() {
+    let user_moved_while_inserted = with_equalizer().speakers(5).default_sink(SPEAKERS);
+    let bluez_vanished_while_inserted = Scene::default()
+        .equalizer(30, 31)
+        .default_sink(EQ_SINK_NAME);
+    for (index, scene) in [user_moved_while_inserted, bluez_vanished_while_inserted]
+        .into_iter()
+        .enumerate()
+    {
+        assert_eq!(
+            default_sink(&scene.build()),
+            sink(SinkKind::Other, false, false),
+            "case {index}"
+        );
+    }
+}
+
+#[test]
 fn the_configured_default_stands_in_while_no_effective_default_exists() {
     let graph = Scene::default()
         .bluez(4)
@@ -1424,7 +1450,7 @@ impl Outputs {
 - [ ] **Step 4: Run them to see them pass**
 
 Run (toolbox): `cargo test -p arctis-audio --test pure`
-Expected: `test result: ok. 30 passed`.
+Expected: `test result: ok. 31 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1665,7 +1691,7 @@ fn path_of(graph: &Graph, id: ObjectId) -> Option<SoundPath> {
 - [ ] **Step 4: Run them to see them pass**
 
 Run (toolbox): `cargo test -p arctis-audio --test pure`
-Expected: `test result: ok. 37 passed`.
+Expected: `test result: ok. 38 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1826,7 +1852,7 @@ fn replace_if_changed<T: Clone + PartialEq>(slot: &mut Option<T>, current: T) ->
 - [ ] **Step 4: Run them to see them pass**
 
 Run (toolbox): `cargo test -p arctis-audio --test pure`
-Expected: `test result: ok. 42 passed`.
+Expected: `test result: ok. 43 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1842,7 +1868,7 @@ git push
 
 **Files:**
 - Create: `crates/audio/src/volume.rs`
-- Modify: `crates/audio/src/lib.rs`, `crates/audio/tests/pure/main.rs`
+- Modify: `crates/audio/src/lib.rs`, `crates/audio/src/graph.rs`, `crates/audio/tests/pure/main.rs`
 - Test: `crates/audio/tests/pure/volume.rs`
 
 - [ ] **Step 1: Write the failing tests**
@@ -1854,6 +1880,8 @@ Add `mod volume;` to `crates/audio/tests/pure/main.rs`.
 ```rust
 use arctis_audio::volume::{Volume, VolumeChange, VolumeMirror, props_pod, volume_change};
 use pipewire::spa::pod::Pod;
+
+use crate::support::{BLUEZ, Scene};
 
 fn volume(channels: &[f32], mute: bool) -> Volume {
     Volume {
@@ -1913,6 +1941,30 @@ fn mute_alone_waits_for_channel_volumes() {
         Some(volume(&[0.75, 0.75], true))
     );
 }
+
+#[test]
+fn a_change_replaces_only_what_it_carries() {
+    let base = volume(&[0.5, 0.5], false);
+    assert_eq!(
+        base.merged(&change(None, Some(true))),
+        volume(&[0.5, 0.5], true)
+    );
+    assert_eq!(
+        base.merged(&change(Some(&[0.25, 0.25]), None)),
+        volume(&[0.25, 0.25], false)
+    );
+}
+
+#[test]
+fn a_sink_knows_its_volume_once_channel_volumes_arrive() {
+    let mut graph = Scene::default().bluez(4).build();
+    assert_eq!(graph.volume_of(BLUEZ), None);
+    graph.change_volume(4, &change(None, Some(true)));
+    assert_eq!(graph.volume_of(BLUEZ), None);
+    graph.change_volume(4, &change(Some(&[0.3, 0.3]), None));
+    assert_eq!(graph.volume_of(BLUEZ), Some(volume(&[0.3, 0.3], true)));
+    assert_eq!(graph.volume_of("absent"), None);
+}
 ```
 
 - [ ] **Step 2: Run them to see them fail**
@@ -1962,6 +2014,19 @@ impl VolumeChange {
 pub struct Volume {
     pub channels: Vec<f32>,
     pub mute: bool,
+}
+
+impl Volume {
+    #[must_use]
+    pub fn merged(&self, change: &VolumeChange) -> Self {
+        Self {
+            channels: change
+                .channels
+                .clone()
+                .unwrap_or_else(|| self.channels.clone()),
+            mute: change.mute.unwrap_or(self.mute),
+        }
+    }
 }
 
 #[derive(Debug, Default)]
@@ -2040,17 +2105,47 @@ fn property(key: u32, value: Value) -> Property {
 }
 ```
 
+Review addition (Deviation 22): each node keeps its last Props volume. In `crates/audio/src/graph.rs`:
+
+1. Add `use crate::volume::{Volume, VolumeChange};` below `use std::collections::BTreeMap;`.
+2. `Node` loses `Eq` (`Volume` holds `f32`) and gains a field:
+
+```rust
+#[derive(Clone, Debug, Default, PartialEq)]
+pub struct Node {
+    pub props: Props,
+    pub running: bool,
+    pub volume: Volume,
+}
+```
+
+3. Add these two methods to `impl Graph`, after `set_running`:
+
+```rust
+    pub fn change_volume(&mut self, id: ObjectId, change: &VolumeChange) {
+        if let Some(node) = self.nodes.get_mut(&id) {
+            node.volume = node.volume.merged(change);
+        }
+    }
+
+    #[must_use]
+    pub fn volume_of(&self, name: &str) -> Option<Volume> {
+        let volume = &self.node(self.node_named(name)?)?.volume;
+        (!volume.channels.is_empty()).then(|| volume.clone())
+    }
+```
+
 - [ ] **Step 4: Run them to see them pass**
 
 Run (toolbox): `cargo test -p arctis-audio --test pure`
-Expected: `test result: ok. 46 passed`.
+Expected: `test result: ok. 49 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
 Run (toolbox): `cargo fmt --all && cargo clippy -p arctis-audio --all-targets -- -D warnings && cargo xtask check-rules`
 
 ```bash
-git add crates/audio/src/lib.rs crates/audio/src/volume.rs crates/audio/tests/pure
+git add crates/audio/src/lib.rs crates/audio/src/graph.rs crates/audio/src/volume.rs crates/audio/tests/pure
 git commit -m "feat(audio): mirror volume and mute as Props pods"
 git push
 ```
@@ -2251,7 +2346,7 @@ fn whole_frames(bytes: usize) -> usize {
 - [ ] **Step 4: Run them to see them pass**
 
 Run (toolbox): `cargo test -p arctis-audio`
-Expected: `pure` reports `49 passed`, `samples_allocations` reports `1 passed`, `init` reports `1 passed`.
+Expected: `pure` reports `52 passed`, `samples_allocations` reports `1 passed`, `init` reports `1 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -2307,7 +2402,7 @@ context.objects = [
     { factory = adapter
         args = {
             factory.name = support.null-audio-sink
-            node.name = "alsa_output.usb-SteelSeries_Arctis_Nova_5-00.iec958-stereo"
+            node.name = "alsa_output.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.iec958-stereo"
             node.description = "Arctis Nova 5 USB"
             media.class = "Audio/Sink"
             audio.position = [ FL FR ]
@@ -2423,7 +2518,7 @@ mod volume;
 ```
 
 `crates/audio/tests/headless/lab.rs` (refuses to run outside `run.sh`; resets the default to the bluez stand-in
-before each test):
+and its volume to 1.0, unmuted, before each test):
 
 ```rust
 use std::thread;
@@ -2437,8 +2532,9 @@ use crate::tools;
 
 pub const HEADLESS: &str = "needs the private PipeWire of crates/audio/tests/headless/run.sh";
 pub const BLUEZ: &str = "bluez_output.AA_BB_CC_DD_EE_FF.1";
-pub const USB: &str = "alsa_output.usb-SteelSeries_Arctis_Nova_5-00.iec958-stereo";
+pub const USB: &str = "alsa_output.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.iec958-stereo";
 pub const EQ_SINK: &str = "arctis_companion_eq";
+const FULL_VOLUME: &str = "{ channelVolumes = [ 1.0, 1.0 ], mute = false }";
 const PATIENCE: Duration = Duration::from_secs(5);
 const POLL: Duration = Duration::from_millis(20);
 
@@ -2474,6 +2570,7 @@ impl Lab {
             "{HEADLESS}"
         );
         tools::set_configured_default(BLUEZ);
+        tools::set_props(BLUEZ, FULL_VOLUME);
         eventually("the bluez default", || {
             tools::configured_default().as_deref() == Some(BLUEZ)
         });
@@ -2902,7 +2999,26 @@ fn the_equalizer_sink_processes_at_unity() {
         "full {full:.2} dB, lowered {lowered:.2} dB"
     );
 }
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn inserting_keeps_the_bluez_volume() {
+    let lab = Lab::open();
+    tools::set_props(BLUEZ, "{ channelVolumes = [ 0.3, 0.3 ] }");
+    eventually("the bluez node at 0.3", || {
+        tools::volume_of(BLUEZ).is_some_and(|(channels, _)| close(&channels, 0.3))
+    });
+    lab.insert(flat());
+    eventually("the equalizer sink at the bluez volume", || {
+        tools::volume_of(EQ_SINK).is_some_and(|(channels, _)| close(&channels, 0.3))
+    });
+    assert!(tools::volume_of(BLUEZ).is_some_and(|(channels, _)| close(&channels, 0.3)));
+}
 ```
+
+`inserting_keeps_the_bluez_volume` is a review addition (Deviation 22). The registry's Props subscription delivers
+the 0.3 change to the adapter at the same time PipeWire shows it to `pw-dump`, so the copy at insertion sees 0.3. If
+the test flakes on that ordering, wait for `pw-dump` twice before inserting; do not add a sleep to the adapter.
 
 - [ ] **Step 3: Run them to see them fail**
 
@@ -2924,8 +3040,12 @@ triple_buffer = "9"
 - [ ] **Step 5: The registry mirror**
 
 Every Node, Device and Client is bound so its info props reach the `Graph`; props are taken only when the change
-mask says `PROPS` (Deviation 12). Links come from global props. Only the metadata named `default` is bound. The
-`RegistryRc` is kept alive inside `Registry`, or the server drops the listener.
+mask says `PROPS` (Deviation 12), and a node enters the `Graph` with its first `info`, never from the global's props
+(Deviation 21). Each node's `Props` param is subscribed so its volume reaches the `Graph` (Deviation 22). Links come
+from global props. Only the metadata named `default` is bound. The `RegistryRc` is kept alive inside `Registry`, or
+the server drops the listener. The review additions here are `node_param`, the `param` listener and
+`subscribe_params` in `bind_node`, the removed global-props `put_node`, and `set_node_props` returning whether it
+found the node.
 
 `crates/audio/src/registry.rs`:
 
@@ -2947,6 +3067,7 @@ use pw::spa::utils::dict::DictRef;
 use pw::types::ObjectType;
 
 use crate::graph::{CONFIGURED_AUDIO_SINK, Graph, Link, ObjectId, Props, json_for_name};
+use crate::volume::volume_change;
 
 const METADATA_NAME: &str = "metadata.name";
 const DEFAULT_METADATA: &str = "default";
@@ -3025,13 +3146,17 @@ impl Registry {
         }
     }
 
-    pub fn set_node_props(&self, name: &str, props: &Pod) {
+    #[must_use]
+    pub fn set_node_props(&self, name: &str, props: &Pod) -> bool {
         let Some(id) = self.graph.borrow().node_named(name) else {
-            return;
+            return false;
         };
-        if let Some(node) = self.proxies.borrow().nodes.get(&id) {
-            node.set_param(ParamType::Props, 0, props);
-        }
+        let proxies = self.proxies.borrow();
+        let Some(node) = proxies.nodes.get(&id) else {
+            return false;
+        };
+        node.set_param(ParamType::Props, 0, props);
+        true
     }
 }
 
@@ -3052,6 +3177,16 @@ impl Watcher {
         let props = changed_props(changed, info.props());
         let running = matches!(info.state(), NodeState::Running);
         self.update(|graph| refresh_node(graph, id, props, running));
+    }
+
+    fn node_param(&self, id: ObjectId, kind: ParamType, param: Option<&Pod>) {
+        let change = param
+            .filter(|_| kind == ParamType::Props)
+            .map(volume_change)
+            .unwrap_or_default();
+        if !change.is_empty() {
+            self.update(|graph| graph.change_volume(id, &change));
+        }
     }
 
     fn device_info(&self, id: ObjectId, info: &DeviceInfoRef) {
@@ -3118,13 +3253,14 @@ impl Binder {
         let Some(node) = self.bound::<Node>(global) else {
             return;
         };
-        let (id, watcher) = (global.id, self.watcher.clone());
-        let props = global.props.map(props_of).unwrap_or_default();
-        self.watcher.update(|graph| graph.put_node(id, props));
+        let id = global.id;
+        let (on_info, on_param) = (self.watcher.clone(), self.watcher.clone());
         let listener = node
             .add_listener_local()
-            .info(move |info| watcher.node_info(id, info))
+            .info(move |info| on_info.node_info(id, info))
+            .param(move |_, kind, _, _, param| on_param.node_param(id, kind, param))
             .register();
+        node.subscribe_params(&[ParamType::Props]);
         self.keep(id, Box::new(listener));
         self.proxies.borrow_mut().nodes.insert(id, node);
     }
@@ -3484,6 +3620,10 @@ fn format_pod() -> Vec<u8> {
 
 - [ ] **Step 7: The system engine**
 
+Review addition (Deviation 22): `seed` and `apply_seed`. `create` remembers the bluez node's volume; the worker calls
+`apply_seed` on every graph change until our sink's node is bound and the copy is sent; `remove` drops a pending
+copy.
+
 `crates/audio/src/system_engine.rs`:
 
 ```rust
@@ -3497,7 +3637,7 @@ use pipewire::spa::pod::Pod;
 use crate::eq_sink::{EqSink, OnVolume};
 use crate::outputs::{EQ_SINK_NAME, InsertStep, Outputs, RemoveStep};
 use crate::registry::Registry;
-use crate::volume::{VolumeChange, VolumeMirror, props_pod};
+use crate::volume::{Volume, VolumeChange, VolumeMirror, props_pod};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Inserted {
@@ -3511,6 +3651,7 @@ pub struct SystemEngine {
     outputs: RefCell<Outputs>,
     sink: RefCell<Option<EqSink>>,
     mirror: Rc<RefCell<VolumeMirror>>,
+    seed: RefCell<Option<Volume>>,
 }
 
 impl SystemEngine {
@@ -3522,6 +3663,7 @@ impl SystemEngine {
             outputs: RefCell::default(),
             sink: RefCell::default(),
             mirror: Rc::default(),
+            seed: RefCell::default(),
         }
     }
 
@@ -3544,8 +3686,21 @@ impl SystemEngine {
             return Inserted::Unchanged;
         };
         *self.sink.borrow_mut() = Some(sink);
+        *self.seed.borrow_mut() = self.registry.graph().volume_of(replaced);
         self.registry.write_default_sink(EQ_SINK_NAME);
         Inserted::Created
+    }
+
+    pub fn apply_seed(&self) {
+        let Some(volume) = self.seed.borrow().clone() else {
+            return;
+        };
+        let bytes = props_pod(&volume);
+        let sent = Pod::from_bytes(&bytes)
+            .is_some_and(|pod| self.registry.set_node_props(EQ_SINK_NAME, pod));
+        if sent {
+            *self.seed.borrow_mut() = None;
+        }
     }
 
     pub fn retarget(&self, curve: &Curve) {
@@ -3561,6 +3716,7 @@ impl SystemEngine {
         }
         let removed = self.sink.borrow_mut().take();
         drop(removed);
+        *self.seed.borrow_mut() = None;
         *self.mirror.borrow_mut() = VolumeMirror::default();
     }
 
@@ -3594,7 +3750,7 @@ fn forward(
     };
     let bytes = props_pod(&volume);
     if let Some(pod) = Pod::from_bytes(&bytes) {
-        registry.set_node_props(target, pod);
+        let _ = registry.set_node_props(target, pod);
     }
 }
 ```
@@ -3840,6 +3996,7 @@ impl Worker {
     }
 
     fn publish(&self) {
+        self.engine.apply_seed();
         if !self.state.ready.get() {
             return;
         }
@@ -3977,7 +4134,7 @@ pub fn init() {
 - [ ] **Step 10: Run them to see them pass**
 
 Run (toolbox): `cargo test -p arctis-audio`
-Expected: `pure` 49 passed, `samples_allocations` 1 passed, `init` 1 passed, `headless` 0 passed and 5 ignored,
+Expected: `pure` 52 passed, `samples_allocations` 1 passed, `init` 1 passed, `headless` 0 passed and 6 ignored,
 `unreachable` 1 ignored.
 
 Run (toolbox): `crates/audio/tests/headless/run.sh`
@@ -3988,6 +4145,7 @@ test no_pipewire_reports_unavailable_and_still_quits ... ok
 test equalizer::a_default_the_user_changed_while_inserted_is_left_alone ... ok
 test equalizer::inserting_makes_the_equalizer_the_default_and_removing_restores_bluez ... ok
 test equalizer::the_bluez_default_is_reported_on_start ... ok
+test volume::inserting_keeps_the_bluez_volume ... ok
 test volume::the_equalizer_sink_processes_at_unity ... ok
 test volume::volume_and_mute_reach_the_bluez_node ... ok
 ```
@@ -4094,7 +4252,7 @@ In `crates/audio/src/worker.rs`:
 - [ ] **Step 4: Run it to see it pass, three times**
 
 Run (toolbox): `for run in 1 2 3; do crates/audio/tests/headless/run.sh || exit 1; done`
-Expected: each run ends with `test result: ok. 6 passed`.
+Expected: each run ends with `test result: ok. 7 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -4217,13 +4375,21 @@ fn a_stream_behind_an_intermediate_node_is_on_the_bluetooth_path() {
 }
 ```
 
-- [ ] **Step 2: Run them**
+- [ ] **Step 2: See them fail once (Deviation 23)**
+
+Temporarily make `prop` in `crates/audio/src/streams.rs` read only the node (`node.get(key)`) and set `MAX_HOPS` in
+`crates/audio/src/links.rs` to `2`.
+Run (toolbox): `crates/audio/tests/headless/run.sh streams`
+Expected: both scenarios FAIL with `timed out waiting for both players` and `timed out waiting for the chained
+player`. Then restore the code: `git checkout -- crates/audio/src/streams.rs crates/audio/src/links.rs`.
+
+- [ ] **Step 3: Run them**
 
 Run (toolbox): `crates/audio/tests/headless/run.sh streams`
 Expected: `identifiers_come_from_node_and_client_props ... ok` and
 `a_stream_behind_an_intermediate_node_is_on_the_bluetooth_path ... ok`.
 
-- [ ] **Step 3: Lint and commit**
+- [ ] **Step 4: Lint and commit**
 
 Run (toolbox): `cargo fmt --all && cargo clippy -p arctis-audio --all-targets -- -D warnings && cargo xtask check-rules`
 
@@ -4289,17 +4455,25 @@ fn a_sine_at_1_khz_follows_the_response_minus_the_preamp() {
 }
 ```
 
-- [ ] **Step 2: Run it**
+- [ ] **Step 2: See it fail once (Deviation 23)**
+
+Temporarily delete the `retarget` call inside `if self.coefficients.update() { … }` in
+`crates/audio/src/samples.rs`, so a `Retarget` never reaches the filter.
+Run (toolbox): `crates/audio/tests/headless/run.sh gain`
+Expected: FAIL with `measured 0.0… dB, expected -3.… dB` (the two-peak curve plays about 3 dB quieter at 1 kHz).
+Then restore the code: `git checkout -- crates/audio/src/samples.rs`.
+
+- [ ] **Step 3: Run it**
 
 Run (toolbox): `crates/audio/tests/headless/run.sh gain`
 Expected: `a_sine_at_1_khz_follows_the_response_minus_the_preamp ... ok`.
 
-- [ ] **Step 3: Run the whole suite three times**
+- [ ] **Step 4: Run the whole suite three times**
 
 Run (toolbox): `for run in 1 2 3; do crates/audio/tests/headless/run.sh || exit 1; done`
-Expected: each run ends with `test result: ok. 9 passed`.
+Expected: each run ends with `test result: ok. 10 passed`.
 
-- [ ] **Step 4: Lint and commit**
+- [ ] **Step 5: Lint and commit**
 
 Run (toolbox): `cargo fmt --all && cargo clippy -p arctis-audio --all-targets -- -D warnings && cargo xtask check-rules`
 
@@ -4410,7 +4584,7 @@ private PipeWire (see Tests).
 | Events only on change | `crates/audio/src/changes.rs::Published` |
 | Volume and mute | `crates/audio/src/volume.rs::VolumeMirror`, `crates/audio/src/volume.rs::volume_change`, `crates/audio/src/volume.rs::props_pod` |
 | Real-time processing | `crates/audio/src/samples.rs::Processor`, `crates/audio/src/eq_sink.rs::move_block` |
-| PipeWire mirror | `crates/audio/src/registry.rs::Registry`, `crates/audio/src/registry.rs::changed_props` |
+| PipeWire mirror (nodes enter on their first info; Props volumes subscribed) | `crates/audio/src/registry.rs::Registry`, `crates/audio/src/registry.rs::changed_props` |
 | System engine | `crates/audio/src/system_engine.rs::SystemEngine`, `crates/audio/src/system_engine.rs::Inserted` |
 | Equalizer sink | `crates/audio/src/eq_sink.rs::EqSink`, `crates/audio/src/eq_sink.rs::Designer`, `crates/audio/src/eq_sink.rs::keep_unity` |
 | Thread and connection | `crates/audio/src/worker.rs::run`, `crates/audio/src/worker.rs::Connection`, `crates/audio/src/worker.rs::Worker`, `crates/audio/src/worker.rs::Dispatcher` |
@@ -4477,7 +4651,10 @@ when the curve or the negotiated rate changes.
 Volume set on our sink reaches the stream as a Props param. `crates/audio/src/volume.rs::VolumeMirror`, owned by
 the system engine, forwards each new `channelVolumes`/`mute` pair once to the bluez node
 (`crates/audio/src/registry.rs::set_node_props`), and `crates/audio/src/eq_sink.rs::keep_unity` puts the
-sink's own soft volume back to 1, so the headset's Bluetooth volume does the attenuation.
+sink's own soft volume back to 1, so the headset's Bluetooth volume does the attenuation. The registry keeps
+each node's last Props volume (`crates/audio/src/graph.rs::Graph`), and on insertion
+`crates/audio/src/system_engine.rs::SystemEngine` copies the bluez node's volume onto our sink, so the slider starts
+where the headset is and the first volume step never jumps it.
 
 ## Connection lifecycle
 
@@ -4490,13 +4667,13 @@ stateDiagram-v2
     Settling --> Ready: second sync done, Available + first events
     Ready --> Ready: graph change, events on change only
     Ready --> Connecting: core error, Unavailable
-    Ready --> Closing: Quit (handle dropped), remove equalizer, sync
-    Closing --> [*]: sync done
+    Ready --> Closing: Quit (handle dropped), remove equalizer, restore the bluez default
+    Closing --> [*]: configured default no longer names our sink, or 1 s grace
     Retrying --> [*]: Quit
 ```
 
 Messages reach the loop through a `pipewire::channel`: commands from `crates/audio/src/handle.rs::AudioCommands`,
-and the delayed `Retry` and `ConfirmManager` that a short sleeper thread posts. The client connects with
+and the delayed `Retry`, `ConfirmManager` and grace `Quit` that a short sleeper thread posts. The client connects with
 `media.category = Manager` in its core properties (`docs/research/hardware-findings.md` §6.2).
 
 ## Tests
@@ -4505,7 +4682,7 @@ and the delayed `Retry` and `ConfirmManager` that a short sleeper thread posts. 
 |---|---|
 | Graph, chains, matching, default-sink and insertion tables, streams, events, volume pods, processing | `crates/audio/tests/pure/main.rs` and its modules |
 | No allocation in processing | `crates/audio/tests/samples_allocations.rs` |
-| Private PipeWire + WirePlumber with a bluez-shaped null sink: insertion, restore, user default, drop, volume, unity, streams, chain, 1 kHz gain | `crates/audio/tests/headless/run.sh`, `crates/audio/tests/headless/main.rs` |
+| Private PipeWire + WirePlumber with a bluez-shaped null sink: insertion, restore, user default, drop, volume, unity, volume kept on insertion, streams, chain, 1 kHz gain | `crates/audio/tests/headless/run.sh`, `crates/audio/tests/headless/main.rs` |
 | PipeWire unreachable | `crates/audio/tests/unreachable.rs` |
 ````
 
@@ -4555,7 +4732,7 @@ keep both sides and regenerate `Cargo.lock` with Run (toolbox): `cargo metadata 
 
 Run (toolbox):
 `cargo fmt --all --check && cargo clippy --workspace --exclude arctis-ui --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure && crates/audio/tests/headless/run.sh`
-Expected: every command exits 0; the headless suite ends with `test result: ok. 9 passed`.
+Expected: every command exits 0; the headless suite ends with `test result: ok. 10 passed`.
 
 - [ ] **Step 3: Push and open the pull request**
 
