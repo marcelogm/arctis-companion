@@ -13,13 +13,16 @@ use super::dongle::DongleState;
 use super::engines::Engines;
 use super::input::Input;
 use super::routing::AudioState;
+use super::routing::{Route, needs_equalizer};
 use super::seen_apps::SeenApp;
+use super::seen_apps::{newly_playing, remember};
 use super::selection::{ActivePreset, Selection};
 use super::snapshot::Snapshot;
 use crate::battery::sample::Reading;
 use crate::eq::curve::Curve;
 use crate::eq::preset::PresetId;
 use crate::messages::audio::SoundPath;
+use crate::messages::audio::{AudioCommand, AudioEvent, StreamInfo};
 use crate::messages::device::{Change, SyncPolicy};
 use crate::messages::device::{DeviceUpdate, Phase};
 use crate::settings::headset_settings::HeadsetSettings;
@@ -68,8 +71,9 @@ impl Companion {
     fn dispatch(&mut self, input: Input, now: Millis, out: &mut Vec<Action>) {
         match input {
             Input::Device(update) => self.device(update, now, out),
+            Input::Audio(event) => self.audio_event(&event, out),
             Input::Woke => self.deadlines.woke(),
-            Input::Audio(_) | Input::Intent(_) | Input::SettingsChanged(_) | Input::Quitting => {}
+            Input::Intent(_) | Input::SettingsChanged(_) | Input::Quitting => {}
         }
     }
 
@@ -221,5 +225,51 @@ impl Companion {
         )));
         self.engines
             .record(SoundPath::Dongle, ActivePreset::route(preset), None);
+    }
+
+    fn audio_event(&mut self, event: &AudioEvent, out: &mut Vec<Action>) {
+        if let AudioEvent::Streams(streams) = event {
+            self.record_seen_apps(streams, out);
+        }
+        if *event == AudioEvent::BluetoothNodeSeen {
+            self.bluetooth_seen(out);
+        }
+        let route = self.audio.route();
+        self.audio.apply(event);
+        if self.audio.route() != route {
+            self.selection.end_manual_picks();
+        }
+        self.place_equalizer(out);
+    }
+
+    fn record_seen_apps(&mut self, streams: &[StreamInfo], out: &mut Vec<Action>) {
+        for app in newly_playing(&self.audio.streams, streams) {
+            self.seen_apps = remember(&self.seen_apps, app.clone());
+            out.push(Action::RecordSeenApp(app));
+        }
+    }
+
+    fn bluetooth_seen(&mut self, out: &mut Vec<Action>) {
+        if !self.settings.bluetooth_sink_seen {
+            self.settings.bluetooth_sink_seen = true;
+            out.push(Action::Persist(PersistedChange::BluetoothSinkSeen));
+        }
+    }
+
+    fn place_equalizer(&mut self, out: &mut Vec<Action>) {
+        let wanted = self.audio.default_sink.is_some_and(needs_equalizer);
+        if wanted && self.audio.equalizer.is_none() {
+            let curve = self.active_curve(SoundPath::Bluetooth);
+            self.audio.equalizer = Some(curve.clone());
+            out.push(Action::SendAudio(AudioCommand::InsertEqualizer(curve)));
+        } else if self.audio.route() != Route::Bluetooth || self.audio.easy_effects_active() {
+            self.remove_equalizer(out);
+        }
+    }
+
+    fn remove_equalizer(&mut self, out: &mut Vec<Action>) {
+        if self.audio.equalizer.take().is_some() {
+            out.push(Action::SendAudio(AudioCommand::RemoveEqualizer));
+        }
     }
 }

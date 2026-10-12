@@ -9,6 +9,7 @@ use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
+use arctis_core::messages::audio::{AudioCommand, AudioEvent};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
 use arctis_core::messages::device::{Change, SyncPolicy};
 use arctis_core::messages::device::{DeviceUpdate, Phase};
@@ -249,4 +250,24 @@ pub fn persisted_changes(actions: &[Action]) -> Vec<PersistedChange> {
             _ => None,
         })
         .collect()
+}
+
+impl Harness {
+    pub fn audio(&mut self, event: AudioEvent) -> Vec<Action> {
+        self.send(Input::Audio(event))
+    }
+}
+
+pub fn audio_commands(actions: &[Action]) -> Vec<AudioCommand> {
+    actions
+        .iter()
+        .filter_map(|action| match action {
+            Action::SendAudio(command) => Some(command.clone()),
+            _ => None,
+        })
+        .collect()
+}
+
+pub fn default_sink(terminal: SinkKind) -> AudioEvent {
+    AudioEvent::DefaultSink(sink(terminal, false, false))
 }
