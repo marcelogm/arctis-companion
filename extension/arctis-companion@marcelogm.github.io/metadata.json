@@ -1,0 +1,8 @@
+{
+  "uuid": "arctis-companion@marcelogm.github.io",
+  "name": "Arctis Companion",
+  "description": "Automatic app presets, presets and headset battery for the SteelSeries Arctis Nova 5 in Quick Settings. Needs the Arctis Companion app.",
+  "shell-version": ["50"],
+  "url": "https://github.com/marcelogm/arctis-companion",
+  "gettext-domain": "arctis-companion-extension"
+}

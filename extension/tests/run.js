@@ -3,6 +3,7 @@ import System from 'system';
 
 import {runAll} from './support/harness.js';
 import './assert.test.js';
+import './metadata.test.js';
 
 const loop = new GLib.MainLoop(null, false);
 let failures = 1;
