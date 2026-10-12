@@ -1,7 +1,7 @@
 use std::collections::VecDeque;
 
 use super::exchange::Outgoing;
-use super::timing::{VERIFY_BACKOFF, WIRELESS_MODE_GRACE};
+use super::timing::VERIFY_BACKOFF;
 use crate::eq::curve::equivalent;
 use crate::protocol::status::Link;
 use crate::protocol::{Command, Query};
@@ -23,7 +23,6 @@ pub(crate) struct Transaction {
     written_at: Millis,
     step: usize,
     retried: bool,
-    grace_until: Option<Millis>,
     link_down: bool,
     sent: Vec<Setting>,
 }
@@ -37,7 +36,6 @@ impl Transaction {
             written_at: Millis(0),
             step: 0,
             retried: false,
-            grace_until: None,
             link_down: false,
             sent: Vec::new(),
         }
@@ -94,21 +92,12 @@ impl Transaction {
         self.unread.push_front(query);
     }
 
-    pub(crate) fn tolerates(&self, asked_at: Millis) -> bool {
-        self.grace_until.is_some_and(|until| asked_at < until)
-    }
-
     pub(crate) fn link(&mut self, link: Link) {
         self.link_down = !link.is_connected();
     }
 
     pub(crate) fn link_lost_at(&self) -> Option<Millis> {
-        self.link_down
-            .then(|| self.grace_until.unwrap_or(self.written_at))
-    }
-
-    pub(crate) fn lost_link_for_good(&self, now: Millis) -> bool {
-        self.link_lost_at().is_some_and(|at| now >= at)
+        self.link_down.then_some(self.written_at)
     }
 
     fn readback_due_at(&self) -> Option<Millis> {
@@ -121,9 +110,6 @@ impl Transaction {
     fn wrote(&mut self, change: &SettingChange, now: Millis) {
         self.written_at = now;
         self.sent.push(change.setting());
-        if change.setting() == Setting::WirelessMode {
-            self.grace_until = Some(now.after(WIRELESS_MODE_GRACE));
-        }
         if self.unwritten.is_empty() {
             self.step = 0;
             self.unread = readbacks(&self.targets).into();

@@ -1,5 +1,6 @@
 use super::echo::EchoFilter;
 use super::exchange::{Outgoing, Unanswered};
+use super::grace::Grace;
 use super::verify::{Progress, Transaction, same};
 use crate::messages::device::{DeviceUpdate, SyncPolicy};
 use crate::protocol::reply::{AudioReadback, UxReadback};
@@ -26,6 +27,7 @@ pub(crate) struct Reconciler {
     unknown: Vec<Setting>,
     transaction: Option<Transaction>,
     echoes: EchoFilter,
+    grace: Grace,
 }
 
 impl Reconciler {
@@ -68,6 +70,14 @@ impl Reconciler {
         self.transaction.is_some()
     }
 
+    pub(crate) fn waits_for_link(&self, now: Millis) -> bool {
+        self.is_writing() || self.grace.covers(now)
+    }
+
+    pub(crate) fn end_grace(&mut self) {
+        self.grace.close();
+    }
+
     pub(crate) fn is_in_sync(&self) -> bool {
         !self.is_writing() && self.drift().is_empty()
     }
@@ -83,7 +93,7 @@ impl Reconciler {
         self.start_if_drifted();
         let outgoing = self.transaction.as_mut()?.next(now)?;
         if let Outgoing::Write(change) = &outgoing {
-            self.echoes.record(change.clone());
+            self.wrote(change, now);
         }
         Some(outgoing)
     }
@@ -140,7 +150,7 @@ impl Reconciler {
         let Some(transaction) = &mut self.transaction else {
             return false;
         };
-        let tolerated = transaction.tolerates(unanswered.asked_at);
+        let tolerated = self.grace.covers(unanswered.asked_at);
         if tolerated {
             transaction.requeue(unanswered.query);
         }
@@ -148,21 +158,18 @@ impl Reconciler {
     }
 
     pub(crate) fn link(&mut self, link: Link) {
+        self.grace.link(link);
         if let Some(transaction) = &mut self.transaction {
             transaction.link(link);
         }
     }
 
     pub(crate) fn link_lost_at(&self) -> Option<Millis> {
-        self.transaction
+        let written = self
+            .transaction
             .as_ref()
-            .and_then(Transaction::link_lost_at)
-    }
-
-    pub(crate) fn lost_link_for_good(&self, now: Millis) -> bool {
-        self.transaction
-            .as_ref()
-            .is_some_and(|transaction| transaction.lost_link_for_good(now))
+            .and_then(Transaction::link_lost_at);
+        written.max(self.grace.link_lost_at())
     }
 
     pub(crate) fn observed_update(&self) -> Vec<DeviceUpdate> {
@@ -182,6 +189,13 @@ impl Reconciler {
         self.desired = None;
         self.interrupt(now);
         self.observed_update()
+    }
+
+    fn wrote(&mut self, change: &SettingChange, now: Millis) {
+        if change.setting() == Setting::WirelessMode {
+            self.grace.open(now);
+        }
+        self.echoes.record(change.clone());
     }
 
     fn start_if_drifted(&mut self) {

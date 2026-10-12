@@ -189,6 +189,7 @@ impl Session {
 
     pub(super) fn headset_off(&mut self) {
         self.interrupt();
+        self.reconciler.end_grace();
         let next_poll = self.now.after(HEADSET_OFF_POLL);
         self.enter(Stage::HeadsetOff { next_poll });
     }
