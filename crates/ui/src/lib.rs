@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod app_dialogs;
+pub mod app_icons;
 mod equalizer_group;
 mod headset_page;
 mod headset_rows;

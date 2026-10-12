@@ -2,6 +2,7 @@ mod support;
 
 mod accessibility;
 mod app_dialogs;
+mod app_icons;
 mod equalizer_group;
 mod headset_page;
 mod headset_status;
