@@ -7,4 +7,5 @@ mod filter;
 mod library;
 mod preset;
 mod response;
+mod silence;
 mod support;
