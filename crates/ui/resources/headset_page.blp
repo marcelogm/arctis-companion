@@ -1,0 +1,115 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisHeadsetPage: Adw.Bin {
+  child: Adw.PreferencesPage {
+    Adw.PreferencesGroup {
+      $ArctisHeadsetStatus status {}
+    }
+
+    $ArctisEqualizerGroup equalizer {}
+
+    Adw.PreferencesGroup bluetooth_only_group {
+      name: "bluetooth-only-group";
+      visible: false;
+    }
+
+    Adw.PreferencesGroup microphone_group {
+      name: "microphone-group";
+      title: _("Microphone");
+
+      $ArctisScaleRow mic_volume {
+        name: "mic-volume";
+      }
+
+      $ArctisScaleRow sidetone {
+        name: "sidetone";
+      }
+
+      $ArctisScaleRow mute_light {
+        name: "mute-light";
+      }
+    }
+
+    Adw.PreferencesGroup sound_group {
+      name: "sound-group";
+      title: _("Sound");
+
+      Adw.SwitchRow volume_limiter {
+        name: "volume-limiter";
+        use-markup: false;
+      }
+    }
+
+    Adw.PreferencesGroup wireless_group {
+      name: "wireless-group";
+      title: _("Wireless");
+
+      Adw.SwitchRow extended_range {
+        name: "extended-range";
+        use-markup: false;
+      }
+    }
+
+    Adw.PreferencesGroup {
+      name: "power-group";
+      title: _("Power");
+
+      Adw.ComboRow auto_power_off {
+        name: "auto-power-off";
+        use-markup: false;
+      }
+
+      Adw.ActionRow {
+        name: "battery-history";
+        title: _("Battery History");
+        activatable: true;
+        action-name: "win.show-page";
+        action-target: "'battery'";
+
+        [suffix]
+        Image {
+          icon-name: "go-next-symbolic";
+        }
+      }
+    }
+
+    Adw.PreferencesGroup device_group {
+      name: "device-group";
+      title: _("Device");
+
+      Adw.ActionRow model_row {
+        name: "model";
+        title: _("Model");
+        subtitle-selectable: true;
+        use-markup: false;
+
+        styles [
+          "property",
+        ]
+      }
+
+      Adw.ActionRow support_row {
+        name: "support";
+        use-markup: false;
+        visible: false;
+
+        [prefix]
+        Image {
+          icon-name: "dialog-warning-symbolic";
+        }
+      }
+
+      Adw.ActionRow firmware_row {
+        name: "firmware";
+        title: _("Firmware");
+        subtitle-selectable: true;
+        use-markup: false;
+
+        styles [
+          "property",
+        ]
+      }
+    }
+  };
+}

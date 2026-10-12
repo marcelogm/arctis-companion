@@ -1,6 +1,7 @@
 mod support;
 
 mod equalizer_group;
+mod headset_page;
 mod headset_status;
 mod intents;
 mod scale_row;

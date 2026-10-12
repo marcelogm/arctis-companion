@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
 mod equalizer_group;
+mod headset_groups;
+mod headset_page;
 mod headset_status;
 pub mod intents;
 mod scale_row;
@@ -10,6 +12,7 @@ pub mod widget_values;
 mod window;
 
 pub use equalizer_group::EqualizerGroup;
+pub use headset_page::HeadsetPage;
 pub use headset_status::HeadsetStatus;
 pub use scale_row::ScaleRow;
 pub use status_pages::StatusView;
