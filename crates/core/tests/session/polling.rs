@@ -1,12 +1,15 @@
 use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
+use arctis_core::protocol::Query;
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::session::timing::{
     COMMAND_SPACING, ENUMERATION_SETTLE, HEADSET_OFF_POLL, REPLY_TIMEOUT, STATUS_SAFETY_POLL,
 };
+use arctis_core::settings::headset_settings::Setting;
 use arctis_core::testkit::{Behaviour, FakeHeadset};
 
 use crate::support::{
-    SETTLED, headset_off, percent, plugged, ready, ready_with, sent, silent, with_sidetone,
+    SETTLED, headset_off, percent, plugged, quiet, ready, ready_with, sent, setter, silent,
+    with_sidetone,
 };
 
 #[test]
@@ -23,11 +26,7 @@ fn an_unanswered_query_is_resent_once_before_headset_off() {
 
 #[test]
 fn a_headset_without_events_is_synced_within_headset_off_poll_of_powering_on() {
-    let quiet = Behaviour {
-        sends_events: false,
-        ..Behaviour::default()
-    };
-    let mut simulation = plugged(FakeHeadset::nova_5().powered_off().with_behaviour(quiet));
+    let mut simulation = plugged(FakeHeadset::nova_5().powered_off().with_behaviour(quiet()));
     simulation.run_until(Phase::HeadsetOff, SETTLED);
     simulation.power_on();
     let waited = simulation.run_until(Phase::Syncing, HEADSET_OFF_POLL + COMMAND_SPACING);
@@ -39,7 +38,7 @@ fn headset_off_polls_the_status_every_headset_off_poll() {
     let mut simulation = headset_off();
     simulation.clear_logs();
     simulation.run_for(6 * HEADSET_OFF_POLL);
-    assert_eq!(simulation.sent_ids(), [0xB0; 6]);
+    assert_eq!(simulation.sent_ids(), [Query::Status.id(); 6]);
 }
 
 #[test]
@@ -47,9 +46,9 @@ fn ready_polls_the_status_only_after_status_safety_poll() {
     let mut simulation = ready();
     simulation.clear_logs();
     simulation.run_for(STATUS_SAFETY_POLL - 1_000);
-    assert_eq!(sent(&simulation, 0xB0), 0);
+    assert_eq!(sent(&simulation, Query::Status.id()), 0);
     simulation.run_for(STATUS_SAFETY_POLL);
-    assert_eq!(simulation.sent_ids(), [0xB0]);
+    assert_eq!(simulation.sent_ids(), [Query::Status.id()]);
 }
 
 #[test]
@@ -60,7 +59,7 @@ fn battery_events_postpone_the_safety_poll() {
         simulation.run_for(STATUS_SAFETY_POLL - 60_000);
         simulation.battery(percent(40));
     }
-    assert_eq!(sent(&simulation, 0xB0), 0);
+    assert_eq!(sent(&simulation, Query::Status.id()), 0);
 }
 
 #[test]
@@ -93,7 +92,7 @@ fn the_safety_poll_waits_for_the_write_transaction() {
     simulation.desire(desired, SyncPolicy::Enforce);
     simulation.run_for(5_000);
     let ids = simulation.sent_ids();
-    assert_eq!(ids.last(), Some(&0xB0));
-    assert_eq!(sent(&simulation, 0xB0), 1);
-    assert_eq!(sent(&simulation, 0x39), 2);
+    assert_eq!(ids.last(), Some(&Query::Status.id()));
+    assert_eq!(sent(&simulation, Query::Status.id()), 1);
+    assert_eq!(sent(&simulation, setter(Setting::Sidetone)), 2);
 }

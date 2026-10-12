@@ -1,13 +1,13 @@
 use arctis_core::messages::device::Phase;
+use arctis_core::protocol::Query;
 use arctis_core::protocol::status::Link;
 use arctis_core::session::Interface;
 use arctis_core::session::timing::{REPLY_TIMEOUT, WIRELESS_MODE_GRACE};
-use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::settings::headset_settings::{HeadsetSettings, Setting};
 use arctis_core::settings::values::WirelessMode;
 use arctis_core::testkit::{Behaviour, Emission, Simulation};
 
-use crate::support::observed;
-use crate::verify::{desire, ready_behaving};
+use crate::support::{desire, observed, ready_behaving, setter};
 
 fn extended_range_written() -> (Simulation, HeadsetSettings) {
     let mut simulation = ready_behaving(Behaviour::default());
@@ -16,7 +16,7 @@ fn extended_range_written() -> (Simulation, HeadsetSettings) {
         ..simulation.headset().settings().clone()
     };
     desire(&mut simulation, &desired);
-    simulation.run_until_sent(0x35, 1_000);
+    simulation.run_until_sent(setter(Setting::WirelessMode), 1_000);
     (simulation, desired)
 }
 
@@ -25,11 +25,14 @@ fn a_link_drop_within_the_grace_waits_for_the_link_to_return() {
     let (mut simulation, desired) = extended_range_written();
     simulation.link(Link::HeadsetOff);
     simulation.run_for(2_000);
-    assert_eq!(simulation.sent_ids(), [0x35]);
+    assert_eq!(simulation.sent_ids(), [setter(Setting::WirelessMode)]);
     simulation.link(Link::Connected);
     simulation.run_for(1_000);
     assert_eq!(simulation.phase(), Phase::Ready);
-    assert_eq!(simulation.sent_ids(), [0x35, 0x36]);
+    assert_eq!(
+        simulation.sent_ids(),
+        [setter(Setting::WirelessMode), Query::Wireless.id()]
+    );
     assert_eq!(observed(&simulation), Some(desired));
 }
 
