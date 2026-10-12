@@ -178,8 +178,8 @@ impl Section {
 
     pub fn tick(self, state: &mut SectionState, input: f32) -> f32 {
         let output = self.b0 * input + state.s1;
-        state.s1 = self.b1 * input - self.a1 * output + state.s2;
-        state.s2 = self.b2 * input - self.a2 * output;
+        state.s1 = audible_or_zero(self.b1 * input - self.a1 * output + state.s2);
+        state.s2 = audible_or_zero(self.b2 * input - self.a2 * output);
         output
     }
 
@@ -189,6 +189,12 @@ impl Section {
         let a2 = f64::from(self.a2);
         a2.abs() < 1.0 && a1.abs() < 1.0 + a2
     }
+}
+
+const INAUDIBLE: f32 = 1.0e-20;
+
+fn audible_or_zero(value: f32) -> f32 {
+    if value.abs() < INAUDIBLE { 0.0 } else { value }
 }
 
 impl From<Biquad> for Section {
