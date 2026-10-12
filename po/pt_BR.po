@@ -1088,7 +1088,7 @@ msgid ""
 "Kjær 5128 and comes, with the target curves and the Harman target preset, "
 "from the AutoEq project by Jaakko Pasanen (MIT licence)."
 msgstr ""
-"A resposta de frequência do headset foi medida pelo RTINGS.com em um Brüel & "
+"A resposta de frequência do headset foi medida pelo RTINGS.com em um Brüel &amp; "
 "Kjær 5128 e vem, com as curvas-alvo e a predefinição Alvo Harman, do projeto "
 "AutoEq de Jaakko Pasanen (licença MIT)."
 
