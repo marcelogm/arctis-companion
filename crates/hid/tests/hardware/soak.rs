@@ -4,9 +4,8 @@ use std::sync::atomic::{AtomicUsize, Ordering};
 use std::thread;
 use std::time::{Duration, Instant};
 
-use arctis_core::messages::device::{Change, DeviceUpdate, Phase, SyncPolicy};
+use arctis_core::messages::device::{Change, DeviceUpdate, SyncPolicy};
 use arctis_core::settings::headset_settings::HeadsetSettings;
-use arctis_core::settings::values::Sidetone;
 use arctis_hid::port::{HidrawOpener, OpenError, Opener, Port};
 use arctis_hid::waiter::PollWaiter;
 use arctis_hid::worker::{Wiring, Worker};
@@ -59,29 +58,16 @@ impl Soak {
     }
 
     fn write_toggle(&mut self) {
-        let (Some(original), Some(observed)) = (&self.log.original, &self.log.observed) else {
-            return;
-        };
-        if self.log.phase() != Some(Phase::Ready) || self.log.waiting_for.is_some() {
-            return;
+        if let Some(desired) = self.log.toggle_request() {
+            self.desire(desired);
         }
-        let desired = toggled(original, observed);
-        self.log.requested += 1;
-        self.log.waiting_for = Some(desired.clone());
-        self.desire(desired);
     }
 
     fn restore(&mut self) {
-        let Some(original) = self.log.original.clone() else {
-            return;
-        };
-        if self.log.observed.as_ref() == Some(&original) {
-            return;
+        if let Some(original) = self.log.restore_request() {
+            self.desire(original);
+            self.run_for(RESTORE_WITHIN);
         }
-        self.log.requested += 1;
-        self.log.waiting_for = Some(original.clone());
-        self.desire(original);
-        self.run_for(RESTORE_WITHIN);
     }
 
     fn desire(&self, settings: HeadsetSettings) {
@@ -90,20 +76,6 @@ impl Soak {
             policy: SyncPolicy::Enforce,
         };
         assert!(self.changes.send(change), "the device thread is gone");
-    }
-}
-
-fn toggled(original: &HeadsetSettings, observed: &HeadsetSettings) -> HeadsetSettings {
-    let level = original.sidetone.get();
-    let other = if level == 0 { 1 } else { level - 1 };
-    let next = if observed.sidetone.get() == level {
-        other
-    } else {
-        level
-    };
-    HeadsetSettings {
-        sidetone: Sidetone::try_from(next).expect("a sidetone level in range"),
-        ..observed.clone()
     }
 }
 
@@ -159,6 +131,13 @@ fn report(minutes: u64, opens: usize, log: &SoakLog) {
     );
     if log.requested == 0 {
         eprintln!("soak: the headset never reached Ready, so no write was exercised");
+    }
+    if log.unrestored {
+        eprintln!(
+            "soak: the headset was not Ready at the end, so the sidetone stays at {:?} instead of the first observed {:?}; set it back by hand",
+            log.observed.as_ref().map(|settings| settings.sidetone),
+            log.original.as_ref().map(|settings| settings.sidetone)
+        );
     }
     let expected = usize::try_from(minutes * REBINDS_PER_MINUTE / 2).unwrap_or(usize::MAX);
     assert!(rebinds >= expected, "too few rebinds: is fwupd running?");

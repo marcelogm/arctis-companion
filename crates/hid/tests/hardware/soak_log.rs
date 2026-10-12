@@ -2,6 +2,7 @@ use std::time::Duration;
 
 use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::settings::values::Sidetone;
 
 #[derive(Debug, Default)]
 pub struct SoakLog {
@@ -13,6 +14,7 @@ pub struct SoakLog {
     pub failed: usize,
     pub interrupted: usize,
     pub waiting_for: Option<HeadsetSettings>,
+    pub unrestored: bool,
 }
 
 impl SoakLog {
@@ -43,6 +45,36 @@ impl SoakLog {
         self.observed = Some(settings);
     }
 
+    pub fn toggle_request(&mut self) -> Option<HeadsetSettings> {
+        if !self.is_ready() || self.waiting_for.is_some() {
+            return None;
+        }
+        let desired = toggled(self.original.as_ref()?, self.observed.as_ref()?);
+        Some(self.request(desired))
+    }
+
+    pub fn restore_request(&mut self) -> Option<HeadsetSettings> {
+        let original = self.original.clone()?;
+        if self.observed.as_ref() == Some(&original) {
+            return None;
+        }
+        if !self.is_ready() {
+            self.unrestored = true;
+            return None;
+        }
+        Some(self.request(original))
+    }
+
+    fn request(&mut self, desired: HeadsetSettings) -> HeadsetSettings {
+        self.requested += 1;
+        self.waiting_for = Some(desired.clone());
+        desired
+    }
+
+    fn is_ready(&self) -> bool {
+        self.phase() == Some(Phase::Ready)
+    }
+
     pub fn phase(&self) -> Option<Phase> {
         self.phases.last().map(|(_, phase)| *phase)
     }
@@ -60,5 +92,19 @@ impl SoakLog {
             .filter(|(_, phase)| !phase.is_present() || *phase == Phase::Rebinding)
             .copied()
             .collect()
+    }
+}
+
+fn toggled(original: &HeadsetSettings, observed: &HeadsetSettings) -> HeadsetSettings {
+    let level = original.sidetone.get();
+    let other = if level == 0 { 1 } else { level - 1 };
+    let next = if observed.sidetone.get() == level {
+        other
+    } else {
+        level
+    };
+    HeadsetSettings {
+        sidetone: Sidetone::try_from(next).expect("a sidetone level in range"),
+        ..observed.clone()
     }
 }
