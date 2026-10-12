@@ -302,3 +302,43 @@ fn a_write_failure_offers_a_retry_toast() {
     assert_eq!(english(&toast.title), "Could Not Change Sidetone");
     assert_eq!(toast.retry, Intent::RetryWrite(Setting::Sidetone));
 }
+
+#[test]
+fn the_header_battery_names_the_charging_state() {
+    let cases = [
+        (reading(45, Charging::Charging), "45 % · Charging"),
+        (reading(100, Charging::PluggedIn), "100 % · Charged"),
+        (reading(50, Charging::Unknown), "50 %"),
+    ];
+    for (level, expected) in cases {
+        let mut s = snapshot();
+        s.battery.reading = Some(level);
+        let header = headset(headset_page(&s)).header;
+        assert_eq!(
+            header.battery.map(|text| english(&text)).as_deref(),
+            Some(expected)
+        );
+    }
+}
+
+#[test]
+fn every_setting_has_its_failure_title() {
+    let cases = [
+        (Setting::MicVolume, "Could Not Change Microphone Volume"),
+        (Setting::Sidetone, "Could Not Change Sidetone"),
+        (Setting::MuteLight, "Could Not Change Mute Light Brightness"),
+        (Setting::VolumeLimiter, "Could Not Change Volume Limiter"),
+        (Setting::WirelessMode, "Could Not Change Extended Range"),
+        (
+            Setting::AutoPowerOff,
+            "Could Not Change Automatic Power Off",
+        ),
+        (Setting::Equalizer, "Could Not Change the Headset Equalizer"),
+    ];
+    for (setting, expected) in cases {
+        let mut s = snapshot();
+        s.dongle.last_failure = Some(WriteFailure { serial: 1, setting });
+        let toast = headset(headset_page(&s)).failure_toast.expect("toast");
+        assert_eq!(english(&toast.title), expected);
+    }
+}

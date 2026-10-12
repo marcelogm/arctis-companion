@@ -90,3 +90,8 @@ fn audio_events_update_the_state() {
     assert!(audio.easy_effects_active());
     assert_eq!(audio.route(), Route::Bluetooth);
 }
+
+#[test]
+fn the_default_audio_state_is_a_fresh_one() {
+    assert_eq!(AudioState::default(), AudioState::new());
+}

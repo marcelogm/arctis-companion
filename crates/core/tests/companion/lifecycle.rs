@@ -125,6 +125,17 @@ fn a_low_battery_reading_notifies() {
 }
 
 #[test]
+fn a_critical_reading_withdraws_the_low_notification() {
+    let mut h = Harness::new(persisted());
+    let _ = h.device(status(15));
+    let actions = h.device(status(4));
+    let critical = |action: &Action| matches!(action, Action::Notify(alert) if alert.id == AlertId::CriticalBattery);
+    assert!(actions.iter().any(critical));
+    assert!(actions.contains(&Action::Withdraw(AlertId::LowBattery)));
+    assert_eq!(h.snapshot().battery.warning, BatteryWarning::Critical);
+}
+
+#[test]
 fn restored_history_is_in_the_snapshot() {
     let mut saved = persisted();
     saved.battery = vec![Sample {
