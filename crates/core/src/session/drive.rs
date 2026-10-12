@@ -116,11 +116,10 @@ impl Session {
             Stage::Syncing(readings) if readings.wants_query() => {
                 Some(Due::at(now, Next::SyncRead))
             }
-            Stage::Syncing(readings) if readings.is_complete() => self.reconcile_due(),
             Stage::Ready if self.reconciler.is_in_sync() => {
                 Some(Due::at(self.safety_poll_at(), Next::Status))
             }
-            Stage::Ready => self.reconcile_due(),
+            Stage::Syncing(_) | Stage::Ready => self.reconcile_due(),
             _ => None,
         }
     }
