@@ -13,6 +13,7 @@ flowchart TD
     P -- "Import…" --> F["PresetFiles::open"]
     P -- "New Preset, Ctrl+N: win.new-preset" --> E
     E --> G["EqGraph: EqHandle × bands"]
+    E --> R["Reference menu, EqLegend"]
     E --> B["EqBandRow × up to 10"]
     E -- "Duplicate · Rename · Export · Delete · Preview" --> A["header actions"]
     A -- "Export…" --> S["PresetFiles::save"]
@@ -28,6 +29,9 @@ flowchart TD
 | Pixels, ticks, zones, hit test, drag and key edits | `crates/core/src/view/eq_plot.rs::Plot`, `crates/core/src/view/eq_plot.rs::frequency_ticks`, `crates/core/src/view/eq_plot.rs::level_ticks`, `crates/core/src/view/eq_plot.rs::zone_label_rows`, `crates/core/src/view/eq_plot.rs::hit_handle`, `crates/core/src/view/eq_plot.rs::drag_edit`, `crates/core/src/view/eq_plot.rs::nudged` | none |
 | Graph widget and handles | `crates/ui/src/eq_graph.rs::EqGraph`, `crates/ui/src/eq_graph.rs::GraphAction`, `crates/ui/src/eq_handle.rs::EqHandle`, drawing in `crates/ui/src/eq_graph/draw.rs`, input in `crates/ui/src/eq_graph/input.rs` | none |
 | Graph to page | `crates/ui/src/eq_editor_page/graph.rs` | none |
+| Reference curves: series, level range, summary | `crates/core/src/view/eq_overlays.rs::overlay_series`, `crates/core/src/view/eq_overlays.rs::level_range`, `crates/core/src/view/eq_overlays.rs::summary`, `crates/core/src/view/eq_graph.rs::graph_with` | none |
+| Legend: entries and fitting | `crates/core/src/view/eq_legend.rs::legend`, `crates/core/src/view/eq_legend.rs::slots`, `crates/ui/src/eq_graph/legend.rs::EqLegend` | none |
+| Reference menu | `crates/ui/src/eq_editor_page/overlays.rs` | `crates/ui/resources/eq_editor_page.blp` (`reference_menu`) |
 | Page services | `crates/ui/src/services.rs::Services`, `crates/ui/src/toasts.rs::button_toast` | none |
 | File chooser | `crates/ui/src/preset_files.rs::PresetFiles`, `crates/ui/src/preset_files.rs::PortalFiles` | none |
 | Window glue | `crates/ui/src/window.rs::Window` (`show_preset`, `set_preset_files`) | `crates/ui/resources/window.blp` |
@@ -78,17 +82,48 @@ drops that row itself and focuses the next band, so no other band inherits its e
 ## Harman target
 
 The built-in "Harman target" (id `harman`, `crates/core/src/eq/library.rs::library`) brings the measured Nova 5 to the
-Harman-style target on the same rig. The editor graph can overlay the measured headset, the headset with the
-preset's curve and both targets from `crates/core/src/eq/reference.rs::plot`; data and alignment are in the
-equalizer core document (`docs/architecture/eq.md`).
+Harman-style target on the same rig; data and alignment are in the equalizer core document
+(`docs/architecture/eq.md`). With it, "Headset with EQ" lies on the dashed Harman line
+(`crates/core/tests/view/eq_overlays.rs`, RMS distance against Flat).
 
 ```mermaid
 flowchart LR
     A["AutoEq ParametricEQ.txt"] -- "rounded as apo::parse does, checked by a test" --> C["ten filters by frequency"]
     C --> L["library: harman"]
-    L --> G["reference::plot(curve)"]
-    G --> U["ResponseGraph series"]
+    L --> G["eq_overlays::overlay_series(curve, overlays)"]
+    G --> U["EqGraph series"]
 ```
+
+## Reference curves
+
+The Reference menu above the graph has a check item, Headset Response, and a radio group, Target: None, Harman
+(B&K 5128) or Diffuse field (B&K 5128). Both choices live in GSettings (`graph-headset`, default on; `graph-target`,
+default `harman`) and reach the page through the snapshot like any other setting.
+
+```mermaid
+sequenceDiagram
+    participant M as Reference menu
+    participant E as EqEditorPage
+    participant C as Companion
+    participant G as GSettings
+    M->>E: reference.headset / reference.target
+    E->>E: overlays = choice, render at once
+    E->>C: Intent::SetOverlays
+    C->>G: PersistedChange::Overlays
+    C-->>E: Snapshot.presets.overlays
+    E->>E: menu state follows the snapshot
+```
+
+With any overlay on, `graph_with` draws on one dB axis, under the equalizer curve: the target dashed, the stock
+headset faint, the headset with the curve bold in the accent colour; the equalizer curve turns faint but keeps its
+fill and handles. The range widens from ±12 to −18..+12 dB (`OVERLAID` in `crates/core/src/view/eq_overlays.rs::level_range`) and
+lines beyond it are clipped at the plot edge; the tick step follows from the height as before. A drag previews the
+dragged copy, so "Headset with EQ" moves with the handle.
+
+The legend sits beside the menu button, not over the plot. `slots` flows its entries onto at most two rows and
+returns nothing when they do not fit, so a narrow window wraps the legend and a very narrow one hides it. Screen
+readers skip the overlays and the legend (`Presentation` role); the graph description ends with a summary such as
+"Showing the measured headset response, with and without the equalizer, and the Harman target (B&K 5128)."
 
 ## Import and export
 
@@ -130,11 +165,12 @@ pick of the picked path; when it stops being `Picked` the page turns the toggle 
 
 ## Tests
 
-Pure: `crates/core/tests/view/eq_editor.rs`, `crates/core/tests/view/eq_graph.rs`, `crates/core/tests/view/eq_plot.rs`, `crates/core/tests/view/preset_edits.rs`,
+Pure: `crates/core/tests/view/eq_editor.rs`, `crates/core/tests/view/eq_graph.rs`, `crates/core/tests/view/eq_plot.rs`, `crates/core/tests/view/eq_overlays.rs`, `crates/core/tests/view/eq_legend.rs`, `crates/core/tests/view/preset_edits.rs`,
 `crates/core/tests/view/preset_files.rs`. Widgets (`crates/ui/tests/widgets/main.rs`):
 `crates/ui/tests/widgets/presets_page.rs`, `crates/ui/tests/widgets/eq_editor_page.rs` (keyboard-only editing,
 undo toast), `crates/ui/tests/widgets/preset_actions.rs` (Duplicate, Rename, Export, Delete, Preview),
 `crates/ui/tests/widgets/new_preset.rs` (New Preset button and Ctrl+N),
 `crates/ui/tests/widgets/eq_band_row.rs`, `crates/ui/tests/widgets/eq_graph.rs` (drag, wheel, keys, double click,
-drawing), `crates/ui/tests/widgets/eq_graph_editing.rs` (live row, one save per drag, row and handle in sync), with the fake file chooser
+drawing), `crates/ui/tests/widgets/eq_graph_editing.rs` (live row, one save per drag, row and handle in sync),
+`crates/ui/tests/widgets/eq_overlays.rs` (Reference menu, overlays and legend), with the fake file chooser
 `crates/ui/tests/widgets/support.rs::FakeFiles`.

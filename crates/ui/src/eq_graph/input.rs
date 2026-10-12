@@ -219,7 +219,7 @@ fn key_meaning(key: gdk::Key) -> Option<KeyMeaning> {
 }
 
 #[expect(clippy::cast_possible_truncation)]
-fn whole(value: f32) -> i32 {
+pub(super) fn whole(value: f32) -> i32 {
     value.round() as i32
 }
 

@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 18:29-0300\n"
+"POT-Creation-Date: 2026-10-12 18:50-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -95,7 +95,7 @@ msgstr ""
 msgid "Vocal Clarity"
 msgstr ""
 
-#: crates/core/src/eq/reference.rs
+#: crates/core/src/eq/reference.rs crates/ui/resources/eq_editor_page.blp
 msgid "Diffuse field (B&K 5128)"
 msgstr ""
 
@@ -103,7 +103,7 @@ msgstr ""
 msgid "Frequency response data"
 msgstr ""
 
-#: crates/core/src/eq/reference.rs
+#: crates/core/src/eq/reference.rs crates/ui/resources/eq_editor_page.blp
 msgid "Harman (B&K 5128)"
 msgstr ""
 
@@ -230,12 +230,49 @@ msgstr ""
 msgid "Band {number}, {kind}, {frequency}, {gain}, Q {q}"
 msgstr ""
 
+#: crates/core/src/view/eq_graph.rs crates/ui/resources/equalizer_group.blp
+msgid "Equalizer"
+msgstr ""
+
 #: crates/core/src/view/eq_graph.rs
 #, rust-format
 msgid "Nominal frequency response of {preset}, with {n} active band"
 msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
 msgstr[0] ""
 msgstr[1] ""
+
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid ""
+"Nominal frequency response of {preset}, with {n} active band. {overlays}"
+msgid_plural ""
+"Nominal frequency response of {preset}, with {n} active bands. {overlays}"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/eq_overlays.rs
+msgid "Showing the Harman target (B&K 5128)."
+msgstr ""
+
+#: crates/core/src/view/eq_overlays.rs
+msgid "Showing the diffuse field target (B&K 5128)."
+msgstr ""
+
+#: crates/core/src/view/eq_overlays.rs
+msgid ""
+"Showing the measured headset response, with and without the equalizer, and "
+"the Harman target (B&K 5128)."
+msgstr ""
+
+#: crates/core/src/view/eq_overlays.rs
+msgid ""
+"Showing the measured headset response, with and without the equalizer, and "
+"the diffuse field target (B&K 5128)."
+msgstr ""
+
+#: crates/core/src/view/eq_overlays.rs
+msgid "Showing the measured headset response, with and without the equalizer."
+msgstr ""
 
 #: crates/core/src/view/eq_plot.rs
 msgid "Bass"
@@ -711,7 +748,19 @@ msgid "Bands"
 msgstr ""
 
 #: crates/ui/resources/eq_editor_page.blp
+msgid "Curves to Compare"
+msgstr ""
+
+#: crates/ui/resources/eq_editor_page.blp
 msgid "Duplicate Preset"
+msgstr ""
+
+#: crates/ui/resources/eq_editor_page.blp
+msgid "Headset Response"
+msgstr ""
+
+#: crates/ui/resources/eq_editor_page.blp
+msgid "None"
 msgstr ""
 
 #: crates/ui/resources/eq_editor_page.blp
@@ -731,6 +780,14 @@ msgid "Preview Through This Preset"
 msgstr ""
 
 #: crates/ui/resources/eq_editor_page.blp
+msgid "Reference"
+msgstr ""
+
+#: crates/ui/resources/eq_editor_page.blp
+msgid "Target"
+msgstr ""
+
+#: crates/ui/resources/eq_editor_page.blp
 msgid "_Delete"
 msgstr ""
 
@@ -744,10 +801,6 @@ msgstr ""
 
 #: crates/ui/resources/equalizer_group.blp
 msgid "Automatic App Presets"
-msgstr ""
-
-#: crates/ui/resources/equalizer_group.blp
-msgid "Equalizer"
 msgstr ""
 
 #: crates/ui/resources/equalizer_group.blp

@@ -5,7 +5,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion 0.1.0\n"
 "Report-Msgid-Bugs-To: https://github.com/marcelogm/arctis-companion/issues\n"
-"POT-Creation-Date: 2026-10-12 14:35-0300\n"
+"POT-Creation-Date: 2026-10-12 18:50-0300\n"
 "PO-Revision-Date: 2026-10-12 12:00-0300\n"
 "Last-Translator: marcelogm\n"
 "Language-Team: Brazilian Portuguese\n"
@@ -94,7 +94,7 @@ msgstr "Formato em V"
 msgid "Vocal Clarity"
 msgstr "Clareza vocal"
 
-#: crates/core/src/eq/reference.rs
+#: crates/core/src/eq/reference.rs crates/ui/resources/eq_editor_page.blp
 msgid "Diffuse field (B&K 5128)"
 msgstr "Campo difuso (B&K 5128)"
 
@@ -102,7 +102,7 @@ msgstr "Campo difuso (B&K 5128)"
 msgid "Frequency response data"
 msgstr "Dados de resposta de frequência"
 
-#: crates/core/src/eq/reference.rs
+#: crates/core/src/eq/reference.rs crates/ui/resources/eq_editor_page.blp
 msgid "Harman (B&K 5128)"
 msgstr "Harman (B&K 5128)"
 
@@ -207,6 +207,20 @@ msgstr "Prateleira baixa"
 msgid "Low-Pass"
 msgstr "Passa-baixas"
 
+#: crates/core/src/view/eq_editor.rs
+msgid "Peak"
+msgstr "Pico"
+
+#: crates/core/src/view/eq_editor.rs
+#, rust-format
+msgid "{frequency} · {gain}"
+msgstr "{frequency} · {gain}"
+
+#: crates/core/src/view/eq_editor.rs
+#, rust-format
+msgid "{frequency} · {kind}"
+msgstr "{frequency} · {kind}"
+
 #: crates/core/src/view/eq_graph.rs
 #, rust-format
 msgid "Band {number}, {kind}, {frequency}, Q {q}"
@@ -217,12 +231,55 @@ msgstr "Banda {number}, {kind}, {frequency}, Q {q}"
 msgid "Band {number}, {kind}, {frequency}, {gain}, Q {q}"
 msgstr "Banda {number}, {kind}, {frequency}, {gain}, Q {q}"
 
+#: crates/core/src/view/eq_graph.rs crates/ui/resources/equalizer_group.blp
+msgid "Equalizer"
+msgstr "Equalizador"
+
 #: crates/core/src/view/eq_graph.rs
 #, rust-format
 msgid "Nominal frequency response of {preset}, with {n} active band"
 msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
 msgstr[0] "Resposta de frequência nominal de {preset}, com {n} banda ativa"
 msgstr[1] "Resposta de frequência nominal de {preset}, com {n} bandas ativas"
+
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid ""
+"Nominal frequency response of {preset}, with {n} active band. {overlays}"
+msgid_plural ""
+"Nominal frequency response of {preset}, with {n} active bands. {overlays}"
+msgstr[0] ""
+"Resposta de frequência nominal de {preset}, com {n} banda ativa. {overlays}"
+msgstr[1] ""
+"Resposta de frequência nominal de {preset}, com {n} bandas ativas. {overlays}"
+
+#: crates/core/src/view/eq_overlays.rs
+msgid "Showing the Harman target (B&K 5128)."
+msgstr "Mostrando o alvo Harman (B&K 5128)."
+
+#: crates/core/src/view/eq_overlays.rs
+msgid "Showing the diffuse field target (B&K 5128)."
+msgstr "Mostrando o alvo de campo difuso (B&K 5128)."
+
+#: crates/core/src/view/eq_overlays.rs
+msgid ""
+"Showing the measured headset response, with and without the equalizer, and "
+"the Harman target (B&K 5128)."
+msgstr ""
+"Mostrando a resposta medida do headset, com e sem o equalizador, e o alvo "
+"Harman (B&K 5128)."
+
+#: crates/core/src/view/eq_overlays.rs
+msgid ""
+"Showing the measured headset response, with and without the equalizer, and "
+"the diffuse field target (B&K 5128)."
+msgstr ""
+"Mostrando a resposta medida do headset, com e sem o equalizador, e o alvo de "
+"campo difuso (B&K 5128)."
+
+#: crates/core/src/view/eq_overlays.rs
+msgid "Showing the measured headset response, with and without the equalizer."
+msgstr "Mostrando a resposta medida do headset, com e sem o equalizador."
 
 #: crates/core/src/view/eq_plot.rs
 msgid "Bass"
@@ -251,20 +308,6 @@ msgstr "Presença"
 #: crates/core/src/view/eq_plot.rs
 msgid "Sub-bass"
 msgstr "Subgraves"
-
-#: crates/core/src/view/eq_editor.rs
-msgid "Peak"
-msgstr "Pico"
-
-#: crates/core/src/view/eq_editor.rs
-#, rust-format
-msgid "{frequency} · {gain}"
-msgstr "{frequency} · {gain}"
-
-#: crates/core/src/view/eq_editor.rs
-#, rust-format
-msgid "{frequency} · {kind}"
-msgstr "{frequency} · {kind}"
 
 #: crates/core/src/view/equalizer_rows.rs
 #: crates/ui/resources/equalizer_group.blp
@@ -590,6 +633,10 @@ msgid "“{file}” is not a preset file"
 msgstr "“{file}” não é um arquivo de predefinição"
 
 #: crates/core/src/view/presets.rs
+msgid "Create, duplicate or import a preset to customize it"
+msgstr "Crie, duplique ou importe uma predefinição para personalizá-la"
+
+#: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”"
 msgstr "Predefinição “{preset}” excluída"
@@ -657,10 +704,6 @@ msgid "Deleted “{preset}”. Used by {n} app rule"
 msgid_plural "Deleted “{preset}”. Used by {n} app rules"
 msgstr[0] "Predefinição “{preset}” excluída. Era usada por {n} regra de app"
 msgstr[1] "Predefinição “{preset}” excluída. Era usada por {n} regras de apps"
-
-#: crates/core/src/view/presets.rs
-msgid "Create, duplicate or import a preset to customize it"
-msgstr "Crie, duplique ou importe uma predefinição para personalizá-la"
 
 #: crates/ui/resources/add_rule_dialog.blp
 #: crates/ui/resources/eq_editor_page.blp
@@ -737,8 +780,20 @@ msgid "Bands"
 msgstr "Bandas"
 
 #: crates/ui/resources/eq_editor_page.blp
+msgid "Curves to Compare"
+msgstr "Curvas para comparar"
+
+#: crates/ui/resources/eq_editor_page.blp
 msgid "Duplicate Preset"
 msgstr "Duplicar predefinição"
+
+#: crates/ui/resources/eq_editor_page.blp
+msgid "Headset Response"
+msgstr "Resposta do headset"
+
+#: crates/ui/resources/eq_editor_page.blp
+msgid "None"
+msgstr "Nenhum"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Plays through this preset while the page is open"
@@ -757,6 +812,14 @@ msgid "Preview Through This Preset"
 msgstr "Pré-visualizar com esta predefinição"
 
 #: crates/ui/resources/eq_editor_page.blp
+msgid "Reference"
+msgstr "Referência"
+
+#: crates/ui/resources/eq_editor_page.blp
+msgid "Target"
+msgstr "Alvo"
+
+#: crates/ui/resources/eq_editor_page.blp
 msgid "_Delete"
 msgstr "_Excluir"
 
@@ -771,10 +834,6 @@ msgstr "_Renomear…"
 #: crates/ui/resources/equalizer_group.blp
 msgid "Automatic App Presets"
 msgstr "Predefinições automáticas de apps"
-
-#: crates/ui/resources/equalizer_group.blp
-msgid "Equalizer"
-msgstr "Equalizador"
 
 #: crates/ui/resources/equalizer_group.blp
 msgid "Now Playing"
@@ -896,14 +955,6 @@ msgstr "_Atalhos de teclado"
 msgid "_Preferences"
 msgstr "_Preferências"
 
-#: crates/ui/src/eq_graph/input.rs
-msgid "_Remove Band"
-msgstr "_Remover banda"
-
-#: crates/ui/src/eq_handle.rs
-msgid "Arrow keys change frequency and gain, Page Up and Page Down change Q"
-msgstr "As setas mudam a frequência e o ganho; Page Up e Page Down mudam o Q"
-
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "Name"
 msgstr "Nome"
@@ -919,6 +970,14 @@ msgstr "_Cancelar"
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "_Rename"
 msgstr "_Renomear"
+
+#: crates/ui/src/eq_graph/input.rs
+msgid "_Remove Band"
+msgstr "_Remover banda"
+
+#: crates/ui/src/eq_handle.rs
+msgid "Arrow keys change frequency and gain, Page Up and Page Down change Q"
+msgstr "As setas mudam a frequência e o ganho; Page Up e Page Down mudam o Q"
 
 #: crates/ui/src/preset_files.rs
 msgid "Export Preset"
@@ -957,10 +1016,32 @@ msgid "headset;equalizer;battery;sidetone;"
 msgstr "headset;fone;equalizador;bateria;sidetone;"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "A Quick Settings toggle through the companion GNOME Shell extension"
+msgid "Control your SteelSeries Arctis Nova 5 headset"
+msgstr "Controle seu headset SteelSeries Arctis Nova 5"
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"Change the headset’s settings and equalizer, let presets follow the app that "
+"plays sound, and keep an eye on the battery."
 msgstr ""
-"Um botão nas configurações rápidas por meio da extensão do GNOME Shell que "
-"acompanha o app"
+"Altere as configurações e o equalizador do headset, deixe as predefinições "
+"acompanharem o app que reproduz som e fique de olho na bateria."
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"Sidetone, microphone volume, mute light, volume limiter, wireless mode and "
+"automatic power off"
+msgstr ""
+"Sidetone, volume do microfone, luz de mudo, limitador de volume, modo sem "
+"fio e desligamento automático"
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"Built-in and custom equalizer presets with a parametric editor and Equalizer "
+"APO import"
+msgstr ""
+"Predefinições de equalizador integradas e personalizadas, com editor "
+"paramétrico e importação do Equalizer APO"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid "App presets that switch the equalizer while a chosen app plays"
@@ -973,40 +1054,25 @@ msgid "Battery history and low battery notifications"
 msgstr "Histórico da bateria e notificações de bateria fraca"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid ""
-"Built-in and custom equalizer presets with a parametric editor and Equalizer "
-"APO import"
+msgid "A Quick Settings toggle through the companion GNOME Shell extension"
 msgstr ""
-"Predefinições de equalizador integradas e personalizadas, com editor "
-"paramétrico e importação do Equalizer APO"
+"Um botão nas configurações rápidas por meio da extensão do GNOME Shell que "
+"acompanha o app"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid ""
-"Change the headset’s settings and equalizer, let presets follow the app that "
-"plays sound, and keep an eye on the battery."
+"The wireless dongle is reached through hidraw, so the app needs access to "
+"all devices and a udev rule on the computer, 70-arctis-companion.rules. When "
+"permission is missing, the app shows the rule and the command to load it."
 msgstr ""
-"Altere as configurações e o equalizador do headset, deixe as predefinições "
-"acompanharem o app que reproduz som e fique de olho na bateria."
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "Control your SteelSeries Arctis Nova 5 headset"
-msgstr "Controle seu headset SteelSeries Arctis Nova 5"
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "First release."
-msgstr "Primeira versão."
+"O dongle sem fio é acessado por hidraw, então o app precisa de acesso a "
+"todos os dispositivos e de uma regra do udev no computador, 70-arctis-"
+"companion.rules. Quando falta permissão, o app mostra a regra e o comando "
+"para carregá-la."
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid "Not supported yet:"
 msgstr "Ainda não suportado:"
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid ""
-"Sidetone, microphone volume, mute light, volume limiter, wireless mode and "
-"automatic power off"
-msgstr ""
-"Sidetone, volume do microfone, luz de mudo, limitador de volume, modo sem "
-"fio e desligamento automático"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid "Switching the headset between 2.4 GHz and Bluetooth audio"
@@ -1027,12 +1093,5 @@ msgstr ""
 "AutoEq de Jaakko Pasanen (licença MIT)."
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid ""
-"The wireless dongle is reached through hidraw, so the app needs access to "
-"all devices and a udev rule on the computer, 70-arctis-companion.rules. When "
-"permission is missing, the app shows the rule and the command to load it."
-msgstr ""
-"O dongle sem fio é acessado por hidraw, então o app precisa de acesso a "
-"todos os dispositivos e de uma regra do udev no computador, 70-arctis-"
-"companion.rules. Quando falta permissão, o app mostra a regra e o comando "
-"para carregá-la."
+msgid "First release."
+msgstr "Primeira versão."

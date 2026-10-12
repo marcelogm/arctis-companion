@@ -2,6 +2,8 @@ pub mod app_presets;
 pub mod battery_chart;
 pub mod eq_editor;
 pub mod eq_graph;
+pub mod eq_legend;
+pub mod eq_overlays;
 pub mod eq_plot;
 pub mod equalizer_rows;
 pub mod headset_page;

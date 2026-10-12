@@ -1,10 +1,11 @@
-use super::eq_graph::{GraphModel, graph};
+use super::eq_graph::{GraphModel, graph_with};
 use super::text::{Arg, Text, preset_title};
 use crate::companion::selection::PresetReason;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::curve::MAX_FILTERS;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
 use crate::eq::preset::{Preset, PresetId, PresetKind};
+use crate::eq::reference::Overlays;
 use crate::l10n::msgid;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -54,6 +55,11 @@ pub fn eq_editor(snapshot: &Snapshot, id: &PresetId) -> Option<EqEditorModel> {
 
 #[must_use]
 pub fn eq_editor_for(snapshot: &Snapshot, preset: &Preset) -> EqEditorModel {
+    eq_editor_with(snapshot, preset, snapshot.presets.overlays)
+}
+
+#[must_use]
+pub fn eq_editor_with(snapshot: &Snapshot, preset: &Preset, overlays: Overlays) -> EqEditorModel {
     let filters = preset.curve().filters();
     EqEditorModel {
         id: preset.id().clone(),
@@ -65,7 +71,7 @@ pub fn eq_editor_for(snapshot: &Snapshot, preset: &Preset) -> EqEditorModel {
             .map(|(filter, index)| band(*filter, index))
             .collect(),
         can_add_band: filters.len() < MAX_FILTERS,
-        graph: graph(preset),
+        graph: graph_with(preset, overlays),
         preview: preview_state(snapshot, preset.id()),
     }
 }

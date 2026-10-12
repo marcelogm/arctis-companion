@@ -14,6 +14,7 @@ mod eq_band_row;
 mod eq_editor_page;
 mod eq_graph;
 mod eq_graph_editing;
+mod eq_overlays;
 mod equalizer_group;
 mod headset_page;
 mod headset_status;

@@ -2,6 +2,7 @@ use arctis_core::companion::routing::Route;
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::eq::FilterKind;
 use arctis_core::eq::preset::Preset;
+use arctis_core::eq::reference::Overlays;
 use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
 use arctis_core::view::eq_editor::{
@@ -74,7 +75,9 @@ fn the_graph_describes_the_nominal_curve() {
         ),
     ];
     for (preset, expected) in cases {
-        let graph = eq_editor(&snapshot(), &id(preset)).expect("editor").graph;
+        let mut bare = snapshot();
+        bare.presets.overlays = Overlays::NONE;
+        let graph = eq_editor(&bare, &id(preset)).expect("editor").graph;
         assert_eq!(english(&graph.description), expected);
     }
 }

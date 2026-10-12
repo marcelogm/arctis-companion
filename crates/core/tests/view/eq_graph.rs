@@ -1,5 +1,6 @@
 use arctis_core::eq::FilterKind;
 use arctis_core::eq::preset::Preset;
+use arctis_core::eq::reference::Overlays;
 use arctis_core::testkit::english::english;
 use arctis_core::view::eq_editor::eq_editor;
 use arctis_core::view::eq_graph::{
@@ -17,7 +18,9 @@ fn two_bands() -> Preset {
 
 #[test]
 fn the_response_is_one_filled_accent_series_from_twenty_hertz_to_twenty_kilohertz() {
-    let model = eq_editor(&snapshot(), &id("flat")).expect("editor").graph;
+    let mut bare = snapshot();
+    bare.presets.overlays = Overlays::NONE;
+    let model = eq_editor(&bare, &id("flat")).expect("editor").graph;
     assert_eq!(model.series.len(), 1);
     let response = &model.series[0];
     assert_eq!(response.style, LineStyle::Solid);

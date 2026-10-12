@@ -35,7 +35,7 @@ pub use battery_chart::BatteryChart;
 pub use battery_page::BatteryPage;
 pub use eq_band_row::EqBandRow;
 pub use eq_editor_page::EqEditorPage;
-pub use eq_graph::{EqGraph, GraphAction};
+pub use eq_graph::{EqGraph, EqLegend, GraphAction};
 pub use eq_handle::EqHandle;
 pub use equalizer_group::EqualizerGroup;
 pub use headset_page::HeadsetPage;

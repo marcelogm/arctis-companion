@@ -7,15 +7,15 @@ use std::fmt::Debug;
 use arctis_core::battery::sample::{Reading, UnixSeconds};
 use arctis_core::battery::series::Window;
 use arctis_core::companion::alerts::Alerts;
-use arctis_core::eq::{Curve, FilterKind};
 use arctis_core::eq::library::library;
-use arctis_core::eq::reference::plot;
+use arctis_core::eq::reference::{Overlays, Target, plot};
+use arctis_core::eq::{Curve, FilterKind};
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::values::AutoPowerOff;
 use arctis_core::view::app_presets::{add_rule_dialog, app_presets};
 use arctis_core::view::battery_chart::battery_page;
 use arctis_core::view::eq_editor::{eq_editor_for, kind_items};
-use arctis_core::view::eq_graph::handle_label;
+use arctis_core::view::eq_graph::{graph_with, handle_label};
 use arctis_core::view::eq_plot::zones;
 use arctis_core::view::equalizer_rows::equalizer_group;
 use arctis_core::view::headset_page::{banner, headset_page};
@@ -164,6 +164,18 @@ fn preset_dumps() -> Vec<String> {
             dump(&zones()),
             dump(&handle_label(filter(FilterKind::LowPass, 8_000, 0, 707), 0)),
         ])
+        .chain(overlay_dumps())
+        .collect()
+}
+
+fn overlay_dumps() -> Vec<String> {
+    let flat = library()[0].clone();
+    let targets = [None, Some(Target::Harman), Some(Target::DiffuseField)];
+    [false, true]
+        .into_iter()
+        .flat_map(|headset| targets.map(|target| Overlays { headset, target }))
+        .map(|overlays| graph_with(&flat, overlays))
+        .map(|model| dump(&(model.description, model.legend)))
         .collect()
 }
 
