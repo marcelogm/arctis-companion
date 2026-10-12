@@ -1,4 +1,5 @@
 use std::cell::RefCell;
+use std::rc::Rc;
 
 use gtk::gio;
 use gtk::gio::prelude::*;
@@ -31,6 +32,33 @@ impl Hold for AppHold {
 
     fn release(&self) {
         self.guard.take();
+    }
+}
+
+pub struct QuitWhenAlone {
+    hold: Rc<dyn Hold>,
+    alone: Box<dyn Fn() -> bool>,
+    quit: Box<dyn Fn()>,
+}
+
+impl QuitWhenAlone {
+    #[must_use]
+    pub fn new(hold: Rc<dyn Hold>, alone: Box<dyn Fn() -> bool>, quit: Box<dyn Fn()>) -> Self {
+        Self { hold, alone, quit }
+    }
+}
+
+impl Hold for QuitWhenAlone {
+    fn hold(&self) {
+        self.hold.hold();
+    }
+
+    fn release(&self) {
+        if (self.alone)() {
+            (self.quit)();
+        } else {
+            self.hold.release();
+        }
     }
 }
 

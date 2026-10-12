@@ -148,3 +148,22 @@ pub fn runs_windowless_until_a_second_launch(bus: &Bus) {
     assert_eq!(code, glib::ExitCode::SUCCESS);
     assert!(probed.get(), "the probe ran inside the service");
 }
+
+async fn terminate_myself() {
+    glib::timeout_future(SETTLE).await;
+    let pid = process::id().to_string();
+    let kill = gio::Subprocess::newv(
+        &["kill".as_ref(), "-TERM".as_ref(), pid.as_ref()],
+        gio::SubprocessFlags::NONE,
+    )
+    .expect("kill starts");
+    kill.wait_future().await.expect("kill returns");
+}
+
+pub fn a_termination_signal_quits_gracefully(_bus: &Bus) {
+    asked_for_background_before();
+    let application = application::build(|| Ok(silent_threads()));
+    glib::spawn_future_local(terminate_myself());
+    let code = application.run_with_args(&["arctis-companion", "--gapplication-service"]);
+    assert_eq!(code, glib::ExitCode::SUCCESS);
+}

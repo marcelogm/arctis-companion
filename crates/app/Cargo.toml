@@ -26,6 +26,7 @@ gtk.workspace = true
 adw.workspace = true
 gettext-rs.workspace = true
 async-channel = "2.5"
+glib-unix = "0.22.8"
 ashpd = { version = "0.13.13", default-features = false, features = ["async-io", "background"] }
 serde_json = "1"
 

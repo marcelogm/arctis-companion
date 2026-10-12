@@ -39,6 +39,7 @@ const SCENARIOS: &[Scenario] = scenarios![
     portal::asks_for_background_with_or_without_autostart,
     window::presents_one_window_with_the_latest_state,
     service::runs_windowless_until_a_second_launch,
+    service::a_termination_signal_quits_gracefully,
 ];
 
 fn main() {

@@ -12,6 +12,9 @@ use crate::threads::Threads;
 
 pub const APP_ID: &str = "io.github.marcelogm.ArctisCompanion";
 const QUIT_ACCELERATOR: &str = "<Control>q";
+const SIGHUP: i32 = 1;
+const SIGINT: i32 = 2;
+const SIGTERM: i32 = 15;
 
 pub type ThreadFactory = fn() -> io::Result<Threads>;
 
@@ -31,6 +34,7 @@ mod imp {
         pub threads: Cell<Option<ThreadFactory>>,
         pub headset: RefCell<Option<Rc<HeadsetObject>>>,
         pub runtime: RefCell<Option<Rc<Runtime>>>,
+        pub signals: RefCell<Vec<glib::SourceId>>,
     }
 
     #[glib::object_subclass]
@@ -60,6 +64,7 @@ mod imp {
         fn startup(&self) {
             self.parent_startup();
             self.obj().install_actions();
+            self.obj().watch_signals();
             self.obj().start_runtime();
         }
 
@@ -70,6 +75,7 @@ mod imp {
 
         fn shutdown(&self) {
             self.obj().drop_runtime();
+            self.obj().unwatch_signals();
             self.parent_shutdown();
         }
     }
@@ -141,6 +147,20 @@ impl CompanionApplication {
         self.set_accels_for_action("app.quit", &[QUIT_ACCELERATOR]);
     }
 
+    fn watch_signals(&self) {
+        let sources = [SIGHUP, SIGINT, SIGTERM].map(|signal| {
+            let application = self.downgrade();
+            glib_unix::unix_signal_add_local(signal, move || quit_on_signal(&application))
+        });
+        self.imp().signals.replace(sources.into());
+    }
+
+    fn unwatch_signals(&self) {
+        for source in self.imp().signals.take() {
+            source.remove();
+        }
+    }
+
     fn quit_gracefully(&self) {
         match self.running_runtime() {
             Some(runtime) => runtime.quit(),
@@ -153,6 +173,13 @@ impl CompanionApplication {
             runtime.show_battery(self.upcast_ref());
         }
     }
+}
+
+fn quit_on_signal(application: &glib::WeakRef<CompanionApplication>) -> glib::ControlFlow {
+    if let Some(application) = application.upgrade() {
+        application.quit_gracefully();
+    }
+    glib::ControlFlow::Continue
 }
 
 #[must_use]
