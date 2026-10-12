@@ -38,6 +38,9 @@ ADR 0013 and ADR 0014.
   Cargo, meson, `xgettext`, `msgfmt`, `appstreamcli`, `npm` and `gnome-extensions pack` run there. Missing packages:
   `sudo dnf install -y <pkg>` inside the toolbox.
 - **Run (host):** `git`, `gh`, `flatpak`, `flatpak run org.flatpak.Builder`, `gnome-extensions install`, `gdbus`.
+- **Run (ui):** `X` means the GTK tests under a private headless weston, always in this worktree (do not use
+  `/home/marcelo/Desenvolvimento/arctis-wt/uitest.sh`: it is hard-wired to the gone `sp12` worktree):
+  `toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp14 && export XDG_RUNTIME_DIR=$(mktemp -d) LC_ALL=C.UTF-8 && { weston --backend=headless --socket=wl-sp14 --idle-time=0 >/dev/null 2>&1 & W=$!; } && until [ -S "$XDG_RUNTIME_DIR/wl-sp14" ]; do sleep 0.1; done; GDK_BACKEND=wayland GSK_RENDERER=cairo WAYLAND_DISPLAY=wl-sp14 X; S=$?; kill $W; exit $S'`.
 - No comments in any file of any language, doc comments included. Shell scripts may keep the `#!/bin/sh` line only.
   Names and small functions carry the meaning. Clippy limits apply to tests too (cognitive complexity 8, 40 lines,
   nesting 3, 4 arguments).
@@ -60,14 +63,14 @@ ADR 0013 and ADR 0014.
 | final manifest (`--device=all`, PipeWire socket) | 7, 8 |
 | udev rule + in-app instructions | 9 (metainfo text), 18 (packaging page), 19 (shown by the installed app when denied); the dialog itself is SP9's `crates/ui/src/permission_dialog.rs::PermissionDialog`, kept |
 | metainfo with known gaps: audio-mode switch, phone Bluetooth preset; `--device=all` justification (risk table) | 7, 9 |
-| pt_BR 100 % | 3, 4, 5, 6, 11, 12, 13 |
+| pt_BR 100 % | 3, 4, 5, 6, 11, 11A (About dialog), 12, 13 |
 | `appstreamcli validate`, `desktop-file-validate`, `glib-compile-schemas --strict` pass | 9 (meson tests on the merged files), 19 (Flatpak build runs them) |
 | CI regenerates the POT, `msgfmt --check`, fails on untranslated `pt_BR` (quality §2) | 4, 14 |
 | `check-doc-paths` covers ADR "Code:" lines | 2 |
 | release workflow: tag builds `.flatpak`, extension zip and rule | 7, 10, 21 |
 | `flatpak-builder --install` works on Fedora 44 with the rule; app launches from the Flatpak | 19 |
 | extension installed for the user (not enabled) | 19 |
-| end-to-end checklist on hardware (300 ms readback; ruled app 1 s / 10 s; Bluetooth 30 min 48 kHz / 256 no xruns) | 17 (written for a person, never ticked by an agent) |
+| end-to-end checklist on hardware (300 ms readback; ruled app 1 s / 10 s; Bluetooth 30 min 48 kHz / 256 no xruns) | 15A (the soak prints the slowest confirmed write, so 300 ms is measurable), 17 (written for a person, never ticked by an agent) |
 | hardware-findings §7 consolidated into `docs/hardware-checklist.md` | 17 |
 | issue #3: drop the `.githooks/commit-msg` fallback | 1, 20 (`Closes #3`) |
 | triage of every follow-up | Triage table below; fixes in 15, issues in 16, checklist rows in 17 |
@@ -82,6 +85,7 @@ ADR 0013 and ADR 0014.
 | `xtask/src/check_doc_paths.rs` | modify | adds `docs/adr/*.md`, checking only "- Code:" lines |
 | `xtask/tests/check_doc_paths.rs` | modify | ADR cases |
 | `docs/adr/0014-xtask-enforces-rules.md` | modify | present tense for the ADR check |
+| `docs/adr/0009-in-process-pipewire-dsp.md` | modify | "Code:" line cites `crates/audio/src/outputs.rs`, which does not exist; becomes `sinks.rs`, `insertion.rs` |
 | `crates/core/src/l10n.rs` | create | `msgid`, `forms` markers |
 | `crates/core/src/lib.rs` | modify | `pub mod l10n;` |
 | `crates/core/src/view/*.rs`, `crates/core/src/companion/alerts.rs`, `crates/core/src/eq/library.rs`, `crates/ui/src/**/*.rs`, `crates/app/src/platform/{background,portal}.rs` | modify | every msgid literal wrapped in `msgid()` / `forms()` |
@@ -94,12 +98,17 @@ ADR 0013 and ADR 0014.
 | `data/io.github.marcelogm.ArctisCompanion.desktop` → `.desktop.in` | rename | translated by `i18n.merge_file` |
 | `data/io.github.marcelogm.ArctisCompanion.metainfo.xml` → `.metainfo.xml.in` | rename + rewrite | description, known gaps, permission, release, translation |
 | `data/meson.build` | modify | `merge_file` and validation of merged outputs |
+| `crates/app/tests/data_files.rs` | modify | `SUFFIXES` name the `.desktop.in` and `.metainfo.xml.in` templates |
+| `crates/ui/build.rs`, `crates/ui/resources/resources.gresource.xml` | modify | read the `.in` template (Task 4); bundle the `msgfmt --xml` merged metainfo for the About dialog (Task 11A) |
+| `crates/ui/tests/widgets/app_dialogs.rs` | modify | the bundled metainfo carries pt-BR |
+| `docs/architecture/ui.md` | modify | metainfo path |
+| `crates/hid/tests/hardware/{soak_log,soak_log_rules,soak}.rs` | modify | slowest write-to-readback confirmation, printed by the soak (checklist A1) |
 | `build-aux/io.github.marcelogm.ArctisCompanion.json` | modify | finish-args |
 | `crates/app/tests/packaging.rs` | create | manifest, versions, metainfo, release assets |
 | `crates/app/src/locale.rs`, `crates/app/src/lib.rs`, `crates/app/src/application.rs`, `crates/app/Cargo.toml` | create/modify | `setlocale`, `bindtextdomain`, `textdomain` |
 | `crates/app/tests/locale.rs` | create | `locale_dir_beside` |
 | `extension/po/pt_BR.po` | modify | reviewed wording, glossary below |
-| `.github/workflows/ci.yml` | modify | `i18n` job |
+| `.github/workflows/ci.yml` | modify | `i18n` job; `gettext` in the `ui` job (`crates/ui/build.rs` runs `msgfmt`) |
 | `.github/workflows/release.yml` | create | tag → three assets |
 | `crates/core/tests/companion/presets_flow.rs` | modify | SP10 follow-up: publish in the same turn |
 | `docs/hardware-checklist.md` | create | hand-run checklist |
@@ -176,6 +185,8 @@ the evidence.
 | 61 | SP8 | end-to-end lists are exact | None | informational |
 | 62 | SP8 | two outstanding Background portal requests | Issue | Task 16 issue L |
 | 63 | SP8 | SP14 owns `setlocale`/`bindtextdomain`; D-Bus error strings English | Fix / None | Task 13; error strings travel on the wire and the extension only logs them (`lib/failures.js`) |
+| 64 | SP10 | header buttons are icon-only; re-measure 360 px if labels are added | None | conditional on a future label |
+| 65 | SP5 + SP14 §5 | 300 ms readback has no measurement in the soak output | Fix | Task 15A, then checklist row A1 |
 
 Issue A (offline Flatpak sources and Flathub metadata) comes from Deviation 1, not from the list.
 
@@ -224,6 +235,9 @@ extension:
 | 13 | The hardware criteria of SP14 (300 ms readback, ruled app 1 s / 10 s, Bluetooth xruns) are written as checklist rows, not run | they need a person, a real session with a ruled app, and a Bluetooth-paired computer |
 | 14 | No screenshots in the metainfo | `appstreamcli validate` passes without them; Flathub is out of scope (issue A) |
 | 15 | The census test reads `po/pt_BR.po` with `include_str!` from `crates/core/tests` | dev-only; `arctis-core` keeps its dependency allow-list |
+| 16 | `crates/ui/build.rs` runs `msgfmt --xml -d ../../po` and bundles the merged metainfo in the GResource; `msgfmt` (gettext ≥ 0.19.7 with its built-in `metainfo.its`) becomes a build tool of `arctis-ui`, like `blueprint-compiler` | `AdwAboutDialog::from_appdata` shows the metainfo summary and release notes; the English template alone would leave them English under pt_BR |
+| 17 | SP14 adds a latency figure to SP5's hardware test support (`crates/hid/tests/hardware/soak_log.rs`) | the acceptance "verified readback within 300 ms" needs a number a person can read; the soak's log had only counts. No hidraw is opened by SP14: only the person runs the ignored test |
+| 18 | The installed app is started with `gapplication launch` (D-Bus activation through the exported service file), falling back to `flatpak run` | it is how the app grid starts a `DBusActivatable` app, and it does not depend on the agent shell's `WAYLAND_DISPLAY` |
 
 ---
 
@@ -418,16 +432,19 @@ second line); keep that assumption and let the new test confirm it.
 - [ ] **Step 4: Run the xtask tests and the repository check**
 
 Run (toolbox): `cargo test -p xtask --test check_doc_paths && cargo xtask check-doc-paths`
-Expected: PASS. If the repository check names an ADR "Code:" path that no longer exists, correct the ADR line to
-the current path (every path listed in the triage evidence exists on `origin/main`).
+Expected: the tests PASS; the repository check FAILS exactly once, on
+`docs/adr/0009-in-process-pipewire-dsp.md:21: \`crates/audio/src/outputs.rs\` does not exist` (checked on
+`origin/main`: every other ADR "Code:" path exists). In that line replace `` `crates/audio/src/outputs.rs` `` with
+`` `crates/audio/src/sinks.rs`, `crates/audio/src/insertion.rs` `` (sink classification and EQ insertion live there),
+then rerun: PASS.
 
 - [ ] **Step 5: Update ADR 0014 and commit**
 
-In `docs/adr/0014-xtask-enforces-rules.md` line 19 replace "ADR "Code:" lines join the check in SP14, once every
-cited path exists." with "ADR "Code:" lines are checked too.".
+`docs/adr/0014-xtask-enforces-rules.md` line 19 already says the ADR "Code:" lines are checked; delete its last
+sentence, "ADR "Code:" lines join the check in SP14, once every cited path exists.".
 
 ```bash
-git add xtask/src/check_doc_paths.rs xtask/tests/check_doc_paths.rs docs/adr/0014-xtask-enforces-rules.md
+git add xtask/src/check_doc_paths.rs xtask/tests/check_doc_paths.rs docs/adr/0014-xtask-enforces-rules.md docs/adr/0009-in-process-pipewire-dsp.md
 git commit -m "feat(xtask): check the Code lines of ADRs"
 git push
 ```
@@ -501,9 +518,15 @@ git push
 **Files:**
 - Create: `po/extract.sh`, `po/check.sh`, `po/LINGUAS`, `po/meson.build`
 - Create (generated): `po/arctis-companion.pot`, `po/pt_BR.po`
-- Modify: `meson.build`
+- Modify: `meson.build`, `data/meson.build`, `crates/app/tests/data_files.rs`, `crates/ui/build.rs`,
+  `crates/ui/resources/resources.gresource.xml`, `docs/architecture/README.md`, `docs/architecture/ui.md`
 
-- [ ] **Step 1: Write the check first**
+- [ ] **Step 1: Write the checks first**
+
+In `crates/app/tests/data_files.rs` change `SUFFIXES` to
+`[".desktop.in", ".metainfo.xml.in", ".gschema.xml", ".service.in"]`. Run (ui):
+`cargo test -p arctis-app --test data_files`. Expected: FAIL naming
+`data/io.github.marcelogm.ArctisCompanion.desktop.in`.
 
 `po/check.sh` (same shape as `extension/po/check.sh`):
 
@@ -592,7 +615,18 @@ if appstreamcli.found()
 endif
 ```
 
-Update the two paths in `docs/architecture/README.md` to the `.in` names so `check-doc-paths` stays green.
+The rename breaks two readers of the old names on `origin/main`; point them at the template:
+
+- `crates/ui/build.rs`: `const METAINFO: &str = "../../data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in";`
+- `crates/ui/resources/resources.gresource.xml`: the entry becomes
+  `<file alias="metainfo.xml">io.github.marcelogm.ArctisCompanion.metainfo.xml.in</file>` (Task 11A swaps it for
+  the merged file).
+
+Update the metainfo and desktop paths in `docs/architecture/README.md` and `docs/architecture/ui.md` (line 40) to
+the `.in` names so `check-doc-paths` stays green.
+
+Run (ui): `cargo test -p arctis-app --test data_files && cargo test -p arctis-ui --test widgets about_comes_from_the_metainfo`
+Expected: PASS.
 
 - [ ] **Step 4: Catalogue files and meson**
 
@@ -624,7 +658,7 @@ Generate the template and the empty pt_BR file:
 
 Run (toolbox): `sh po/extract.sh && msginit --no-translator --locale=pt_BR.UTF-8 --input=po/arctis-companion.pot --output-file=po/pt_BR.po`
 
-Confirm that the Blueprint and data strings are in: `grep -c '^msgid' po/arctis-companion.pot` is above 100 and
+Confirm that the Blueprint and data strings are in: `grep -c '^msgid' po/arctis-companion.pot` is above 50 (Blueprint and data only at this point) and
 `grep -n 'Permission Required\|Control your SteelSeries' po/arctis-companion.pot` prints both.
 
 - [ ] **Step 5: Run the check to see the remaining, expected failure**
@@ -638,7 +672,7 @@ Expected: PASS (an untranslated catalogue is still valid, and the merged files e
 - [ ] **Step 6: Commit**
 
 ```bash
-git add po meson.build data docs/architecture/README.md
+git add po meson.build data docs/architecture/README.md docs/architecture/ui.md crates/app/tests/data_files.rs crates/ui/build.rs crates/ui/resources/resources.gresource.xml
 git commit -m "build(i18n): add the po catalogue with extract and check scripts"
 git push
 ```
@@ -685,7 +719,13 @@ StatusPageModel::new(
 )
 
 built_in("bass-boost", msgid("Bass Boost"), BASS_BOOST),
+
+const REASON: &str =
+    msgid("Keep battery warnings, battery history and app presets working with the window closed");
 ```
+
+`xgettext` 0.26 extracts `msgid("…")` inside macro bodies (`vec![…]`, `assert_eq!(…)`) and in `const` items
+(checked in the toolbox), so no literal has to move out of a macro.
 
 In `crates/ui` and `crates/app` the import is `use arctis_core::l10n::msgid;`.
 
@@ -717,10 +757,8 @@ sentence or label shown to a user in that list gets `msgid()`; repeat until none
 
 - [ ] **Step 4: Full test run**
 
-Run (toolbox): `cargo clippy --workspace --all-targets -- -D warnings && cargo test -p arctis-core && cargo test -p arctis-ui -p arctis-app`
-(the last under the weston setup the UI tests already use locally: `/home/marcelo/Desenvolvimento/arctis-wt/uitest.sh`
-if present, else `weston --backend=headless --socket=wayland-sp14 &` with `WAYLAND_DISPLAY=wayland-sp14
-GDK_BACKEND=wayland GSK_RENDERER=cairo`).
+Run (toolbox): `cargo clippy --workspace --all-targets -- -D warnings && cargo test -p arctis-core`, then
+Run (ui): `cargo test -p arctis-ui -p arctis-app`.
 Expected: PASS.
 
 - [ ] **Step 5: Regenerate the template and commit**
@@ -1077,8 +1115,17 @@ fn census() -> BTreeSet<String> {
 }
 
 #[test]
-fn the_census_reaches_the_views() {
-    assert!(census().len() > 100, "{:#?}", census());
+fn the_census_reaches_every_family_of_views() {
+    let census = census();
+    for msgid in [
+        "Permission Required",
+        "No App Presets",
+        "Bass Boost",
+        "Off",
+        "Headset Battery Low",
+    ] {
+        assert!(census.contains(msgid), "{msgid} not reached: {census:#?}");
+    }
 }
 
 #[test]
@@ -1123,7 +1170,7 @@ of `msgid` and `msgid_plural`, so keep `{n}` in both pt_BR plural forms.
 - [ ] **Step 4: Run the census to see it fail**
 
 Run (toolbox): `cargo test -p arctis-core --test view catalogue`
-Expected: `the_census_reaches_the_views` PASS; `every_view_message_is_translated_to_pt_br` FAIL listing the
+Expected: `the_census_reaches_every_family_of_views` PASS; `every_view_message_is_translated_to_pt_br` FAIL listing the
 msgids (pt_BR is empty). Any listed msgid that is absent from `po/arctis-companion.pot` is an unmarked literal:
 go back to Task 5 Step 2 for it.
 
@@ -1339,8 +1386,10 @@ the meson `merge_file` wiring is already in place from Task 4.
 
 Run (toolbox):
 `meson setup /tmp/arctis-sp14-meson --wipe && meson test -C /tmp/arctis-sp14-meson validate-desktop validate-metainfo validate-schema && cargo test -p arctis-app --test packaging the_metainfo`
-Expected: PASS; `cargo test -p arctis-app --test packaging cargo_and` PASS too. `appstreamcli` must print
-"Validation was successful" with no warnings.
+Expected: PASS; `cargo test -p arctis-app --test packaging cargo_and` PASS too. Read
+`/tmp/arctis-sp14-meson/meson-logs/testlog.txt`: fix every `W:` or `E:` line from `appstreamcli`; `I:`/`P:` lines
+may stay. Run (ui): `cargo test -p arctis-ui --test widgets about_comes_from_the_metainfo` still PASS (the About
+dialog reads this file).
 
 - [ ] **Step 3: Regenerate the template, commit**
 
@@ -1494,6 +1543,80 @@ git commit -m "feat(i18n): complete the pt_BR translation"
 git push
 ```
 
+## Task 11A: Translated About dialog
+
+**Files:**
+- Modify: `crates/ui/tests/widgets/app_dialogs.rs`
+- Modify: `crates/ui/build.rs`, `crates/ui/resources/resources.gresource.xml`
+- Modify: `.github/workflows/ci.yml` (`ui` job installs `gettext`)
+
+`crates/ui/src/app_dialogs.rs::about_dialog` builds `AdwAboutDialog::from_appdata` from the GResource copy of the
+metainfo. Since Task 4 that copy is the English template, so the About dialog's summary and release notes would stay
+English under pt_BR.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `crates/ui/tests/widgets/app_dialogs.rs`:
+
+```rust
+#[gtk::test]
+fn the_bundled_metainfo_carries_pt_br() {
+    init();
+    let bytes = gtk::gio::resources_lookup_data(
+        "/io/github/marcelogm/ArctisCompanion/ui/metainfo.xml",
+        gtk::gio::ResourceLookupFlags::NONE,
+    )
+    .expect("the metainfo resource");
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("xml:lang=\"pt-BR\""), "{text}");
+}
+```
+
+Run (ui): `cargo test -p arctis-ui --test widgets the_bundled_metainfo_carries_pt_br`
+Expected: FAIL (the template has no `xml:lang`).
+
+- [ ] **Step 2: Merge the metainfo at build time**
+
+`crates/ui/build.rs`: keep `METAINFO` (the template), add `const PO_DIR: &str = "../../po";`, print
+`cargo::rerun-if-changed={PO_DIR}`, and before `compile_resources` call a new `merge_metainfo(&out_dir)?` that runs
+
+```rust
+fn merge_metainfo(out_dir: &Path) -> Result<(), Box<dyn Error>> {
+    let merged = out_dir.join("io.github.marcelogm.ArctisCompanion.metainfo.xml");
+    let status = Command::new("msgfmt")
+        .arg("--xml")
+        .arg(format!("--template={METAINFO}"))
+        .args(["-d", PO_DIR, "-o"])
+        .arg(merged)
+        .status()
+        .map_err(|error| format!("msgfmt: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("msgfmt --xml failed on the metainfo".into())
+    }
+}
+```
+
+In `crates/ui/resources/resources.gresource.xml` the entry goes back to
+`<file alias="metainfo.xml">io.github.marcelogm.ArctisCompanion.metainfo.xml</file>`; `compile_resources` searches
+`OUT_DIR` first, so it picks the merged file. `msgfmt` writes `xml:lang="pt-BR"` (checked with gettext 0.26 in the
+toolbox, whose own `metainfo.its` needs no `appstream` package). In `.github/workflows/ci.yml` add `gettext` to the
+`ui` job's `dnf install` list (`test` already has it; the GNOME 50 SDK ships `msgfmt`).
+
+- [ ] **Step 3: Run the tests**
+
+Run (ui): `cargo test -p arctis-ui --test widgets app_dialogs`
+Expected: PASS, `about_comes_from_the_metainfo` included.
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add crates/ui/build.rs crates/ui/resources/resources.gresource.xml crates/ui/tests/widgets/app_dialogs.rs .github/workflows/ci.yml
+git commit -m "feat(ui): translate the About dialog from the merged metainfo"
+git push
+```
+
 ## Task 12: Review the extension's pt_BR
 
 **Files:**
@@ -1548,7 +1671,9 @@ fn a_bare_name_has_no_prefix() {
 
 #[test]
 fn the_domain_is_the_meson_project_name() {
-    assert_eq!(GETTEXT_PACKAGE, "arctis-companion");
+    let meson = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../meson.build"))
+        .expect("meson.build");
+    assert!(meson.starts_with(&format!("project(\n  '{GETTEXT_PACKAGE}',")));
 }
 ```
 
@@ -1605,8 +1730,9 @@ first `Text` resolve in the user's language.
 
 - [ ] **Step 4: Run the tests**
 
-Run (toolbox): `cargo test -p arctis-app --test locale && cargo clippy -p arctis-app --all-targets -- -D warnings`
-Expected: PASS.
+Run (ui): `cargo test -p arctis-app --test locale --test application`, then Run (toolbox):
+`cargo clippy -p arctis-app --all-targets -- -D warnings`.
+Expected: PASS (`crates/app/tests/application.rs` still starts the application with `init` in place).
 
 - [ ] **Step 5: Commit**
 
@@ -1654,16 +1780,11 @@ git push
 
 - [ ] **Step 1: Write the tests**
 
+Reuse `crates/core/tests/companion/support.rs::published` (it returns the last `Action::Publish` of a turn as
+`Option<Rc<Snapshot>>`); add `published` to the existing `use crate::support::{…}` list instead of writing a second
+helper.
+
 ```rust
-use arctis_core::companion::Snapshot;
-
-fn published(actions: &[Action]) -> Option<&Snapshot> {
-    actions.iter().find_map(|action| match action {
-        Action::Publish(snapshot) => Some(snapshot.as_ref()),
-        _ => None,
-    })
-}
-
 #[test]
 fn saving_a_preset_publishes_it_in_the_same_turn() {
     let mut h = Harness::new(persisted());
@@ -1691,6 +1812,76 @@ call for `SavePreset`/`DeletePreset`, then rerun.
 ```bash
 git add crates/core/tests/companion/presets_flow.rs
 git commit -m "test(core): pin the snapshot published after saving or deleting a preset"
+git push
+```
+
+## Task 15A: The soak reports its slowest confirmed write
+
+**Files:**
+- Modify: `crates/hid/tests/hardware/soak_log_rules.rs`
+- Modify: `crates/hid/tests/hardware/soak_log.rs`, `crates/hid/tests/hardware/soak.rs`
+
+Checklist row A1 needs "edit → verified readback within 300 ms when not Rebinding" as a number. `SoakLog` already
+drops a write that a phase change interrupts (`enter` moves it to `interrupted`), so every confirmed write is one that
+did not cross a Rebinding. Only the request time is missing. These are pure tests of the log; nothing here opens
+hidraw.
+
+- [ ] **Step 1: Write the failing test**
+
+Append to `crates/hid/tests/hardware/soak_log_rules.rs`:
+
+```rust
+#[test]
+fn the_slowest_confirmation_is_measured_from_the_request() {
+    let mut log = log_after(vec![
+        DeviceUpdate::Phase(Phase::Ready),
+        DeviceUpdate::Observed(original()),
+    ]);
+    let first = log.toggle_request(Duration::from_millis(1_000)).expect("a toggle");
+    log.record(Duration::from_millis(1_120), DeviceUpdate::Observed(first));
+    let second = log.toggle_request(Duration::from_millis(2_000)).expect("a toggle");
+    log.record(Duration::from_millis(2_250), DeviceUpdate::Observed(second));
+    assert_eq!(log.slowest_confirmation(), Some(Duration::from_millis(250)));
+}
+
+#[test]
+fn an_interrupted_write_has_no_latency() {
+    let mut log = log_after(vec![
+        DeviceUpdate::Phase(Phase::Ready),
+        DeviceUpdate::Observed(original()),
+    ]);
+    let _ = log.toggle_request(Duration::from_millis(1_000));
+    log.record(Duration::from_millis(1_050), DeviceUpdate::Phase(Phase::Rebinding));
+    assert_eq!(log.slowest_confirmation(), None);
+}
+```
+
+Existing callers of `toggle_request()` / `restore_request()` in this file pass `Duration::ZERO`.
+
+Run (toolbox): `cargo test -p arctis-hid --test hardware soak_log`
+Expected: FAIL to compile (`toggle_request` takes no argument; no `slowest_confirmation`).
+
+- [ ] **Step 2: Implement**
+
+In `crates/hid/tests/hardware/soak_log.rs`: `toggle_request(&mut self, at: Duration)` and
+`restore_request(&mut self, at: Duration)` pass `at` to `request`, which stores `waiting_since: Option<Duration>`
+next to `waiting_for`; `observe` takes `at` (from `record`) and, when it confirms, pushes
+`at.saturating_sub(since)` into `pub confirmations: Vec<Duration>`; `enter` clears `waiting_since` with
+`waiting_for`; `pub fn slowest_confirmation(&self) -> Option<Duration>` is `self.confirmations.iter().max().copied()`.
+In `crates/hid/tests/hardware/soak.rs` pass `self.started.elapsed()` to both requests and add
+`slowest confirmation {:?}` (`log.slowest_confirmation()`) to the `soak:` summary line. Keep each function within
+the clippy limits.
+
+- [ ] **Step 3: Run the tests**
+
+Run (toolbox): `cargo test -p arctis-hid --test hardware && cargo clippy -p arctis-hid --all-targets -- -D warnings`
+Expected: PASS; the ignored hardware test is not run (no `ARCTIS_HW`, no `--ignored`).
+
+- [ ] **Step 4: Commit**
+
+```bash
+git add crates/hid/tests/hardware
+git commit -m "test(hid): report the slowest confirmed write of the soak"
 git push
 ```
 
@@ -1748,11 +1939,10 @@ it ticks a box. Rows:
   H14 is the SP5 soak with the headset on: `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored
   --nocapture`, passes when the `soak:` line shows writes requested = confirmed and failed 0.
 - **A — SP14 acceptance on hardware:**
-  A1 2.4 GHz edit latency: headset on, Ready, not Rebinding (no fwupd rebind in the last second, `journalctl -k`):
-  run H14's `hardware` test, which drives the real `crates/hid/src/worker.rs::Worker` and confirms each sidetone
-  write by an `Observed` readback; passes when every write is confirmed within 300 ms of the request. If the
-  `soak:` output does not print per-write times, record "not measurable yet" and open an issue to add them rather
-  than ticking the row.
+  A1 2.4 GHz edit latency: headset on: run H14's `hardware` test, which drives the real
+  `crates/hid/src/worker.rs::Worker` and confirms each sidetone write by an `Observed` readback (writes that cross a
+  Rebinding are counted as interrupted, not timed); passes when the `soak:` line's "slowest confirmation" (Task 15A)
+  is at most 300 ms.
   A2 ruled app: add a rule for a player (e.g. `org.gnome.Totem` or `firefox`) with a non-current preset, start
   playback: the preset row changes after 1 s; stop: it returns 10 s later (stopwatch or the debug log timestamps).
   A3 Bluetooth system engine: on a Bluetooth-paired computer, play audio through "Arctis Nova 5 (Equalizer)" for 30
@@ -1769,19 +1959,21 @@ it ticks a box. Rows:
   connected, NN %"; log out and in: the app starts in the background.
   F5 low battery: below the threshold a notification appears; clicking it opens the battery page; charging
   withdraws it.
-  F6 pt_BR: `LANGUAGE=pt_BR flatpak run io.github.marcelogm.ArctisCompanion`: every page in Portuguese, numbers
-  with a decimal comma, nothing truncated at 360 px wide.
+  F6 pt_BR: if `flatpak info --user io.github.marcelogm.ArctisCompanion.Locale` does not list `pt`, run
+  `flatpak config --user --set extra-languages pt_BR && flatpak update --user`; then quit the running instance and
+  start `LANG=pt_BR.UTF-8 LANGUAGE=pt_BR flatpak run io.github.marcelogm.ArctisCompanion`: every page, dialog, toast
+  and the About dialog in Portuguese, numbers with a decimal comma, nothing truncated at 360 px wide.
 - **U — UI by hand (SP10):** U3 export a preset as JSON and as APO text, import both back and a published AutoEQ
   file; U4 open the Rename and the Details dialogs and use them with the keyboard only.
 - **B — Bluetooth audio (SP7):** B1 the Nova 5 bluez node properties (`pw-dump`) match the matcher in
-  `crates/audio/src/outputs.rs`; B2 with the Flatpak app running, switch the default output between the Nova 5
+  `crates/audio/src/sinks.rs::sink_kind` (`device.api` `bluez5`, description "Arctis Nova 5"); B2 with the Flatpak app running, switch the default output between the Nova 5
   Bluetooth sink and speakers several times: the EQ sink is inserted and removed each time and the previous default
   comes back; B3 inside the Flatpak, if WirePlumber denies the Manager role, the warning row "Choose “Arctis Nova 5
   (Equalizer)” as output in Sound settings" appears.
 - **E — Shell extension (SP13 devkit table):** in `extension/`, `npm run devkit -- <scenario>` for each scenario,
   one row each: connected, low-battery, charging, app-rule, manual-pick, no-rules, connecting, absent, with the
-  "Expect" column copied from PR #4's comment (toggle "App Presets" checked, subtitle "Flat", header "Arctis Nova 5"
-  / "73 %", three presets, Flat checked, no panel icon; …). E9: enable the installed extension yourself in the
+  "Expect" column copied verbatim from PR #4's comment (Run (host): `gh pr view 4 --comments`; scenario names as
+  `extension/tests/nested-shell.sh` accepts them). E9: enable the installed extension yourself in the
   Extensions app; the toggle appears while the Flatpak app runs and hides when it quits.
 
 - [ ] **Step 2: Check it renders and passes the rules**
@@ -1817,8 +2009,10 @@ Sections, each a mermaid diagram plus a table of backticked paths and symbols (a
 2. **Translations** — flowchart: sources (`crates/core/src/l10n.rs::msgid`, `crates/core/src/l10n.rs::forms`,
    Blueprint `_()`, desktop, metainfo) → `po/extract.sh` → `po/arctis-companion.pot` → `po/pt_BR.po` →
    `po/check.sh` (CI `i18n` job) and `crates/core/tests/view/catalogue.rs` (census); runtime sequence:
-   `crates/app/src/locale.rs::init` → `gettextrs::textdomain` → `crates/ui/src/text.rs::resolve`. The extension's
-   own domain: `extension/po/extract.sh`, `extension/po/pt_BR.po`.
+   `crates/app/src/locale.rs::init` → `gettextrs::textdomain` → `crates/ui/src/text.rs::resolve`. The About dialog's
+   metainfo is merged by `crates/ui/build.rs` (`msgfmt --xml`) into the GResource read by
+   `crates/ui/src/app_dialogs.rs::about_dialog`. The extension's own domain: `extension/po/extract.sh`,
+   `extension/po/pt_BR.po`.
 3. **Release** — flowchart of `.github/workflows/release.yml`: tag `v*` → `version`, `flatpak`, `extension` →
    `publish` (`gh release create` with the bundle, the zip and `data/udev/70-arctis-companion.rules`); pull
    requests touching the workflow run the build jobs only. Pinned by `crates/app/tests/packaging.rs`.
@@ -1850,7 +2044,8 @@ git push
 - [ ] **Step 1: Full local test run**
 
 Run (toolbox): `cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui --exclude arctis-app && sh po/check.sh && cd extension && npx eslint . && npm test && npm run check-po`
-and the UI/app tests under headless weston (Task 5 Step 4).
+plus `cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure`, and Run (ui):
+`cargo test -p arctis-ui -p arctis-app`.
 Expected: PASS.
 
 - [ ] **Step 2: Build and install**
@@ -1869,7 +2064,9 @@ Expected: ends with the app installed; the meson tests inside the build (`run-te
 desktop-file-validate, appstreamcli, `glib-compile-schemas --strict` and `msgfmt --check` in the GNOME 50 SDK.
 Then: `flatpak info --user --show-permissions io.github.marcelogm.ArctisCompanion` lists `devices=all;` and
 `filesystems=xdg-run/pipewire-0;`, and `flatpak list --user | grep ArctisCompanion` shows the app (and its
-`.Locale` extension when the user's languages include pt).
+`.Locale` extension when the user's languages include pt). The catalogue was built and split into the Locale
+extension: `find /home/marcelo/.cache/arctis-flatpak/build/files/share/runtime/locale -name arctis-companion.mo`
+prints a `pt/share/pt_BR/LC_MESSAGES/arctis-companion.mo` path.
 
 - [ ] **Step 3: Stop a running preview instance by PID**
 
@@ -1889,17 +2086,30 @@ Never kill any other PID. Wait until `gdbus call --session --dest org.freedeskto
 
 - [ ] **Step 4: Launch from the Flatpak and verify**
 
-Run (host, in the background): `flatpak run io.github.marcelogm.ArctisCompanion > /home/marcelo/.cache/arctis-flatpak/run.log 2>&1`
-Then:
+First make sure nothing outside the Flatpak can win the D-Bus activation: `ls
+~/.local/share/dbus-1/services/io.github.marcelogm.ArctisCompanion.service
+~/.local/share/applications/io.github.marcelogm.ArctisCompanion.desktop` must report both missing (none existed on
+2026-10-12). If one exists, do not delete it: record it in the "Local install" section and in the final report,
+since it would start the preview instead of the Flatpak.
+
+Run (host): `date --iso-8601=seconds > /home/marcelo/.cache/arctis-flatpak/launched-at && gapplication launch io.github.marcelogm.ArctisCompanion`
+(D-Bus activation through the exported service file, as the app grid does). If it fails with "not found" or
+`ServiceUnknown`, fall back to Run (host, in the background):
+`flatpak run io.github.marcelogm.ArctisCompanion > /home/marcelo/.cache/arctis-flatpak/run.log 2>&1`.
+Then, after a few seconds:
 - `flatpak ps --columns=application,pid` lists the app;
 - `gdbus introspect --session --dest io.github.marcelogm.ArctisCompanion --object-path /io/github/marcelogm/ArctisCompanion | grep io.github.marcelogm.ArctisCompanion.Headset1` prints the interface;
-- `gdbus call --session --dest io.github.marcelogm.ArctisCompanion --object-path /io/github/marcelogm/ArctisCompanion --method org.freedesktop.DBus.Properties.Get io.github.marcelogm.ArctisCompanion.Headset1 State` returns a state other than `absent` and `permission-denied` (the host's existing rule grants hidraw);
-- `run.log` contains no `CRITICAL`.
+- `gdbus call --session --dest io.github.marcelogm.ArctisCompanion --object-path /io/github/marcelogm/ArctisCompanion --method org.freedesktop.DBus.Properties.Get io.github.marcelogm.ArctisCompanion.Headset1 State` returns a state other than `absent` and `permission-denied` (the host's existing rule grants hidraw; `connecting`
+may show for a few seconds, so poll up to 30 s);
+- the same call for `Route` returns `dongle` while the dongle's USB sink is the default output (PipeWire reached
+  through `xdg-run/pipewire-0`); any other value is recorded with `pactl get-default-sink`, not treated as a failure;
+- no `CRITICAL` in `run.log`, or, after `gapplication launch`, in
+  `journalctl --user --since "$(cat /home/marcelo/.cache/arctis-flatpak/launched-at)" | grep -i arctis`.
 Leave the app running; it is the user's real instance now.
 
 - [ ] **Step 5: Install the extension (do not enable)**
 
-Run (toolbox): `cd extension && npm ci && npm run pack`
+Run (toolbox): `cd extension && npm ci && npm run pack` (`gnome-extensions` and `msgfmt` are in the toolbox).
 Run (host): `gnome-extensions install --force /home/marcelo/Desenvolvimento/arctis-wt/sp14/extension/dist/arctis-companion@marcelogm.github.io.shell-extension.zip`
 Expected: `gnome-extensions info arctis-companion@marcelogm.github.io` shows the extension; its enabled state is
 whatever it was before.
@@ -1965,8 +2175,12 @@ then `git -C /home/marcelo/Desenvolvimento/arctis-companion branch -D sp14-packa
 
 - Every SP14 acceptance criterion maps to a task (table at the top); the hardware criteria are checklist rows by
   design (Deviation 13).
-- Tests precede code in Tasks 1, 2, 3, 6, 7, 13 and 15; Tasks 4, 9, 10, 11, 14 are driven by `po/check.sh`, the
+- Tests precede code in Tasks 1, 2, 3, 4 (`data_files.rs`), 6, 7, 11A, 13 and 15A; Task 15 is a characterization
+  pin (it passes on arrival unless the SP10 gap is real); Tasks 4, 9, 10, 11, 14 are driven by `po/check.sh`, the
   census and `crates/app/tests/packaging.rs`, which are written red first.
+- Renaming the desktop entry and metainfo to `.in` templates is followed into every reader on `origin/main`:
+  `crates/ui/build.rs`, `crates/ui/resources/resources.gresource.xml`, `crates/app/tests/data_files.rs`,
+  `docs/architecture/README.md`, `docs/architecture/ui.md`.
 - Names used across tasks: `arctis_core::l10n::{msgid, forms}` (Task 3, used in 5, 18), `po/extract.sh` /
   `po/check.sh` (4, 11, 14, 18), `crates/app/src/locale.rs::{init, locale_dir_beside, GETTEXT_PACKAGE}` (13, 18),
   `crates/app/tests/packaging.rs` (7–10, 18), `.github/workflows/release.yml` (7, 10, 18, 21).
