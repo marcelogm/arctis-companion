@@ -65,6 +65,25 @@ fn a_member_leaves_after_ten_seconds_of_silence() {
 }
 
 #[test]
+fn silence_seen_again_keeps_the_first_leave_deadline() {
+    let mut set = joined(&[candidate("firefox", "footsteps")], T);
+    let silent = T.after(2_000);
+    set.observe(&[], silent);
+    set.observe(&[], silent.after(5_000));
+    assert_eq!(set.next_deadline(), Some(silent.after(RULE_LEAVE)));
+    assert!(set.advance(silent.after(RULE_LEAVE)));
+    assert_eq!(set.next_deadline(), None);
+}
+
+#[test]
+fn clearing_reports_whether_members_were_dropped() {
+    let mut set = joined(&[candidate("firefox", "footsteps")], T);
+    assert!(set.clear());
+    assert!(set.is_empty());
+    assert!(!set.clear());
+}
+
+#[test]
 fn pausing_and_resuming_within_ten_seconds_changes_nothing() {
     let firefox = [candidate("firefox", "footsteps")];
     let mut set = joined(&firefox, T);

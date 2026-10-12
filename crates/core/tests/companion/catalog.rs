@@ -1,4 +1,4 @@
-use arctis_core::companion::catalog::Catalog;
+use arctis_core::companion::catalog::{Catalog, fresh_id};
 use arctis_core::eq::library;
 
 use crate::support::{curve_of, custom, id, unique_curve};
@@ -76,4 +76,13 @@ fn fresh_ids_are_slugs_with_a_free_suffix() {
     for (catalog, name, expected) in cases {
         assert_eq!(catalog.fresh_id(name), id(expected), "{name}");
     }
+}
+
+#[test]
+fn a_fresh_id_skips_every_taken_suffix() {
+    let taken = [
+        custom("mine", unique_curve()),
+        custom("mine-2", unique_curve()),
+    ];
+    assert_eq!(fresh_id(&taken, "Mine"), id("mine-3"));
 }
