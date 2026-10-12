@@ -12,6 +12,14 @@ pub fn quoted(name: &str) -> String {
     format!("{{\"name\":\"{name}\"}}")
 }
 
+pub struct FilterNodes<'a> {
+    pub sink: ObjectId,
+    pub output: ObjectId,
+    pub name: &'a str,
+    pub output_name: &'a str,
+    pub group: &'a str,
+}
+
 pub struct Scene {
     graph: Graph,
     next_link: ObjectId,
@@ -36,6 +44,18 @@ impl Scene {
         self.node(id, &[("media.class", "Audio/Sink"), ("node.name", name)])
     }
 
+    pub fn bluez(self, id: ObjectId) -> Self {
+        self.node(
+            id,
+            &[
+                ("media.class", "Audio/Sink"),
+                ("node.name", BLUEZ),
+                ("node.description", "Arctis Nova 5"),
+                ("device.api", "bluez5"),
+            ],
+        )
+    }
+
     pub fn usb(mut self, id: ObjectId, device: ObjectId, product: &str) -> Self {
         let device_id = device.to_string();
         self.graph.put_device(
@@ -57,6 +77,25 @@ impl Scene {
 
     pub fn speakers(self, id: ObjectId) -> Self {
         self.sink(id, SPEAKERS)
+    }
+
+    pub fn filter(self, nodes: &FilterNodes) -> Self {
+        self.node(
+            nodes.sink,
+            &[
+                ("media.class", "Audio/Sink"),
+                ("node.name", nodes.name),
+                ("node.link-group", nodes.group),
+            ],
+        )
+        .node(
+            nodes.output,
+            &[
+                ("media.class", "Stream/Output/Audio"),
+                ("node.name", nodes.output_name),
+                ("node.link-group", nodes.group),
+            ],
+        )
     }
 
     pub fn stream(self, id: ObjectId, pairs: &[(&str, &str)]) -> Self {
