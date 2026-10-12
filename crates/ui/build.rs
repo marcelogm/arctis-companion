@@ -4,12 +4,19 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+const METAINFO: &str = "../../data/io.github.marcelogm.ArctisCompanion.metainfo.xml";
+
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed=resources");
+    println!("cargo::rerun-if-changed={METAINFO}");
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     compile_blueprints(&out_dir)?;
     glib_build_tools::compile_resources(
-        &[out_dir.as_path(), Path::new("resources")],
+        &[
+            out_dir.as_path(),
+            Path::new("resources"),
+            Path::new("../../data"),
+        ],
         "resources/resources.gresource.xml",
         "arctis-ui.gresource",
     );
