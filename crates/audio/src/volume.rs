@@ -9,8 +9,8 @@ use spa::sys::{
     SPA_PROP_softVolumes, SPA_TYPE_OBJECT_Props,
 };
 
-const CHANNEL_VOLUMES: u32 = SPA_PROP_channelVolumes;
-const MUTE: u32 = SPA_PROP_mute;
+pub const CHANNEL_VOLUMES: u32 = SPA_PROP_channelVolumes;
+pub const MUTE: u32 = SPA_PROP_mute;
 pub const SOFT_VOLUMES: u32 = SPA_PROP_softVolumes;
 pub const SOFT_MUTE: u32 = SPA_PROP_softMute;
 
