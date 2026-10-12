@@ -8,6 +8,7 @@ pub mod intents;
 mod scale_row;
 mod status_pages;
 pub mod text;
+mod toasts;
 pub mod widget_values;
 mod window;
 
@@ -16,6 +17,7 @@ pub use headset_page::HeadsetPage;
 pub use headset_status::HeadsetStatus;
 pub use scale_row::ScaleRow;
 pub use status_pages::StatusView;
+pub use toasts::ToastFeed;
 pub use window::Window;
 
 pub fn register_resources() -> Result<(), gtk::glib::Error> {
