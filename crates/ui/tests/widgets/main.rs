@@ -1,10 +1,12 @@
 mod support;
 
+mod accessibility;
 mod app_dialogs;
 mod equalizer_group;
 mod headset_page;
 mod headset_status;
 mod intents;
+mod layout;
 mod permission_dialog;
 mod preferences_dialog;
 mod scale_row;

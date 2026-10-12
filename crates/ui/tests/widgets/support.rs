@@ -7,6 +7,7 @@ use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
 
+use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::intent::Intent;
 use arctis_ui::intents::IntentSink;
 
@@ -86,4 +87,24 @@ pub fn rendered_window(snapshot: Snapshot) -> (Window, Log) {
     window.connect_intent(move |intent| writer.borrow_mut().push(intent));
     window.render(&Rc::new(snapshot));
     (window, log)
+}
+
+pub fn shown(widget: &gtk::Widget) -> bool {
+    (is_toplevel(widget) || widget.get_visible() && widget.is_child_visible())
+        && widget.parent().is_none_or(|parent| shown(&parent))
+}
+
+fn is_toplevel(widget: &gtk::Widget) -> bool {
+    widget.is::<gtk::Window>() || widget.is::<adw::Dialog>()
+}
+
+pub fn rich_snapshot() -> Snapshot {
+    let mut s = arctis_core::testkit::snapshots::snapshot();
+    s.audio.bluetooth_sink_seen = true;
+    s.audio.manager_denied = true;
+    s.presets.active.dongle = ActivePreset {
+        preset: arctis_core::testkit::snapshots::id("footsteps"),
+        reason: PresetReason::App("Firefox".to_owned()),
+    };
+    s
 }
