@@ -25,9 +25,12 @@ Spec: `docs/superpowers/specs/2026-10-11-arctis-companion-design.md` §2, §3, �
 
 Every code block below was compiled, linted and tested in a scratch copy of `origin/main` (`b7f88d1`) inside the
 toolbox on 2026-10-12, including the headless suite run three times in a row; Deviations 12, 15 and 17 record what
-that prototype taught. The plan review added Deviations 21 to 24 after the prototype; the code they change (marked
-"review addition" in its step) has not been compiled yet. If one of those snippets does not compile or trips
-clippy, fix the names or split the function, keeping the behaviour its test asserts.
+that prototype taught. The first plan review added Deviations 21 to 24. The second review ran Tasks 8 to 11 as
+written and found that the first review's volume copy (Deviation 22) hung PipeWire on every insertion (see the
+warning in Task 8); it replaced that code and added Tasks 9a and 9b and Deviations 25 to 27. All code of Tasks 8 to
+11, 9a and 9b, as it now stands, passed clippy, `check-rules` and the headless suite three times in a row in a
+scratch copy of the branch on 2026-10-12. If a snippet still trips clippy, fix the names or split the function,
+keeping the behaviour its test asserts.
 
 ---
 
@@ -48,9 +51,14 @@ clippy, fix the names or split the function, keeping the behaviour its test asse
   `crates/audio/tests/headless/run.sh`, which gives PipeWire, WirePlumber, D-Bus and every client a private
   `XDG_RUNTIME_DIR`, config, state and data dir. The tests refuse to run without `ARCTIS_HEADLESS_PIPEWIRE=1`, which
   only that script sets.
+- Never stop a process by name (`pkill`, `killall`, `pkill -f`): the toolbox shares the host's PID namespace, so a
+  name also matches the user's live `pipewire` and `wireplumber`. Stop only a PID the test or script started itself.
+- A headless run that hangs is a bug, not a slow machine: every wait in the suite gives up after 5 to 10 s. Wrap
+  manual runs in `timeout 300`, and do not add debug calls to `pw-dump`, `pw-cli` or `pw-metadata` inside a waiting
+  loop: when the graph is stuck they block forever too.
 - Before each commit: `cargo fmt --all`, then Run (toolbox):
   `cargo clippy -p arctis-audio --all-targets -- -D warnings && cargo test -p arctis-audio && cargo xtask check-rules`.
-  From Task 8 on, also Run (toolbox): `crates/audio/tests/headless/run.sh`.
+  From Task 8 on, also Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh`.
 - Commit subjects are conventional (`type(scope): summary`), short. Never write `Co-Authored-By`,
   "Generated with", or any AI or tool name in a commit message, PR title or PR body. Never use `--no-verify`.
 - Push after every commit: `git push -u origin sp7-audio-adapter` the first time, then `git push`.
@@ -78,7 +86,10 @@ clippy, fix the names or split the function, keeping the behaviour its test asse
 | `AudioCommand` contract: `InsertEqualizer`, `Retarget`, `RemoveEqualizer` | 3 (rules), 8, 11 (`Retarget` audible) |
 | RT safety: coefficients through `triple_buffer`, nothing allocated on the RT path | 7 |
 | `#![forbid(unsafe_code)]` kept (two `pw_stream`s, SP0 §6.3) | every task |
-| Manager role from the core properties; ManagerDenied by reading back | 3 (rule), 8 (`media.category`, `ConfirmManager`) |
+| Manager role from the core properties; ManagerDenied by reading back | 3 (rule), 8 (`media.category`, `ConfirmManager`), 9a (`the_adapter_connects_as_a_manager`) |
+| A default that is not the Nova 5 bluez node is never changed (audio §2) | 3 (`insertion_target`), 9a (`inserting_over_another_default_changes_nothing`) |
+| PipeWire lost and back: `Unavailable`, then `Available` after a reconnect (design §3.1 lifecycle, Deviation 13) | 9a (`crates/audio/tests/reconnect.rs`) |
+| Coefficients redesigned for the negotiated rate (Deviation 16) | 9b (`crates/audio/src/designer.rs`) |
 | `docs/architecture/audio.md` (sub-project rule, design §5) | 13 |
 
 ## File structure
@@ -94,16 +105,18 @@ crates/audio/src/
   changes.rs        Published: AudioEvents only on change (pure)
   volume.rs         VolumeChange, Volume, VolumeMirror, Props pods (pure over libspa pods)
   samples.rs        Processor: f32 bytes through core::eq::Equalizer, coefficients from triple_buffer (pure)
+  designer.rs       Designer: curve and negotiated rate → coefficients into triple_buffer; rate_of (pure, Task 9b)
   registry.rs       Registry: PipeWire registry, node, device, client and metadata listeners into the Graph
-  eq_sink.rs        EqSink: capture Audio/Sink + playback stream, RT callbacks, keep_unity
+  eq_sink.rs        EqSink, Replaced: capture Audio/Sink + playback stream, RT callbacks, start_at, keep_unity
   system_engine.rs  SystemEngine: insert, retarget, remove, volume forwarding, manager_denied
   worker.rs         audio thread: pw main loop, Message dispatch, connect/reconnect, Available/Unavailable, shutdown
   handle.rs         AudioHandle::spawn, AudioCommands, Drop
 crates/audio/tests/
   init.rs                     (exists, unchanged)
-  pure/main.rs support.rs graph.rs links.rs outputs.rs streams.rs changes.rs volume.rs samples.rs
+  pure/main.rs support.rs graph.rs links.rs outputs.rs streams.rs changes.rs volume.rs samples.rs designer.rs
   samples_allocations.rs      counting allocator around Processor::run
   unreachable.rs              #[ignore]: no PipeWire → Unavailable, prompt quit
+  reconnect.rs                #[ignore]: PipeWire started and stopped by the test → Available, Unavailable
   headless/run.sh session.sh pipewire.conf wireplumber.conf
   headless/main.rs lab.rs tools.rs tone.rs equalizer.rs volume.rs streams.rs gain.rs   (#[ignore])
 .github/workflows/ci.yml       + audio-integration job
@@ -118,7 +131,7 @@ prototype showed:
 
 | # | Decision | Why |
 |---|---|---|
-| 1 | New modules outside the spec's tree: `graph.rs`, `changes.rs`, `samples.rs`, `system_engine.rs`; `registry.rs` only binds PipeWire objects into `graph.rs`. `raw_filter.rs` is not created | the pure model, the change filter and the byte processing are testable without PipeWire; SP0 §6.3 chose two `pw_stream`s, so no `unsafe` |
+| 1 | New modules outside the spec's tree: `graph.rs`, `changes.rs`, `samples.rs`, `designer.rs`, `system_engine.rs`; `registry.rs` only binds PipeWire objects into `graph.rs`. `raw_filter.rs` is not created | the pure model, the change filter and the byte processing are testable without PipeWire; SP0 §6.3 chose two `pw_stream`s, so no `unsafe` |
 | 2 | `crates/audio` also depends on `async-channel` (design §2 names it for thread messages) and enables `pipewire` feature `v1_2_0` (for `Stream::trigger_process`); dev-dependencies `serde_json` and `allocation-counter` | the design §3 table lists only core, `pipewire`, `triple_buffer`; the GNOME 50 runtime ships PipeWire ≥ 1.4 |
 | 3 | `AudioHandle::spawn() -> io::Result<AudioHandle>` with `commands: AudioCommands` (`send(AudioCommand) -> bool`, wrapping a `pipewire::channel::Sender` so a command wakes the PipeWire loop) and `events: async_channel::Receiver<AudioEvent>`; `Drop` sends `Quit` and joins the thread | design §3.1 writes `Sender<AudioCommand>`; the PipeWire loop can only be woken by its own channel |
 | 4 | A chain hop is one PipeWire link; moving between the two nodes of one filter (sink and output stream sharing `node.link-group`) is free. More than `MAX_HOPS` (4) links, a loop, or an end away from an `Audio/Sink` gives no chain. Links into `Stream/Input/Audio` (monitor recorders) are not followed | audio §1 "at most 4 hops through filter nodes"; a loopback is one filter, not two hops |
@@ -127,7 +140,7 @@ prototype showed:
 | 7 | `sink_kind` only classifies `Audio/Sink` nodes; a sink's Device must have vendor `0x1038` and a PID that `Model::lookup` calls `Supported` | the Nova 5 microphones share the Device and the bluez properties |
 | 8 | No default, a vanished default or no chain gives `DefaultSink { terminal: Other, via_equalizer: false, via_easy_effects: false }`; EasyEffects is any node named `ee_*` in the chain | `DefaultSink` has no "unknown"; routing to `None` is SP6's (audio §1) |
 | 9 | ManagerDenied: after writing `default.configured.audio.sink`, the worker checks again `MANAGER_CONFIRM_AFTER` (1 s) later; it is denied when the configured default is not our sink and the current default is still the bluez node it replaced | hardware-findings §6.2, §9: a denied write is silent and the metadata lives in WirePlumber, so a core sync cannot confirm it; a user who moved away meanwhile is not a denial |
-| 10 | Headless tests connect as a native host client, which always gets the Manager permissions, so the denial path is covered by the `outputs.rs` tables only; the Flatpak case joins SP14's checklist | SP0 §6.2 shows only a Flatpak client is denied |
+| 10 | Headless tests connect as a native host client, which always gets the Manager permissions, so the denial path is covered by the `outputs.rs` tables only; the Flatpak case joins SP14's checklist. What the headless suite does check is the request itself: our client object carries `media.category = Manager` (Task 9a) | SP0 §6.2 shows only a Flatpak client is denied, and that a category set anywhere but the core properties never reaches the client object |
 | 11 | Removal restores the bluez node when either `default.audio.sink` or `default.configured.audio.sink` names our sink, by writing `default.configured.audio.sink`; `Retarget` and `RemoveEqualizer` without an insertion do nothing; `InsertEqualizer` while inserted retargets; `InsertEqualizer` over any default other than the bluez node itself does nothing | audio §2 "Removal"; SP0 note: restore the configured key explicitly |
 | 12 | Node, Device and Client props are replaced only when the info event's change mask has `PROPS` | prototype: later info events carry an empty dict, which erased every node's props |
 | 13 | `Available` is sent after the registry settles (a second core sync after the first `done`), so the first `DefaultSink` is never a half-bound graph; `Unavailable` once per transition on connect failure or core error; reconnect every `RECONNECT_AFTER` (2 s); delayed messages (`Retry`, `ConfirmManager`, the shutdown `Quit`) are posted by a short sleeper thread | PipeWire timers borrow the loop, which cannot outlive one session |
@@ -139,9 +152,12 @@ prototype showed:
 | 19 | The gain check is relative to Flat (same stream, same sinks): expected = `response(curve, [1000])` + `preamp_db_at(curve, 48000)`, tolerance ±0.5 dB, with a two-peak curve (1 kHz +6 dB Q 2, 100 Hz +9 dB Q 1) so the preamp is not trivially the 1 kHz gain | cancels stream and sink gains the test does not control |
 | 20 | `--filesystem=xdg-run/pipewire-0` and the other final finish-args stay with SP14's manifest | SP7's checks run in the container job, not in the Flatpak |
 | 21 | Nodes enter the `Graph` on their first `info` event (whose change mask always has `PROPS`), never from the registry global's props; links still come from global props | audio §4 "classified after its info event", design §3.1 "info waits": global props are a filtered subset without `application.*`, so a stream published from them would carry partial identifiers |
-| 22 | The registry subscribes to each node's `Props` param and keeps its last `channelVolumes` and `mute` in the `Graph`. On insertion the system engine copies the bluez node's volume onto our sink through our sink's node proxy (once the registry has bound it), which runs the same `param_changed` path as any other volume change: `keep_unity`, then a forward of the same volume back to the bluez node, a no-op. With no known bluez volume nothing is copied | audio §2 mirrors our sink's volume to the bluez node; a new sink starts at 1.0, so without the copy GNOME's slider would show 100 % and the first slider step or media key would jump the headset to almost full volume |
+| 22 | The registry subscribes to each node's `Props` param and keeps its last `channelVolumes` and `mute` in the `Graph`. On insertion the system engine reads the bluez node's volume from the `Graph` and hands it to the EQ sink as `Replaced::volume`. The EQ sink applies it to itself with `Stream::set_control` (`channelVolumes`, `mute`, then `keep_unity`) on its capture stream's first `Props` report, and never forwards that first report. Our own node's volume is never set through a `pw_node` proxy | audio §2 mirrors our sink's volume to the bluez node; a new sink starts at 1.0, so without the copy GNOME's slider would show 100 % and the first step would jump the headset to almost full volume. The first `Props` report carries that default 1.0, and forwarding it set the headset to full volume on every insertion. A `set_param` on a node our own client exports deadlocks PipeWire: the server marks our client busy, stops reading its socket and waits for the pong only that socket can carry (found in review 2: the whole graph hung, `pw-dump` included) |
 | 23 | Tasks 10 and 11 are acceptance scenarios over behaviour Tasks 4, 7 and 8 drove test-first; each gets a "see it fail once" step with a temporary mutation that is reverted with `git checkout` | TDD needs every test seen failing; the mutation proves the scenario can fail |
 | 24 | A `default.configured.audio.sink` that still names our sink after a crash is left to WirePlumber's fallback; the adapter does not rewrite it on start | SP0 §6.3: WirePlumber falls back to the bluez node, so the stale value is harmless, and the replaced node is not known after a restart |
+| 25 | The volume mirror runs one way, our sink → bluez node. A volume change made on the bluez node itself (the headset's dial over AVRCP, or another app) is not copied back onto our sink's slider while inserted | audio §2 names only that direction; copying back risks a feedback loop between two nodes. SP14's Bluetooth checklist records how the dial behaves |
+| 26 | `crates/audio/tests/reconnect.rs` starts its own `pipewire` (no WirePlumber) as a child process before `session.sh` starts the shared one, and stops it by its PID | the only way to see the reconnect path; `Available` needs only the registry, and a PID the test spawned can never be the user's daemon |
+| 27 | The coefficient designer and the `Format` rate parser move out of `eq_sink.rs` into the pure `designer.rs` (Task 9b) | the rate redesign of Deviation 16 had no test: the headless graph always runs at 48 kHz |
 
 ---
 
@@ -2364,10 +2380,17 @@ The PipeWire shell, built against a private PipeWire: the registry mirror, the E
 audio thread and the handle. The scenarios are written first and fail because `arctis_audio::AudioHandle` does not
 exist yet.
 
+> **Review 2 correction.** The first review's version of Steps 5 to 8 copied the bluez volume onto our sink with
+> `Registry::set_node_props(EQ_SINK_NAME, …)` from `SystemEngine::apply_seed`. That `set_param` targets a node our
+> own client exports, so PipeWire marked our client busy and waited for a pong it no longer read: every insertion
+> froze the graph, `lab.insert` timed out, and `pw-dump`, `pw-cli` and `pw-metadata` blocked forever. If your
+> working copy has `seed`, `apply_seed` or a `bool`-returning `set_node_props`, replace them with the code below
+> (Deviation 22); the scenarios do not change.
+
 **Files:**
 - Create: `crates/audio/src/registry.rs`, `crates/audio/src/eq_sink.rs`, `crates/audio/src/system_engine.rs`,
   `crates/audio/src/worker.rs`, `crates/audio/src/handle.rs`
-- Modify: `crates/audio/Cargo.toml`, `crates/audio/src/lib.rs`
+- Modify: `crates/audio/Cargo.toml`, `crates/audio/src/lib.rs`, `crates/audio/src/volume.rs`
 - Test: `crates/audio/tests/unreachable.rs`, `crates/audio/tests/headless/run.sh`,
   `crates/audio/tests/headless/session.sh`, `crates/audio/tests/headless/pipewire.conf`,
   `crates/audio/tests/headless/wireplumber.conf`, `crates/audio/tests/headless/main.rs`,
@@ -3016,13 +3039,14 @@ fn inserting_keeps_the_bluez_volume() {
 }
 ```
 
-`inserting_keeps_the_bluez_volume` is a review addition (Deviation 22). The registry's Props subscription delivers
-the 0.3 change to the adapter at the same time PipeWire shows it to `pw-dump`, so the copy at insertion sees 0.3. If
-the test flakes on that ordering, wait for `pw-dump` twice before inserting; do not add a sleep to the adapter.
+`inserting_keeps_the_bluez_volume` covers Deviation 22: it fails if our sink starts at 1.0 and also if that first
+1.0 is forwarded to the bluez node (the final assertion). The registry's Props subscription delivers the 0.3 change
+to the adapter at the same time PipeWire shows it to `pw-dump`, so the copy at insertion sees 0.3. If the test flakes
+on that ordering, wait for `pw-dump` twice before inserting; do not add a sleep to the adapter.
 
 - [ ] **Step 3: Run them to see them fail**
 
-Run (toolbox): `crates/audio/tests/headless/run.sh`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh`
 Expected: FAIL to compile with `unresolved import arctis_audio::AudioHandle`.
 
 - [ ] **Step 4: Dependencies**
@@ -3043,9 +3067,8 @@ Every Node, Device and Client is bound so its info props reach the `Graph`; prop
 mask says `PROPS` (Deviation 12), and a node enters the `Graph` with its first `info`, never from the global's props
 (Deviation 21). Each node's `Props` param is subscribed so its volume reaches the `Graph` (Deviation 22). Links come
 from global props. Only the metadata named `default` is bound. The `RegistryRc` is kept alive inside `Registry`, or
-the server drops the listener. The review additions here are `node_param`, the `param` listener and
-`subscribe_params` in `bind_node`, the removed global-props `put_node`, and `set_node_props` returning whether it
-found the node.
+the server drops the listener. `set_node_props` is only ever called for the bluez node, never for our own sink
+(Deviation 22).
 
 `crates/audio/src/registry.rs`:
 
@@ -3146,17 +3169,13 @@ impl Registry {
         }
     }
 
-    #[must_use]
-    pub fn set_node_props(&self, name: &str, props: &Pod) -> bool {
+    pub fn set_node_props(&self, name: &str, props: &Pod) {
         let Some(id) = self.graph.borrow().node_named(name) else {
-            return false;
+            return;
         };
-        let proxies = self.proxies.borrow();
-        let Some(node) = proxies.nodes.get(&id) else {
-            return false;
-        };
-        node.set_param(ParamType::Props, 0, props);
-        true
+        if let Some(node) = self.proxies.borrow().nodes.get(&id) {
+            node.set_param(ParamType::Props, 0, props);
+        }
     }
 }
 
@@ -3347,12 +3366,17 @@ fn link_of(props: &DictRef) -> Option<Link> {
 - [ ] **Step 6: The EQ sink**
 
 Two streams sharing `node.link-group` and `node.group` (Deviation 14). The capture stream's `param_changed` handles
-`Format` (rate → `Designer`) and `Props` (volume → `keep_unity` and the engine's forwarder, Deviation 15).
+`Format` (rate → `Designer`) and `Props` (volume → `keep_unity` and the engine's forwarder, Deviation 15). The first
+`Props` report is the stream's own default 1.0: `Reactions::on_props` answers it with `start_at` (the bluez volume
+from `Replaced`, applied with `Stream::set_control`) and does not forward it (Deviation 22).
+
+First make the two volume keys public in `crates/audio/src/volume.rs`: `pub const CHANNEL_VOLUMES` and
+`pub const MUTE`, next to `SOFT_VOLUMES` and `SOFT_MUTE`.
 
 `crates/audio/src/eq_sink.rs`:
 
 ```rust
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use std::rc::Rc;
 
@@ -3375,12 +3399,19 @@ use triple_buffer::Input;
 
 use crate::outputs::{EQ_DESCRIPTION, EQ_LINK_GROUP, EQ_OUTPUT_NAME, EQ_SINK_NAME};
 use crate::samples::{CHANNELS, FRAME_BYTES, Processor};
-use crate::volume::{SOFT_MUTE, SOFT_VOLUMES, VolumeChange, volume_change};
+use crate::volume::{
+    CHANNEL_VOLUMES, MUTE, SOFT_MUTE, SOFT_VOLUMES, Volume, VolumeChange, volume_change,
+};
 
 pub const INITIAL_RATE: u32 = 48_000;
 const UNITY: [f32; CHANNELS] = [1.0; CHANNELS];
 
 pub type OnVolume = Rc<dyn Fn(VolumeChange)>;
+
+pub struct Replaced {
+    pub name: String,
+    pub volume: Option<Volume>,
+}
 
 pub struct EqSink {
     capture: StreamRc,
@@ -3394,7 +3425,7 @@ impl EqSink {
     pub fn create(
         core: &CoreRc,
         curve: &Curve,
-        target: &str,
+        replaced: Replaced,
         on_volume: OnVolume,
     ) -> Result<Self, pw::Error> {
         let (input, output) =
@@ -3405,9 +3436,14 @@ impl EqSink {
             coefficients: input,
         }));
         let capture = StreamRc::new(core.clone(), EQ_SINK_NAME, capture_props())?;
-        let playback = StreamRc::new(core.clone(), EQ_OUTPUT_NAME, playback_props(target))?;
-        let capture_listener =
-            listen_capture(&capture, playback.clone(), designer.clone(), on_volume)?;
+        let playback = StreamRc::new(core.clone(), EQ_OUTPUT_NAME, playback_props(&replaced.name))?;
+        let reactions = Reactions {
+            designer: designer.clone(),
+            on_volume,
+            start: replaced.volume,
+            opening: Cell::new(true),
+        };
+        let capture_listener = listen_capture(&capture, playback.clone(), reactions)?;
         let playback_listener =
             listen_playback(&playback, capture.clone(), Processor::new(output))?;
         connect(&capture, Direction::Input, StreamFlags::empty())?;
@@ -3489,22 +3525,13 @@ fn playback_props(target: &str) -> PropertiesBox {
 fn listen_capture(
     capture: &StreamRc,
     playback: StreamRc,
-    designer: Rc<RefCell<Designer>>,
-    on_volume: OnVolume,
+    reactions: Reactions,
 ) -> Result<StreamListener<()>, pw::Error> {
     capture
         .add_local_listener_with_user_data(())
         .param_changed(move |stream, (), id, param| {
             if let Some(param) = param {
-                on_param(
-                    stream,
-                    id,
-                    param,
-                    &Reactions {
-                        designer: &designer,
-                        on_volume: &on_volume,
-                    },
-                );
+                reactions.on_param(stream, id, param);
             }
         })
         .process(move |_, ()| {
@@ -3513,23 +3540,49 @@ fn listen_capture(
         .register()
 }
 
-struct Reactions<'a> {
-    designer: &'a RefCell<Designer>,
-    on_volume: &'a OnVolume,
+struct Reactions {
+    designer: Rc<RefCell<Designer>>,
+    on_volume: OnVolume,
+    start: Option<Volume>,
+    opening: Cell<bool>,
 }
 
-fn on_param(stream: &Stream, id: u32, param: &Pod, reactions: &Reactions) {
-    if id == ParamType::Format.as_raw() {
-        if let Some(rate) = rate_of(param) {
-            reactions.designer.borrow_mut().set_rate(rate);
+impl Reactions {
+    fn on_param(&self, stream: &Stream, id: u32, param: &Pod) {
+        if id == ParamType::Format.as_raw() {
+            self.on_format(param);
+        } else if id == ParamType::Props.as_raw() {
+            self.on_props(stream, param);
         }
-    } else if id == ParamType::Props.as_raw() {
+    }
+
+    fn on_format(&self, param: &Pod) {
+        if let Some(rate) = rate_of(param) {
+            self.designer.borrow_mut().set_rate(rate);
+        }
+    }
+
+    fn on_props(&self, stream: &Stream, param: &Pod) {
+        if self.opening.replace(false) {
+            start_at(stream, self.start.as_ref());
+            return;
+        }
         let change = volume_change(param);
         if !change.is_empty() {
             keep_unity(stream);
         }
-        (reactions.on_volume)(change);
+        (self.on_volume)(change);
     }
+}
+
+fn start_at(stream: &Stream, volume: Option<&Volume>) {
+    let Some(volume) = volume else {
+        return;
+    };
+    let mute = if volume.mute { 1.0 } else { 0.0 };
+    let _ = stream.set_control(CHANNEL_VOLUMES, &volume.channels);
+    let _ = stream.set_control(MUTE, &[mute]);
+    keep_unity(stream);
 }
 
 fn keep_unity(stream: &Stream) {
@@ -3620,9 +3673,7 @@ fn format_pod() -> Vec<u8> {
 
 - [ ] **Step 7: The system engine**
 
-Review addition (Deviation 22): `seed` and `apply_seed`. `create` remembers the bluez node's volume; the worker calls
-`apply_seed` on every graph change until our sink's node is bound and the copy is sent; `remove` drops a pending
-copy.
+`create` hands the replaced bluez node's name and last known volume to the EQ sink as `Replaced` (Deviation 22).
 
 `crates/audio/src/system_engine.rs`:
 
@@ -3634,10 +3685,10 @@ use arctis_core::eq::Curve;
 use pipewire::core::CoreRc;
 use pipewire::spa::pod::Pod;
 
-use crate::eq_sink::{EqSink, OnVolume};
+use crate::eq_sink::{EqSink, OnVolume, Replaced};
 use crate::outputs::{EQ_SINK_NAME, InsertStep, Outputs, RemoveStep};
 use crate::registry::Registry;
-use crate::volume::{Volume, VolumeChange, VolumeMirror, props_pod};
+use crate::volume::{VolumeChange, VolumeMirror, props_pod};
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Inserted {
@@ -3651,7 +3702,6 @@ pub struct SystemEngine {
     outputs: RefCell<Outputs>,
     sink: RefCell<Option<EqSink>>,
     mirror: Rc<RefCell<VolumeMirror>>,
-    seed: RefCell<Option<Volume>>,
 }
 
 impl SystemEngine {
@@ -3663,7 +3713,6 @@ impl SystemEngine {
             outputs: RefCell::default(),
             sink: RefCell::default(),
             mirror: Rc::default(),
-            seed: RefCell::default(),
         }
     }
 
@@ -3681,26 +3730,17 @@ impl SystemEngine {
 
     fn create(&self, curve: &Curve, replaced: &str) -> Inserted {
         let forwarder = forwarder(Rc::downgrade(&self.registry), self.mirror.clone(), replaced);
+        let replaced = Replaced {
+            name: replaced.to_owned(),
+            volume: self.registry.graph().volume_of(replaced),
+        };
         let Ok(sink) = EqSink::create(&self.core, curve, replaced, forwarder) else {
             self.outputs.borrow_mut().remove(&self.registry.graph());
             return Inserted::Unchanged;
         };
         *self.sink.borrow_mut() = Some(sink);
-        *self.seed.borrow_mut() = self.registry.graph().volume_of(replaced);
         self.registry.write_default_sink(EQ_SINK_NAME);
         Inserted::Created
-    }
-
-    pub fn apply_seed(&self) {
-        let Some(volume) = self.seed.borrow().clone() else {
-            return;
-        };
-        let bytes = props_pod(&volume);
-        let sent = Pod::from_bytes(&bytes)
-            .is_some_and(|pod| self.registry.set_node_props(EQ_SINK_NAME, pod));
-        if sent {
-            *self.seed.borrow_mut() = None;
-        }
     }
 
     pub fn retarget(&self, curve: &Curve) {
@@ -3716,7 +3756,6 @@ impl SystemEngine {
         }
         let removed = self.sink.borrow_mut().take();
         drop(removed);
-        *self.seed.borrow_mut() = None;
         *self.mirror.borrow_mut() = VolumeMirror::default();
     }
 
@@ -3750,7 +3789,7 @@ fn forward(
     };
     let bytes = props_pod(&volume);
     if let Some(pod) = Pod::from_bytes(&bytes) {
-        let _ = registry.set_node_props(target, pod);
+        registry.set_node_props(target, pod);
     }
 }
 ```
@@ -3996,7 +4035,6 @@ impl Worker {
     }
 
     fn publish(&self) {
-        self.engine.apply_seed();
         if !self.state.ready.get() {
             return;
         }
@@ -4137,7 +4175,7 @@ Run (toolbox): `cargo test -p arctis-audio`
 Expected: `pure` 52 passed, `samples_allocations` 1 passed, `init` 1 passed, `headless` 0 passed and 6 ignored,
 `unreachable` 1 ignored.
 
-Run (toolbox): `crates/audio/tests/headless/run.sh`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh`
 Expected:
 
 ```
@@ -4151,7 +4189,11 @@ test volume::volume_and_mute_reach_the_bluez_node ... ok
 ```
 
 If a headless test fails, read `$XDG_RUNTIME_DIR/wireplumber.log` by rerunning with
-`WIREPLUMBER_DEBUG=4` exported in `session.sh` for that one run (do not commit it) before changing code.
+`WIREPLUMBER_DEBUG=4` exported in `session.sh` for that one run (do not commit it) before changing code. `run.sh`
+deletes the private directory on exit, so copy the logs out first (add a `cp` before its `rm -rf` for that run). If
+the graph freezes (no link to the bluez node, `pw-dump` never returns), prefix the `pipewire` line of `session.sh`
+with `PIPEWIRE_DEBUG=4`: a `busy changed 1` on our client followed by no pong is a `set_param` sent to a node our own
+client exports (Deviation 22).
 
 - [ ] **Step 11: Lint and commit**
 
@@ -4193,7 +4235,7 @@ fn dropping_the_handle_restores_bluez() {
 
 - [ ] **Step 2: Run it to see it fail**
 
-Run (toolbox): `crates/audio/tests/headless/run.sh dropping`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh dropping`
 Expected: FAIL with `timed out waiting for the configured bluez default` (the client disconnects with
 `default.configured.audio.sink` still naming `arctis_companion_eq`).
 
@@ -4251,7 +4293,7 @@ In `crates/audio/src/worker.rs`:
 
 - [ ] **Step 4: Run it to see it pass, three times**
 
-Run (toolbox): `for run in 1 2 3; do crates/audio/tests/headless/run.sh || exit 1; done`
+Run (toolbox): `for run in 1 2 3; do timeout 300 crates/audio/tests/headless/run.sh || exit 1; done`
 Expected: each run ends with `test result: ok. 7 passed`.
 
 - [ ] **Step 5: Lint and commit**
@@ -4261,6 +4303,356 @@ Run (toolbox): `cargo fmt --all && cargo clippy -p arctis-audio --all-targets --
 ```bash
 git add crates/audio
 git commit -m "fix(audio): restore the bluetooth default before quitting"
+git push
+```
+
+### Task 9a: Lifecycle and safety scenarios
+
+Three scenarios over behaviour Task 8 built: PipeWire going away and coming back, the Manager role request, and the
+rule that a default other than the bluez node is never touched. Each is seen failing once under a temporary
+mutation (Deviation 23).
+
+**Files:**
+- Create: `crates/audio/tests/reconnect.rs`
+- Modify: `crates/audio/tests/headless/session.sh`, `crates/audio/tests/headless/tools.rs`
+- Test: `crates/audio/tests/reconnect.rs`, `crates/audio/tests/headless/equalizer.rs`
+
+- [ ] **Step 1: Write the scenarios**
+
+`crates/audio/tests/reconnect.rs` (Deviation 26: the test owns the `pipewire` it starts and stops it by PID):
+
+```rust
+use std::process::{Child, Command, Stdio};
+use std::thread;
+use std::time::{Duration, Instant};
+
+use arctis_audio::AudioHandle;
+use arctis_core::messages::audio::AudioEvent;
+
+const PATIENCE: Duration = Duration::from_secs(10);
+const POLL: Duration = Duration::from_millis(20);
+
+struct Daemon(Child);
+
+impl Daemon {
+    fn start() -> Self {
+        let child = Command::new("pipewire")
+            .stdout(Stdio::null())
+            .stderr(Stdio::null())
+            .spawn()
+            .expect("pipewire");
+        Self(child)
+    }
+}
+
+impl Drop for Daemon {
+    fn drop(&mut self) {
+        let _ = Command::new("kill").arg(self.0.id().to_string()).status();
+        let _ = self.0.wait();
+    }
+}
+
+fn wait_for(audio: &AudioHandle, expected: &AudioEvent) {
+    let deadline = Instant::now() + PATIENCE;
+    while audio.events.try_recv().ok().as_ref() != Some(expected) {
+        assert!(
+            Instant::now() < deadline,
+            "timed out waiting for {expected:?}"
+        );
+        thread::sleep(POLL);
+    }
+}
+
+#[test]
+#[ignore = "run by crates/audio/tests/headless/session.sh before PipeWire starts"]
+fn pipewire_coming_and_going_is_announced() {
+    assert_eq!(
+        std::env::var("ARCTIS_HEADLESS_PIPEWIRE").as_deref(),
+        Ok("1"),
+        "run through crates/audio/tests/headless/run.sh"
+    );
+    let audio = AudioHandle::spawn().expect("audio thread");
+    wait_for(&audio, &AudioEvent::Unavailable);
+    let daemon = Daemon::start();
+    wait_for(&audio, &AudioEvent::Available);
+    drop(daemon);
+    wait_for(&audio, &AudioEvent::Unavailable);
+    let started = Instant::now();
+    drop(audio);
+    assert!(started.elapsed() < PATIENCE);
+}
+```
+
+In `crates/audio/tests/headless/session.sh`, add right after the `unreachable` line, so it also runs before the
+shared PipeWire starts:
+
+```sh
+cargo test --package arctis-audio --test reconnect -- --ignored
+```
+
+Append to `crates/audio/tests/headless/tools.rs` (`pipewire.sec.pid` is set by the server, so only this test
+process's clients match):
+
+```rust
+pub fn manager_clients_of(pid: u32) -> usize {
+    dump()
+        .iter()
+        .filter(|object| object["type"] == "PipeWire:Interface:Client")
+        .map(props)
+        .filter(|props| props["pipewire.sec.pid"].as_u64() == Some(u64::from(pid)))
+        .filter(|props| props["media.category"] == "Manager")
+        .count()
+}
+```
+
+In `crates/audio/tests/headless/equalizer.rs`, put `use std::thread;` and `use std::time::Duration;` (then a blank
+line) above the `arctis_core` import, add `const QUIET: Duration = Duration::from_secs(1);` after the `use` block,
+and append:
+
+```rust
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn the_adapter_connects_as_a_manager() {
+    let _lab = Lab::open();
+    eventually("one Manager client of this process", || {
+        tools::manager_clients_of(std::process::id()) == 1
+    });
+}
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn inserting_over_another_default_changes_nothing() {
+    let lab = Lab::open();
+    tools::set_configured_default(USB);
+    lab.wait_for(
+        "the USB default",
+        |event| matches!(event, AudioEvent::DefaultSink(sink) if sink.terminal == SinkKind::Other),
+    );
+    lab.send(AudioCommand::InsertEqualizer(flat()));
+    thread::sleep(QUIET);
+    assert_eq!(tools::node_id(EQ_SINK), None);
+    assert_eq!(tools::configured_default().as_deref(), Some(USB));
+}
+```
+
+`QUIET` is the one fixed wait in the suite: it proves an absence (no EQ sink appears), which no event announces.
+
+- [ ] **Step 2: See them fail once (Deviation 23)**
+
+Temporarily, in `crates/audio/src/worker.rs`, replace `worker.quit_loop();` inside the `.error` closure of
+`listen_core` with `let _ = &worker;`.
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh`
+Expected: `pipewire_coming_and_going_is_announced ... FAILED` with `timed out waiting for Unavailable` (the run
+stops there). Restore it: `git checkout -- crates/audio/src/worker.rs`.
+
+Temporarily, in `crates/audio/src/worker.rs` `Connection::open`, put `"Monitor"` in place of `MANAGER_CATEGORY`, and
+in `crates/audio/src/outputs.rs` `insertion_target`, put `!= SinkKind::NovaDongle` in place of
+`== SinkKind::NovaBluetooth`.
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh`
+Expected: `the_adapter_connects_as_a_manager` FAILED with `timed out waiting for one Manager client of this
+process`, and `inserting_over_another_default_changes_nothing` FAILED with `left: Some(…)`, `right: None`.
+Restore both: `git checkout -- crates/audio/src/worker.rs crates/audio/src/outputs.rs`.
+
+- [ ] **Step 3: Run them, three times**
+
+Run (toolbox): `for run in 1 2 3; do timeout 300 crates/audio/tests/headless/run.sh || exit 1; done`
+Expected: each run shows `unreachable` 1 passed, `reconnect` 1 passed, `headless` 9 passed.
+
+- [ ] **Step 4: Lint and commit**
+
+Run (toolbox): `cargo fmt --all && cargo clippy -p arctis-audio --all-targets -- -D warnings && cargo xtask check-rules`
+
+```bash
+git add crates/audio/tests
+git commit -m "test(audio): cover reconnection, the manager role and foreign defaults"
+git push
+```
+
+### Task 9b: Coefficients for the negotiated rate
+
+`Designer` and `rate_of` move out of `crates/audio/src/eq_sink.rs` into a pure module so the rate redesign of
+Deviation 16 gets tables (Deviation 27); the headless graph always runs at 48 kHz and cannot show it.
+
+**Files:**
+- Create: `crates/audio/src/designer.rs`
+- Modify: `crates/audio/src/lib.rs`, `crates/audio/src/eq_sink.rs`, `crates/audio/tests/pure/main.rs`
+- Test: `crates/audio/tests/pure/designer.rs`
+
+- [ ] **Step 1: Write the failing tests**
+
+Add `mod designer;` to `crates/audio/tests/pure/main.rs` after `mod changes;`.
+
+`crates/audio/tests/pure/designer.rs`:
+
+```rust
+use std::io::Cursor;
+
+use arctis_audio::designer::{Designer, INITIAL_RATE, rate_of};
+use arctis_core::eq::{Coefficients, Curve, PresetId, library};
+use pipewire::spa;
+use spa::param::audio::{AudioFormat, AudioInfoRaw};
+use spa::pod::serialize::PodSerializer;
+use spa::pod::{Object, Pod, Value};
+use spa::sys::{SPA_PARAM_Format, SPA_TYPE_OBJECT_Format};
+
+fn curve(id: &str) -> Curve {
+    library::find(&PresetId::new(id))
+        .expect("built-in")
+        .curve()
+        .clone()
+}
+
+fn format_at(rate: u32) -> Vec<u8> {
+    let mut info = AudioInfoRaw::new();
+    info.set_format(AudioFormat::F32LE);
+    info.set_channels(2);
+    info.set_rate(rate);
+    let format = Value::Object(Object {
+        type_: SPA_TYPE_OBJECT_Format,
+        id: SPA_PARAM_Format,
+        properties: info.into(),
+    });
+    PodSerializer::serialize(Cursor::new(Vec::new()), &format)
+        .expect("format pod")
+        .0
+        .into_inner()
+}
+
+#[test]
+fn a_negotiated_format_names_its_rate() {
+    for (rate, expected) in [(44_100, Some(44_100)), (48_000, Some(48_000)), (0, None)] {
+        let bytes = format_at(rate);
+        let pod = Pod::from_bytes(&bytes).expect("pod");
+        assert_eq!(rate_of(pod), expected, "{rate}");
+    }
+}
+
+#[test]
+fn coefficients_start_at_the_initial_rate() {
+    let (_designer, output) = Designer::new(&curve("v-shape"));
+    assert_eq!(
+        *output.output_buffer(),
+        Coefficients::design(&curve("v-shape"), INITIAL_RATE)
+    );
+}
+
+#[test]
+fn a_new_rate_publishes_coefficients_for_it() {
+    let (mut designer, mut output) = Designer::new(&curve("v-shape"));
+    designer.set_rate(44_100);
+    assert!(output.update());
+    assert_eq!(
+        *output.output_buffer(),
+        Coefficients::design(&curve("v-shape"), 44_100)
+    );
+}
+
+#[test]
+fn the_same_rate_publishes_nothing() {
+    let (mut designer, mut output) = Designer::new(&curve("v-shape"));
+    designer.set_rate(INITIAL_RATE);
+    assert!(!output.update());
+}
+
+#[test]
+fn a_new_curve_is_designed_at_the_negotiated_rate() {
+    let (mut designer, mut output) = Designer::new(&curve("flat"));
+    designer.set_rate(44_100);
+    designer.set_curve(&curve("v-shape"));
+    assert!(output.update());
+    assert_eq!(
+        *output.output_buffer(),
+        Coefficients::design(&curve("v-shape"), 44_100)
+    );
+}
+```
+
+- [ ] **Step 2: Run them to see them fail**
+
+Run (toolbox): `cargo test -p arctis-audio --test pure`
+Expected: FAIL to compile with `unresolved import arctis_audio::designer`.
+
+- [ ] **Step 3: Implement**
+
+Add `pub mod designer;` to `crates/audio/src/lib.rs` after `pub mod changes;`.
+
+`crates/audio/src/designer.rs`:
+
+```rust
+use arctis_core::eq::{Coefficients, Curve};
+use pipewire::spa::param::audio::AudioInfoRaw;
+use pipewire::spa::pod::Pod;
+use triple_buffer::{Input, Output};
+
+pub const INITIAL_RATE: u32 = 48_000;
+
+pub struct Designer {
+    curve: Curve,
+    rate: u32,
+    coefficients: Input<Coefficients>,
+}
+
+impl Designer {
+    #[must_use]
+    pub fn new(curve: &Curve) -> (Self, Output<Coefficients>) {
+        let (coefficients, output) =
+            triple_buffer::triple_buffer(&Coefficients::design(curve, INITIAL_RATE));
+        let designer = Self {
+            curve: curve.clone(),
+            rate: INITIAL_RATE,
+            coefficients,
+        };
+        (designer, output)
+    }
+
+    pub fn set_curve(&mut self, curve: &Curve) {
+        self.curve = curve.clone();
+        self.publish();
+    }
+
+    pub fn set_rate(&mut self, rate: u32) {
+        if rate != self.rate {
+            self.rate = rate;
+            self.publish();
+        }
+    }
+
+    fn publish(&mut self) {
+        self.coefficients
+            .write(Coefficients::design(&self.curve, self.rate));
+    }
+}
+
+#[must_use]
+pub fn rate_of(format: &Pod) -> Option<u32> {
+    let mut info = AudioInfoRaw::new();
+    info.parse(format).ok()?;
+    Some(info.rate()).filter(|rate| *rate > 0)
+}
+```
+
+In `crates/audio/src/eq_sink.rs`: delete `INITIAL_RATE`, `struct Designer` with its `impl`, and `fn rate_of`;
+import `use crate::designer::{Designer, rate_of};`; drop `Coefficients` from the `arctis_core::eq` import and
+the `triple_buffer::Input` import; and in `EqSink::create` replace the `triple_buffer` call and the `Designer`
+literal with
+
+```rust
+        let (designer, output) = Designer::new(curve);
+        let designer = Rc::new(RefCell::new(designer));
+```
+
+- [ ] **Step 4: Run them to see them pass**
+
+Run (toolbox): `cargo test -p arctis-audio --test pure && timeout 300 crates/audio/tests/headless/run.sh`
+Expected: `pure` 57 passed; the headless run as in Task 9a.
+
+- [ ] **Step 5: Lint and commit**
+
+Run (toolbox): `cargo fmt --all && cargo clippy -p arctis-audio --all-targets -- -D warnings && cargo xtask check-rules`
+
+```bash
+git add crates/audio/src crates/audio/tests/pure
+git commit -m "refactor(audio): design coefficients in a pure module"
 git push
 ```
 
@@ -4379,13 +4771,13 @@ fn a_stream_behind_an_intermediate_node_is_on_the_bluetooth_path() {
 
 Temporarily make `prop` in `crates/audio/src/streams.rs` read only the node (`node.get(key)`) and set `MAX_HOPS` in
 `crates/audio/src/links.rs` to `2`.
-Run (toolbox): `crates/audio/tests/headless/run.sh streams`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh streams`
 Expected: both scenarios FAIL with `timed out waiting for both players` and `timed out waiting for the chained
 player`. Then restore the code: `git checkout -- crates/audio/src/streams.rs crates/audio/src/links.rs`.
 
 - [ ] **Step 3: Run them**
 
-Run (toolbox): `crates/audio/tests/headless/run.sh streams`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh streams`
 Expected: `identifiers_come_from_node_and_client_props ... ok` and
 `a_stream_behind_an_intermediate_node_is_on_the_bluetooth_path ... ok`.
 
@@ -4459,19 +4851,19 @@ fn a_sine_at_1_khz_follows_the_response_minus_the_preamp() {
 
 Temporarily delete the `retarget` call inside `if self.coefficients.update() { … }` in
 `crates/audio/src/samples.rs`, so a `Retarget` never reaches the filter.
-Run (toolbox): `crates/audio/tests/headless/run.sh gain`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh gain`
 Expected: FAIL with `measured 0.0… dB, expected -3.… dB` (the two-peak curve plays about 3 dB quieter at 1 kHz).
 Then restore the code: `git checkout -- crates/audio/src/samples.rs`.
 
 - [ ] **Step 3: Run it**
 
-Run (toolbox): `crates/audio/tests/headless/run.sh gain`
+Run (toolbox): `timeout 300 crates/audio/tests/headless/run.sh gain`
 Expected: `a_sine_at_1_khz_follows_the_response_minus_the_preamp ... ok`.
 
 - [ ] **Step 4: Run the whole suite three times**
 
-Run (toolbox): `for run in 1 2 3; do crates/audio/tests/headless/run.sh || exit 1; done`
-Expected: each run ends with `test result: ok. 10 passed`.
+Run (toolbox): `for run in 1 2 3; do timeout 300 crates/audio/tests/headless/run.sh || exit 1; done`
+Expected: each run ends with `test result: ok. 12 passed`.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -4497,6 +4889,7 @@ Insert before the `flatpak:` job in `.github/workflows/ci.yml`:
     needs: test
     runs-on: ubuntu-latest
     container: fedora:44
+    timeout-minutes: 30
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git gcc clang-devel pipewire-devel pipewire pipewire-utils wireplumber dbus-daemon
       - uses: actions/checkout@v4
@@ -4522,8 +4915,9 @@ git commit -m "ci: run the audio adapter against a headless PipeWire"
 git push
 ```
 
-The job runs on the pull request opened in Task 14; if it fails only in CI (the container runs as root), read its
-log, fix the script or the package list, and push again.
+`timeout-minutes` bounds a hung graph (the failure mode Deviation 22 records) to 30 minutes instead of GitHub's
+six hours. The job runs on the pull request opened in Task 14; if it fails only in CI (the container runs as root),
+read its log, fix the script or the package list, and push again.
 
 ### Task 13: `docs/architecture/audio.md`
 
@@ -4554,6 +4948,7 @@ flowchart BT
     changes["changes.rs<br/>Published: events on change"]
     volume["volume.rs<br/>VolumeMirror, Props pods"]
     samples["samples.rs<br/>Processor: bytes through Equalizer"]
+    designer["designer.rs<br/>Designer: coefficients per curve and rate"]
     registry["registry.rs<br/>registry, metadata and info listeners"]
     eq_sink["eq_sink.rs<br/>EqSink: two pw_streams"]
     engine["system_engine.rs<br/>SystemEngine: insert, retarget, remove"]
@@ -4562,12 +4957,12 @@ flowchart BT
     graph --> links --> outputs --> streams --> changes
     graph --> registry
     volume --> eq_sink
-    samples --> eq_sink
+    samples & designer --> eq_sink
     outputs & registry & eq_sink --> engine
     changes & registry & engine --> worker --> handle
 ```
 
-Graph, links, outputs, streams, changes, volume and samples are pure: they take a `Graph` or bytes and return
+Graph, links, outputs, streams, changes, volume, samples and designer are pure: they take a `Graph` or bytes and return
 values, and are tested by tables in `crates/audio/tests/pure/main.rs`. Registry, equalizer sink, worker and handle
 hold the PipeWire objects, as does the system engine that drives the equalizer sink, and are tested against a
 private PipeWire (see Tests).
@@ -4586,7 +4981,8 @@ private PipeWire (see Tests).
 | Real-time processing | `crates/audio/src/samples.rs::Processor`, `crates/audio/src/eq_sink.rs::move_block` |
 | PipeWire mirror (nodes enter on their first info; Props volumes subscribed) | `crates/audio/src/registry.rs::Registry`, `crates/audio/src/registry.rs::changed_props` |
 | System engine | `crates/audio/src/system_engine.rs::SystemEngine`, `crates/audio/src/system_engine.rs::Inserted` |
-| Equalizer sink | `crates/audio/src/eq_sink.rs::EqSink`, `crates/audio/src/eq_sink.rs::Designer`, `crates/audio/src/eq_sink.rs::keep_unity` |
+| Equalizer sink | `crates/audio/src/eq_sink.rs::EqSink`, `crates/audio/src/eq_sink.rs::Replaced`, `crates/audio/src/eq_sink.rs::start_at`, `crates/audio/src/eq_sink.rs::keep_unity` |
+| Coefficients per curve and rate | `crates/audio/src/designer.rs::Designer`, `crates/audio/src/designer.rs::rate_of` |
 | Thread and connection | `crates/audio/src/worker.rs::run`, `crates/audio/src/worker.rs::Connection`, `crates/audio/src/worker.rs::Worker`, `crates/audio/src/worker.rs::Dispatcher` |
 | Handle | `crates/audio/src/handle.rs::AudioHandle`, `crates/audio/src/handle.rs::AudioCommands`, `crates/audio/src/handle.rs::spawn` |
 
@@ -4645,16 +5041,20 @@ sequenceDiagram
 The capture stream's process callback triggers the playback stream; the playback callback dequeues both buffers
 and runs `crates/audio/src/samples.rs::Processor`, which converts the `f32` bytes, takes any coefficients the
 audio thread published through the triple buffer and calls `Equalizer::process`. Neither callback allocates
-(`crates/audio/tests/samples_allocations.rs`). `crates/audio/src/eq_sink.rs::Designer` redesigns the coefficients
+(`crates/audio/tests/samples_allocations.rs`). `crates/audio/src/designer.rs::Designer` redesigns the coefficients
 when the curve or the negotiated rate changes.
 
 Volume set on our sink reaches the stream as a Props param. `crates/audio/src/volume.rs::VolumeMirror`, owned by
 the system engine, forwards each new `channelVolumes`/`mute` pair once to the bluez node
 (`crates/audio/src/registry.rs::set_node_props`), and `crates/audio/src/eq_sink.rs::keep_unity` puts the
 sink's own soft volume back to 1, so the headset's Bluetooth volume does the attenuation. The registry keeps
-each node's last Props volume (`crates/audio/src/graph.rs::Graph`), and on insertion
-`crates/audio/src/system_engine.rs::SystemEngine` copies the bluez node's volume onto our sink, so the slider starts
-where the headset is and the first volume step never jumps it.
+each node's last Props volume (`crates/audio/src/graph.rs::Graph`). On insertion
+`crates/audio/src/system_engine.rs::SystemEngine` hands the bluez node's volume to the sink
+(`crates/audio/src/eq_sink.rs::Replaced`), which applies it to itself on its first Props report
+(`crates/audio/src/eq_sink.rs::start_at`) and never forwards that report, so the slider starts where the headset is
+and inserting never changes the headset's volume. Our own node is never set through a node proxy: PipeWire would
+wait on our own client and freeze the graph. The mirror runs one way only: a change made on the bluez node itself
+is not copied back.
 
 ## Connection lifecycle
 
@@ -4682,8 +5082,9 @@ and the delayed `Retry`, `ConfirmManager` and grace `Quit` that a short sleeper 
 |---|---|
 | Graph, chains, matching, default-sink and insertion tables, streams, events, volume pods, processing | `crates/audio/tests/pure/main.rs` and its modules |
 | No allocation in processing | `crates/audio/tests/samples_allocations.rs` |
-| Private PipeWire + WirePlumber with a bluez-shaped null sink: insertion, restore, user default, drop, volume, unity, volume kept on insertion, streams, chain, 1 kHz gain | `crates/audio/tests/headless/run.sh`, `crates/audio/tests/headless/main.rs` |
+| Private PipeWire + WirePlumber with a bluez-shaped null sink: insertion, restore, user default, foreign default untouched, Manager role, drop, volume, unity, volume kept on insertion, streams, chain, 1 kHz gain | `crates/audio/tests/headless/run.sh`, `crates/audio/tests/headless/main.rs` |
 | PipeWire unreachable | `crates/audio/tests/unreachable.rs` |
+| PipeWire started and stopped under a running adapter | `crates/audio/tests/reconnect.rs` |
 ````
 
 - [ ] **Step 2: Link it from the index**
@@ -4731,8 +5132,8 @@ keep both sides and regenerate `Cargo.lock` with Run (toolbox): `cargo metadata 
 - [ ] **Step 2: Everything, locally**
 
 Run (toolbox):
-`cargo fmt --all --check && cargo clippy --workspace --exclude arctis-ui --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure && crates/audio/tests/headless/run.sh`
-Expected: every command exits 0; the headless suite ends with `test result: ok. 10 passed`.
+`cargo fmt --all --check && cargo clippy --workspace --exclude arctis-ui --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure && timeout 300 crates/audio/tests/headless/run.sh`
+Expected: every command exits 0; `reconnect` passes and the headless suite ends with `test result: ok. 12 passed`.
 
 - [ ] **Step 3: Push and open the pull request**
 
