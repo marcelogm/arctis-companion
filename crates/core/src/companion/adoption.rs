@@ -64,3 +64,10 @@ pub fn adopt(observed: &HeadsetSettings, catalog: &Catalog) -> Adoption {
         new_preset: Some(preset),
     }
 }
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+pub enum AdoptionStatus {
+    Unknown,
+    NeverAdopted,
+    Adopted,
+}
