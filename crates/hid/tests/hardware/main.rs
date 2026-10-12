@@ -1,6 +1,7 @@
 mod discovery;
 mod soak;
 mod soak_log;
+mod soak_log_rules;
 
 const HARDWARE: &str = "ARCTIS_HW";
 
