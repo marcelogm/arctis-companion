@@ -142,3 +142,10 @@ pub fn snapshot() -> Snapshot {
         battery: battery(),
     }
 }
+
+pub fn with(phase: Phase, route: Route) -> Snapshot {
+    let mut s = snapshot();
+    s.dongle.phase = phase;
+    s.audio.route = route;
+    s
+}

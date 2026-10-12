@@ -8406,7 +8406,7 @@ git push
 - Modify: `crates/core/src/view/mod.rs`
 - Test: `crates/core/tests/view/headset_page.rs`, `crates/core/tests/view/main.rs`, `crates/core/tests/view/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod headset_page;` to `crates/core/tests/view/main.rs`.
 
@@ -8643,12 +8643,12 @@ fn a_write_failure_offers_a_retry_toast() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test view headset_page`
 Expected: FAIL to compile (`view::headset_page` missing).
 
-- [ ] **Step 3: Implement `status_page` and `headset_page`**
+- [x] **Step 3: Implement `status_page` and `headset_page`**
 
 `crates/core/src/view/status_page.rs`:
 
@@ -8950,12 +8950,12 @@ pub mod text;
 pub use headset_page::headset_page;
 ```
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test view`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/view crates/core/tests/view
