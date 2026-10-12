@@ -7,17 +7,19 @@ use arctis_core::testkit::FakeHeadset;
 
 use crate::soak_log::SoakLog;
 
+fn with_sidetone(level: u8) -> HeadsetSettings {
+    HeadsetSettings {
+        sidetone: Sidetone::try_from(level).expect("a sidetone level in range"),
+        ..FakeHeadset::nova_5().settings().clone()
+    }
+}
+
 fn original() -> HeadsetSettings {
-    FakeHeadset::nova_5().settings().clone()
+    with_sidetone(3)
 }
 
 fn changed() -> HeadsetSettings {
-    let level = original().sidetone.get();
-    let other = if level == 0 { 1 } else { level - 1 };
-    HeadsetSettings {
-        sidetone: Sidetone::try_from(other).expect("a sidetone level in range"),
-        ..original()
-    }
+    with_sidetone(2)
 }
 
 fn log_after(updates: Vec<DeviceUpdate>) -> SoakLog {
@@ -42,8 +44,9 @@ fn a_restore_while_ready_is_requested() {
     let mut log = changed_then(Phase::Ready);
     assert_eq!(log.restore_request(), Some(original()));
     assert_eq!(log.requested, 1);
-    assert_eq!(log.waiting_for, Some(original()));
     assert!(!log.unrestored);
+    log.record(Duration::ZERO, DeviceUpdate::Observed(original()));
+    assert_eq!(log.confirmed, 1);
 }
 
 #[test]
@@ -73,6 +76,27 @@ fn a_toggle_waits_for_the_previous_write() {
     assert_eq!(log.toggle_request(), Some(changed()));
     assert_eq!(log.toggle_request(), None);
     assert_eq!(log.requested, 1);
+}
+
+#[test]
+fn a_toggle_from_sidetone_off_asks_for_level_one() {
+    let mut log = log_after(vec![
+        DeviceUpdate::Phase(Phase::Ready),
+        DeviceUpdate::Observed(with_sidetone(0)),
+    ]);
+    assert_eq!(log.toggle_request(), Some(with_sidetone(1)));
+}
+
+#[test]
+fn a_confirmed_toggle_is_followed_by_one_back_to_the_original() {
+    let mut log = log_after(vec![
+        DeviceUpdate::Phase(Phase::Ready),
+        DeviceUpdate::Observed(original()),
+    ]);
+    assert_eq!(log.toggle_request(), Some(changed()));
+    log.record(Duration::ZERO, DeviceUpdate::Observed(changed()));
+    assert_eq!(log.toggle_request(), Some(original()));
+    assert_eq!(log.confirmed, 1);
 }
 
 #[test]

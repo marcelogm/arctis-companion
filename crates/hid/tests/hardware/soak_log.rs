@@ -13,7 +13,7 @@ pub struct SoakLog {
     pub confirmed: usize,
     pub failed: usize,
     pub interrupted: usize,
-    pub waiting_for: Option<HeadsetSettings>,
+    waiting_for: Option<HeadsetSettings>,
     pub unrestored: bool,
 }
 
