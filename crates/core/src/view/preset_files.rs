@@ -158,10 +158,10 @@ fn too_many_filters(file_name: &str, found: usize) -> Text {
     )
 }
 
-fn bad_line(file_name: &str, msgid: &str, line: usize) -> Text {
+fn bad_line(file_name: &str, template: &str, line: usize) -> Text {
     let mut args = file_args(file_name);
     args.push(("line", Arg::Number(saturating_count(line))));
-    Text::format(msgid, args)
+    Text::format(template, args)
 }
 
 fn file_args(file_name: &str) -> Args {
