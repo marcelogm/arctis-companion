@@ -1,4 +1,6 @@
-use arctis_core::eq::{Curve, FilterKind, Preset, PresetId, PresetKind, library};
+use arctis_core::eq::{
+    Curve, EnvelopeError, FilterKind, Preset, PresetFormatError, PresetId, PresetKind, library,
+};
 
 use crate::support::{filter, peaking};
 
@@ -114,4 +116,29 @@ fn an_unknown_format_names_itself() {
         error.to_string().contains("unsupported preset format 2"),
         "{error}"
     );
+}
+
+#[test]
+fn format_errors_explain_themselves() {
+    let cases = [
+        (
+            PresetFormatError::UnsupportedFormat(3),
+            "unsupported preset format 3",
+        ),
+        (
+            PresetFormatError::NotADecimal,
+            "a gain or Q is not a plain decimal number",
+        ),
+        (
+            PresetFormatError::OffGrid,
+            "a gain is not a multiple of 0.5 dB",
+        ),
+        (
+            PresetFormatError::Envelope(EnvelopeError::Q),
+            "a filter lies outside the envelope: Q",
+        ),
+    ];
+    for (error, message) in cases {
+        assert_eq!(error.to_string(), message);
+    }
 }
