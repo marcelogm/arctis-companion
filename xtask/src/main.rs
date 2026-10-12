@@ -8,6 +8,8 @@ mod cli;
 mod git;
 mod install_hooks;
 mod report;
+mod rust_tokens;
+mod text;
 
 use std::process::ExitCode;
 
