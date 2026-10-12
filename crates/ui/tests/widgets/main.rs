@@ -1,5 +1,6 @@
 mod support;
 
+mod app_dialogs;
 mod equalizer_group;
 mod headset_page;
 mod headset_status;
