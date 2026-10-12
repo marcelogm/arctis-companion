@@ -20,6 +20,7 @@ const WRITE_EVERY: Duration = Duration::from_secs(60);
 const RESTORE_WITHIN: Duration = Duration::from_secs(5);
 const TICK: Duration = Duration::from_millis(50);
 const REBINDS_PER_MINUTE: u64 = 3;
+const INITIAL_OPENS: usize = 2;
 
 struct CountingOpener {
     opens: Arc<AtomicUsize>,
@@ -120,11 +121,12 @@ fn the_worker_rides_through_fwupd_rebinds_on_the_real_dongle() {
     let Soak { changes, log, .. } = soak;
     drop(changes);
     thread.join().expect("the device thread ends");
-    report(minutes, opens.load(Ordering::Relaxed), &log);
+    let rebinds = opens.load(Ordering::Relaxed).saturating_sub(INITIAL_OPENS);
+    print_summary(minutes, rebinds, &log);
+    assert_soak_passed(minutes, rebinds, &log);
 }
 
-fn report(minutes: u64, opens: usize, log: &SoakLog) {
-    let rebinds = opens.saturating_sub(2);
+fn print_summary(minutes: u64, rebinds: usize, log: &SoakLog) {
     eprintln!(
         "soak: {minutes} min, {rebinds} rebinds ridden, phases {:?}, writes requested {}, confirmed {}, failed {}, interrupted by the headset turning off {}",
         log.phases, log.requested, log.confirmed, log.failed, log.interrupted
@@ -139,6 +141,9 @@ fn report(minutes: u64, opens: usize, log: &SoakLog) {
             log.original.as_ref().map(|settings| settings.sidetone)
         );
     }
+}
+
+fn assert_soak_passed(minutes: u64, rebinds: usize, log: &SoakLog) {
     let expected = usize::try_from(minutes * REBINDS_PER_MINUTE / 2).unwrap_or(usize::MAX);
     assert!(rebinds >= expected, "too few rebinds: is fwupd running?");
     assert_eq!(log.disconnects(), [], "a user-visible disconnect");
