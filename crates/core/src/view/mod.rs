@@ -1,3 +1,4 @@
+pub mod app_presets;
 pub mod eq_editor;
 pub mod equalizer_rows;
 pub mod headset_page;
