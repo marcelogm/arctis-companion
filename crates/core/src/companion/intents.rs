@@ -1,8 +1,10 @@
 use super::action::Action;
+use super::action::PresetChange;
 use super::adoption::AdoptionStatus;
 use super::app_settings::PersistedChange;
 use super::reducer::Companion;
 use super::selection::{ActivateError, ManualPick, PATHS, picked_path};
+use crate::eq::preset::Preset;
 use crate::eq::preset::PresetId;
 use crate::intent::Intent;
 use crate::messages::audio::SoundPath;
@@ -30,9 +32,9 @@ impl Companion {
             Intent::SetLowBatteryThreshold(threshold) => {
                 self.set_low_battery_threshold(threshold, out);
             }
-            Intent::SavePreset(_)
-            | Intent::DeletePreset(_)
-            | Intent::SetMicVolume(_)
+            Intent::SavePreset(preset) => self.save_preset(preset, out),
+            Intent::DeletePreset(preset) => self.delete_preset(&preset, out),
+            Intent::SetMicVolume(_)
             | Intent::SetSidetone(_)
             | Intent::SetMuteLight(_)
             | Intent::SetVolumeLimiter(_)
@@ -174,5 +176,32 @@ impl Companion {
                 .into_iter()
                 .map(Action::from),
         );
+    }
+
+    fn save_preset(&mut self, preset: Preset, out: &mut Vec<Action>) {
+        let id = preset.id().clone();
+        if !self.catalog.save(preset.clone()) {
+            return;
+        }
+        out.push(Action::StorePreset(PresetChange::Save(preset)));
+        self.curve_changed(&id, out);
+    }
+
+    fn delete_preset(&mut self, id: &PresetId, out: &mut Vec<Action>) {
+        if !self.catalog.delete(id) {
+            return;
+        }
+        out.push(Action::StorePreset(PresetChange::Delete(id.clone())));
+        self.curve_changed(id, out);
+    }
+
+    fn curve_changed(&mut self, id: &PresetId, out: &mut Vec<Action>) {
+        if self.active(SoundPath::Dongle).preset == *id {
+            self.engines.editor.request();
+        }
+        if self.active(SoundPath::Bluetooth).preset == *id {
+            let curve = self.active_curve(SoundPath::Bluetooth);
+            self.retarget_system_curve(curve, out);
+        }
     }
 }

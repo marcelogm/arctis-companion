@@ -182,6 +182,9 @@ impl Companion {
         for path in PATHS {
             self.settle(path, trigger, out);
         }
+        if self.engines.editor.take_due(trigger.now) {
+            self.write_active_headset_curve(out);
+        }
     }
 
     pub(super) fn sync_policy(&self) -> Action {
@@ -320,11 +323,12 @@ impl Companion {
         }
     }
 
-    fn write_headset_curve(&self, curve: Curve, out: &mut Vec<Action>) -> bool {
+    fn write_headset_curve(&mut self, curve: Curve, out: &mut Vec<Action>) -> bool {
         if self.adoption() != AdoptionStatus::Adopted {
             return false;
         }
         let on_headset = self.on_headset(&curve);
+        self.engines.editor.cancel();
         out.push(Action::SendDevice(Change::Desired {
             settings: self.settings.headset.with_curve(curve),
             policy: SyncPolicy::Enforce,
@@ -347,5 +351,10 @@ impl Companion {
         self.audio.equalizer = Some(curve.clone());
         out.push(Action::SendAudio(AudioCommand::Retarget(curve)));
         true
+    }
+
+    fn write_active_headset_curve(&mut self, out: &mut Vec<Action>) {
+        let curve = self.active_curve(SoundPath::Dongle);
+        self.write_headset_curve(curve, out);
     }
 }
