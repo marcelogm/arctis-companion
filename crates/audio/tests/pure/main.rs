@@ -1,4 +1,5 @@
 mod changes;
+mod designer;
 mod graph;
 mod links;
 mod outputs;

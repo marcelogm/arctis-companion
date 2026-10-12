@@ -2,7 +2,7 @@ use std::cell::{Cell, RefCell};
 use std::io::Cursor;
 use std::rc::Rc;
 
-use arctis_core::eq::{Coefficients, Curve};
+use arctis_core::eq::Curve;
 use pipewire as pw;
 use pw::buffer::Buffer;
 use pw::core::CoreRc;
@@ -17,15 +17,14 @@ use spa::sys::{
     SPA_AUDIO_CHANNEL_FL, SPA_AUDIO_CHANNEL_FR, SPA_PARAM_EnumFormat, SPA_TYPE_OBJECT_Format,
 };
 use spa::utils::Direction;
-use triple_buffer::Input;
 
+use crate::designer::{Designer, rate_of};
 use crate::outputs::{EQ_DESCRIPTION, EQ_LINK_GROUP, EQ_OUTPUT_NAME, EQ_SINK_NAME};
 use crate::samples::{CHANNELS, FRAME_BYTES, Processor};
 use crate::volume::{
     CHANNEL_VOLUMES, MUTE, SOFT_MUTE, SOFT_VOLUMES, Volume, VolumeChange, volume_change,
 };
 
-pub const INITIAL_RATE: u32 = 48_000;
 const UNITY: [f32; CHANNELS] = [1.0; CHANNELS];
 
 pub type OnVolume = Rc<dyn Fn(VolumeChange)>;
@@ -50,13 +49,8 @@ impl EqSink {
         replaced: Replaced,
         on_volume: OnVolume,
     ) -> Result<Self, pw::Error> {
-        let (input, output) =
-            triple_buffer::triple_buffer(&Coefficients::design(curve, INITIAL_RATE));
-        let designer = Rc::new(RefCell::new(Designer {
-            curve: curve.clone(),
-            rate: INITIAL_RATE,
-            coefficients: input,
-        }));
+        let (designer, output) = Designer::new(curve);
+        let designer = Rc::new(RefCell::new(designer));
         let capture = StreamRc::new(core.clone(), EQ_SINK_NAME, capture_props())?;
         let playback = StreamRc::new(core.clone(), EQ_OUTPUT_NAME, playback_props(&replaced.name))?;
         let reactions = Reactions {
@@ -88,31 +82,6 @@ impl Drop for EqSink {
     fn drop(&mut self) {
         let _ = self.playback.disconnect();
         let _ = self.capture.disconnect();
-    }
-}
-
-struct Designer {
-    curve: Curve,
-    rate: u32,
-    coefficients: Input<Coefficients>,
-}
-
-impl Designer {
-    fn set_curve(&mut self, curve: &Curve) {
-        self.curve = curve.clone();
-        self.publish();
-    }
-
-    fn set_rate(&mut self, rate: u32) {
-        if rate != self.rate {
-            self.rate = rate;
-            self.publish();
-        }
-    }
-
-    fn publish(&mut self) {
-        self.coefficients
-            .write(Coefficients::design(&self.curve, self.rate));
     }
 }
 
@@ -210,12 +179,6 @@ fn start_at(stream: &Stream, volume: Option<&Volume>) {
 fn keep_unity(stream: &Stream) {
     let _ = stream.set_control(SOFT_VOLUMES, &UNITY);
     let _ = stream.set_control(SOFT_MUTE, &[0.0]);
-}
-
-fn rate_of(format: &Pod) -> Option<u32> {
-    let mut info = AudioInfoRaw::new();
-    info.parse(format).ok()?;
-    Some(info.rate()).filter(|rate| *rate > 0)
 }
 
 fn listen_playback(

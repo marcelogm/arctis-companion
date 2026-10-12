@@ -1,6 +1,7 @@
 #![forbid(unsafe_code)]
 
 pub mod changes;
+pub mod designer;
 pub mod eq_sink;
 pub mod graph;
 pub mod handle;
