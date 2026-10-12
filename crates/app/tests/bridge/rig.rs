@@ -2,15 +2,14 @@ use std::rc::Rc;
 
 use arctis_app::bridge::Bridge;
 use arctis_app::ports::{Ports, Stores};
-use arctis_core::companion::app_settings::{AppRules, AppSettings, Persisted, RoutePresets};
+use arctis_core::companion::app_settings::Persisted;
 use arctis_core::companion::{Companion, Input, Snapshot};
 use arctis_core::eq::curve::Curve;
-use arctis_core::eq::library;
-use arctis_core::eq::preset::{Preset, PresetId};
-use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
+use arctis_core::eq::preset::Preset;
 use arctis_core::messages::device::Change;
 use arctis_core::ports::PresetRepository;
-use arctis_core::testkit::snapshots::{id, percent, values};
+pub use arctis_core::testkit::companion::{curve, firefox, persisted, with_rule};
+use arctis_core::testkit::snapshots::id;
 use arctis_core::time::Millis;
 
 use crate::fakes::{Journal, ManualAlarm, ManualClock, Recorder, Seen};
@@ -77,50 +76,8 @@ impl Rig {
     }
 }
 
-pub fn persisted() -> Persisted {
-    Persisted {
-        settings: AppSettings {
-            headset: values(),
-            route_presets: RoutePresets {
-                dongle: id("flat"),
-                bluetooth: id("flat"),
-            },
-            app_rules: AppRules::default(),
-            automatic_presets: true,
-            adopted_identity: None,
-            bluetooth_sink_seen: false,
-            low_battery_threshold: percent(15),
-        },
-        custom_presets: Vec::new(),
-        seen_apps: Vec::new(),
-        battery: Vec::new(),
-    }
-}
-
-pub fn with_rule(app: &str, preset: &str) -> Persisted {
-    let mut saved = persisted();
-    saved.settings.app_rules.set(app.to_owned(), id(preset));
-    saved
-}
-
-pub fn curve(preset: &str) -> Curve {
-    library::find(&PresetId::new(preset))
-        .expect("built-in preset")
-        .curve()
-        .clone()
-}
-
 pub fn mine() -> Preset {
     Preset::custom(id("mine"), "Mine".to_owned(), curve("bass-boost"))
-}
-
-pub fn firefox(path: Option<SoundPath>) -> StreamInfo {
-    StreamInfo {
-        ids: AppIdentifiers::new(Some("org.mozilla.firefox"), None, Some("firefox")),
-        name: "Firefox".to_owned(),
-        running: true,
-        path,
-    }
 }
 
 pub fn published(seen: &[Seen]) -> Option<Rc<Snapshot>> {
