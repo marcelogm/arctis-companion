@@ -45,65 +45,55 @@ template $ArctisEqEditorPage: Adw.NavigationPage {
       }
     }
 
-    content: Adw.BreakpointBin {
-      width-request: 360;
-      height-request: 200;
+    content: Box layout {
+      name: "editor-layout";
+      orientation: vertical;
 
-      child: Box layout {
-        name: "editor-layout";
-        orientation: horizontal;
-        spacing: 12;
+      Adw.Clamp {
+        maximum-size: 720;
+        tightening-threshold: 600;
 
-        $ArctisResponseGraph graph {
+        child: $ArctisResponseGraph graph {
           name: "response-graph";
           height-request: 160;
-          hexpand: true;
-          valign: start;
           margin-start: 12;
           margin-end: 12;
           margin-top: 12;
-        }
+        };
+      }
 
-        ScrolledWindow {
-          hscrollbar-policy: never;
-          hexpand: true;
-          vexpand: true;
+      ScrolledWindow {
+        hscrollbar-policy: never;
+        vexpand: true;
 
-          child: Adw.Clamp {
+        child: Adw.Clamp {
+          maximum-size: 720;
+          tightening-threshold: 600;
+
+          child: Adw.PreferencesGroup bands {
+            name: "bands";
+            title: _("Bands");
             margin-start: 12;
             margin-end: 12;
-            margin-top: 12;
-            margin-bottom: 12;
+            margin-top: 24;
+            margin-bottom: 24;
 
-            child: Adw.PreferencesGroup bands {
-              name: "bands";
-              title: _("Bands");
+            header-suffix: Button add_band {
+              name: "add-band";
+              icon-name: "list-add-symbolic";
+              action-name: "editor.add-band";
+              tooltip-text: _("Add Band");
 
-              header-suffix: Button add_band {
-                name: "add-band";
-                icon-name: "list-add-symbolic";
-                action-name: "editor.add-band";
-                tooltip-text: _("Add Band");
+              styles [
+                "flat",
+              ]
 
-                styles [
-                  "flat",
-                ]
-
-                accessibility {
-                  label: _("Add Band");
-                }
-              };
+              accessibility {
+                label: _("Add Band");
+              }
             };
           };
-        }
-      };
-
-      Adw.Breakpoint {
-        condition ("max-width: 720sp")
-
-        setters {
-          layout.orientation: vertical;
-        }
+        };
       }
     };
   };
