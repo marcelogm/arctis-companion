@@ -285,6 +285,7 @@ Each item keeps its designed default until a person runs it; scripts must use th
 | 11 | QuickSwitch | both links up, press QuickSwitch, log `B0[1]` and events | no "playing from Bluetooth" state |
 | 12 | Nova 5 bluez node | pair over Bluetooth, `pw-dump` the node and its Device | match by `device.api` and description prefix |
 | 13 | Optional flap confirmation | `systemctl stop fwupd` for 2 min, `journalctl -k` shows no `input3` rebind, start it again | fwupd is the cause (§4) |
+| 14 | SP5 soak with the headset on | only if §11 says the headset was off: turn it on, set Automatic power off to Never for the run, then `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored --nocapture`; the `soak:` line must show writes requested = confirmed and failed 0. Check the sidetone first: §11 says an earlier run may have left it one step off | write then verify (device §4) |
 
 ## 8. Captures
 
@@ -331,3 +332,28 @@ is what the golden tests need. SP2 moved them to `crates/core/tests/golden/`.
 | fwupd was not stopped; the cause was confirmed from source, timing and the stale tail instead, and the stop test is optional item 13 | `systemctl stop fwupd` needs root |
 | `34` was not sent although `22` returned a band layout | it needs phone audio and a listener, and this run allowed no `34` |
 | The device spec's timing table and ADR 0005 now point here instead of saying "SP0 measures/confirms" | keeps the authoritative docs in step with the results |
+
+## 11. SP5 soak
+
+`crates/hid/tests/hardware/soak.rs` ran the real `crates/hid/src/worker.rs::Worker` (sysfs discovery, `poll(2)`,
+raw hidraw) against this dongle for 30 minutes on 2026-10-12 with fwupd 2.1.8 running. Each minute, while the
+session was Ready, it would ask for the sidetone one step away from the value it first observed (and back the next
+minute), and count the `Observed` that confirmed each write; at the end it restores the first observed settings.
+
+```
+soak: 30 min, 90 rebinds ridden, phases [(150.512519ms, Settling), (5.512343467s, Probing), (5.512345027s, HeadsetOff)], writes requested 0, confirmed 0, failed 0, interrupted by the headset turning off 0
+soak: the headset never reached Ready, so no write was exercised
+```
+
+| Item | Result |
+|---|---|
+| Headset | off for the whole run (auto-off timer) |
+| Rebinds ridden (iface 3 reopened after an `EIO`) | 90 |
+| User-visible disconnect (`Absent`, `PermissionDenied` or `Rebinding` published after connecting) | none |
+| Sidetone writes requested / confirmed by `Observed` / `WriteFailed` / interrupted by auto-off | 0 / 0 / 0 / 0, see §7 item 14 |
+
+An earlier 30-minute run the same morning (09:46 to 10:16) found the dongle, rode the rebinds without a disconnect and
+had no `WriteFailed`, but failed on `a write was lost`: the headset was Ready for part of the run and was off at
+the end, and the harness then asked to restore the first observed settings, which the session never writes in
+HeadsetOff. The harness now restores only while Ready (`crates/hid/tests/hardware/soak_log.rs::SoakLog`). That run
+printed no `soak:` line, so the sidetone it left on the headset is unknown and may be one step from the user's value.
