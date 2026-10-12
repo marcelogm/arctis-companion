@@ -1,7 +1,12 @@
+use std::thread;
+use std::time::Duration;
+
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, SinkKind};
 
 use crate::lab::{BLUEZ, EQ_SINK, Lab, USB, bluetooth, eventually, flat};
 use crate::tools;
+
+const QUIET: Duration = Duration::from_secs(1);
 
 #[test]
 #[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
@@ -58,4 +63,28 @@ fn dropping_the_handle_restores_bluez() {
     eventually("the equalizer sink gone", || {
         tools::node_id(EQ_SINK).is_none()
     });
+}
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn the_adapter_connects_as_a_manager() {
+    let _lab = Lab::open();
+    eventually("one Manager client of this process", || {
+        tools::manager_clients_of(std::process::id()) == 1
+    });
+}
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn inserting_over_another_default_changes_nothing() {
+    let lab = Lab::open();
+    tools::set_configured_default(USB);
+    lab.wait_for(
+        "the USB default",
+        |event| matches!(event, AudioEvent::DefaultSink(sink) if sink.terminal == SinkKind::Other),
+    );
+    lab.send(AudioCommand::InsertEqualizer(flat()));
+    thread::sleep(QUIET);
+    assert_eq!(tools::node_id(EQ_SINK), None);
+    assert_eq!(tools::configured_default().as_deref(), Some(USB));
 }

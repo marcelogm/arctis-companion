@@ -72,3 +72,13 @@ pub fn volume_of(name: &str) -> Option<(Vec<f64>, bool)> {
         .collect();
     Some((channels, volumes["mute"].as_bool()?))
 }
+
+pub fn manager_clients_of(pid: u32) -> usize {
+    dump()
+        .iter()
+        .filter(|object| object["type"] == "PipeWire:Interface:Client")
+        .map(props)
+        .filter(|props| props["pipewire.sec.pid"].as_u64() == Some(u64::from(pid)))
+        .filter(|props| props["media.category"] == "Manager")
+        .count()
+}
