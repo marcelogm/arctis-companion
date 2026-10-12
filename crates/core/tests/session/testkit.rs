@@ -3,7 +3,7 @@ use arctis_core::protocol::{Command, Query, encode};
 use arctis_core::session::Interface;
 use arctis_core::settings::headset_settings::SettingChange;
 use arctis_core::settings::values::Percent;
-use arctis_core::testkit::{Behaviour, FakeHeadset};
+use arctis_core::testkit::{Behaviour, FakeHeadset, frame_from_report};
 use arctis_core::time::Millis;
 
 use crate::support::{filter, golden, sidetone};
@@ -136,4 +136,16 @@ fn a_silent_headset_answers_nothing() {
     });
     let emissions = headset.receive(&encode(&Command::from(Query::Status)), Millis(0));
     assert!(emissions.is_empty());
+}
+
+#[test]
+fn a_written_report_reads_back_as_its_frame() {
+    let frame = encode(&Command::from(Query::Status));
+    assert_eq!(frame_from_report(frame.as_bytes()), Some(frame));
+}
+
+#[test]
+fn a_report_of_the_wrong_shape_is_refused() {
+    assert_eq!(frame_from_report(&[0xB0; 65]), None);
+    assert_eq!(frame_from_report(&[0; 64]), None);
 }
