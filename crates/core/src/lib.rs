@@ -9,6 +9,7 @@ pub mod intent;
 pub mod messages;
 pub mod ports;
 pub mod protocol;
+pub mod session;
 pub mod settings;
 #[cfg(feature = "testkit")]
 pub mod testkit;
