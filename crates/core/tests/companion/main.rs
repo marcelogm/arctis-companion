@@ -1,6 +1,7 @@
 mod support;
 
 mod adoption;
+mod adoption_flow;
 mod alerts;
 mod app_settings;
 mod catalog;

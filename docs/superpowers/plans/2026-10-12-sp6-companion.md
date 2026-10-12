@@ -5517,7 +5517,7 @@ git push
 - Modify: `crates/core/src/companion/reducer.rs`
 - Test: `crates/core/tests/companion/adoption_flow.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod adoption_flow;` to `crates/core/tests/companion/main.rs`.
 
@@ -5664,12 +5664,12 @@ fn a_button_press_before_adoption_changes_no_desired_value() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion adoption_flow`
 Expected: FAIL (no `SendDevice` and no `Persist` actions yet).
 
-- [ ] **Step 3: Implement adoption in `reducer.rs`**
+- [x] **Step 3: Implement adoption in `reducer.rs`**
 
 Add to the imports of `reducer.rs`:
 
@@ -5767,12 +5767,12 @@ Replace `handle` and `device` and add `advance`, `sync_policy`, `headset_changed
 
 The last `sync_policy()` in `try_adopt` runs after the identity is stored, so it is `Enforce`.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
