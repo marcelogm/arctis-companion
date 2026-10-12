@@ -29,3 +29,34 @@ pub enum DecodeError {
     UnexpectedId { expected: u8, got: u8 },
     InvalidValue { offset: usize },
 }
+
+pub(crate) fn expect_frame(bytes: &[u8], id: u8, needed: usize) -> Result<&[u8], DecodeError> {
+    let frame = bytes.get(..needed).ok_or(DecodeError::TooShort {
+        needed,
+        got: bytes.len(),
+    })?;
+    if frame[0] == id {
+        Ok(frame)
+    } else {
+        Err(DecodeError::UnexpectedId {
+            expected: id,
+            got: frame[0],
+        })
+    }
+}
+
+pub(crate) fn field<T: TryFrom<u8>>(frame: &[u8], offset: usize) -> Result<T, DecodeError> {
+    T::try_from(frame[offset]).map_err(|_| DecodeError::InvalidValue { offset })
+}
+
+pub(crate) const fn flag(raw: u8) -> Option<bool> {
+    match raw {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+
+pub(crate) fn flag_field(frame: &[u8], offset: usize) -> Result<bool, DecodeError> {
+    flag(frame[offset]).ok_or(DecodeError::InvalidValue { offset })
+}
