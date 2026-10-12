@@ -3,8 +3,10 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use arctis_app::platform::battery_store::FileBattery;
+use arctis_app::platform::persisted::{file_stores, load_persisted};
 use arctis_app::platform::preset_store::FilePresets;
 use arctis_app::platform::seen_apps_store::FileSeenApps;
+use arctis_core::battery::log_format::RETENTION_SECONDS;
 use arctis_core::battery::sample::{Reading, Sample, UnixSeconds};
 use arctis_core::companion::seen_apps::SeenApp;
 use arctis_core::eq::library;
@@ -17,6 +19,8 @@ use arctis_core::settings::values::Percent;
 use arctis_core::testkit::repository_contracts::battery_repository_contract;
 use arctis_core::testkit::repository_contracts::preset_repository_contract;
 use arctis_core::testkit::repository_contracts::seen_apps_repository_contract;
+use arctis_core::testkit::snapshots::snapshot;
+use arctis_core::time::Millis;
 use tempfile::TempDir;
 
 struct Scratch {
@@ -167,4 +171,52 @@ fn an_unreadable_seen_apps_file_is_an_error_and_the_next_record_replaces_it() {
     };
     store.record(&firefox).expect("record");
     assert_eq!(store.load().expect("load"), [firefox]);
+}
+
+const NOW_SECONDS: u64 = 1_760_000_000;
+
+fn app_settings() -> arctis_core::companion::app_settings::AppSettings {
+    let snapshot = snapshot();
+    arctis_core::companion::app_settings::AppSettings {
+        headset: snapshot.dongle.desired,
+        route_presets: snapshot.presets.route_presets.clone(),
+        app_rules: snapshot.presets.rules.clone(),
+        automatic_presets: true,
+        adopted_identity: None,
+        bluetooth_sink_seen: false,
+        low_battery_threshold: snapshot.battery.low_threshold,
+    }
+}
+
+#[test]
+fn start_up_drops_battery_rows_older_than_eight_days() {
+    let scratch = Scratch::new();
+    let dir = scratch.fresh();
+    let mut stores = file_stores(&dir);
+    let old = sample(NOW_SECONDS - RETENTION_SECONDS - 1, 90);
+    let recent = sample(NOW_SECONDS - 60, 80);
+    stores.battery.append(&old).expect("old");
+    stores.battery.append(&recent).expect("recent");
+    let persisted = load_persisted(app_settings(), &mut stores, Millis(NOW_SECONDS * 1_000));
+    assert_eq!(persisted.battery, [recent]);
+    assert_eq!(
+        FileBattery::new(dir.join("battery.csv"))
+            .load()
+            .expect("load"),
+        [recent]
+    );
+}
+
+#[test]
+fn start_up_reads_every_store_and_survives_a_broken_one() {
+    let scratch = Scratch::new();
+    let dir = scratch.fresh();
+    let mut stores = file_stores(&dir);
+    stores.presets.save(&custom("mine")).expect("preset");
+    fs::write(dir.join("seen-apps.json"), "[ broken").expect("broken seen apps");
+    let persisted = load_persisted(app_settings(), &mut stores, Millis(NOW_SECONDS * 1_000));
+    assert_eq!(persisted.custom_presets, [custom("mine")]);
+    assert_eq!(persisted.seen_apps, []);
+    assert_eq!(persisted.settings, app_settings());
+    assert!(dir.join("presets").join("mine.json").exists());
 }
