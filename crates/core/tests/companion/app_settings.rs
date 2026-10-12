@@ -72,10 +72,13 @@ fn rules_follow_the_identifier_order_of_the_stream() {
 #[test]
 fn rules_can_be_set_and_removed() {
     let mut app_rules = AppRules::default();
-    app_rules.set("firefox".to_owned(), id("footsteps"));
-    assert_eq!(app_rules.len(), 1);
-    app_rules.remove("firefox");
     assert!(app_rules.is_empty());
+    app_rules.set("firefox".to_owned(), id("footsteps"));
+    app_rules.set("chromium".to_owned(), id("podcast"));
+    assert_eq!(app_rules.len(), 2);
+    assert!(!app_rules.is_empty());
+    app_rules.remove("firefox");
+    assert_eq!(app_rules.len(), 1);
 }
 
 #[test]

@@ -91,6 +91,10 @@ fn the_headset_switches_at_most_once_per_thirty_seconds() {
     let held = h.at(6_000).send(Input::Woke);
     assert!(device_curves(&held).is_empty());
     assert_eq!(wakes(&held), [START.after(32_000)]);
+    assert_eq!(
+        h.snapshot().presets.active(SoundPath::Dongle),
+        &chosen_for("footsteps", "firefox")
+    );
     let _ = h
         .at(10_000)
         .audio(playing(&["firefox", "spotify", "mpv"], SoundPath::Dongle));
