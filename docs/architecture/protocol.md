@@ -21,7 +21,7 @@ flowchart BT
 | Module | Code |
 |---|---|
 | Range-checked values | `crates/core/src/bounded.rs::OutOfRange` and the `bounded!` and `raw_enum!` macros in `crates/core/src/bounded.rs`; `MuteLight` and `WirelessMode` in `crates/core/src/settings/values.rs`, `crates/core/src/settings/values.rs::AutoPowerOff` |
-| Filters and curves | `crates/core/src/eq/filter.rs::Filter`, `crates/core/src/eq/filter.rs::FilterKind`, `crates/core/src/eq/curve.rs::Curve` |
+| Filters and curves (SP3, see eq.md) | `crates/core/src/eq/filter.rs::Filter`, `crates/core/src/eq/filter.rs::FilterKind`, `crates/core/src/eq/curve.rs::Curve` |
 | Headset settings | `crates/core/src/settings/headset_settings.rs::HeadsetSettings`, `crates/core/src/settings/headset_settings.rs::Setting`, `crates/core/src/settings/headset_settings.rs::SettingChange`, `crates/core/src/settings/headset_settings.rs::apply` |
 | Frames | `crates/core/src/protocol/frame.rs::Frame`, `crates/core/src/protocol/frame.rs::DecodeError`, `crates/core/src/protocol/frame.rs::expect_frame` |
 | Commands | `crates/core/src/protocol/command.rs::Command`, `crates/core/src/protocol/command.rs::Query`, `crates/core/src/protocol/command.rs::encode`, `crates/core/src/protocol/command.rs::readback` |
@@ -132,5 +132,5 @@ The udev rule test stays a file of its own at the path the device spec names.
 | Replies, firmware slots, no-panic and stale-tail proptests | `crates/core/tests/protocol/reply.rs` |
 | Events, no-panic proptest | `crates/core/tests/protocol/event.rs` |
 | Models and the udev rule | `crates/core/tests/protocol/model.rs`, `crates/core/tests/udev_rule.rs` |
-| Value ranges | `crates/core/tests/protocol/values.rs`, `crates/core/tests/protocol/status.rs`, `crates/core/tests/protocol/eq_types.rs`, `crates/core/tests/protocol/headset_settings.rs` |
+| Value ranges | `crates/core/tests/protocol/values.rs`, `crates/core/tests/protocol/status.rs`, `crates/core/tests/protocol/headset_settings.rs` |
 | Frozen message contract: exhaustive matches that stop compiling when a variant or payload type changes | `crates/core/tests/protocol/messages.rs` |
