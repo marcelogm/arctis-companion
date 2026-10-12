@@ -1,6 +1,7 @@
 pub mod biquad;
 pub mod coefficients;
 pub mod curve;
+pub mod decimal;
 pub mod equalizer;
 pub mod filter;
 pub mod library;

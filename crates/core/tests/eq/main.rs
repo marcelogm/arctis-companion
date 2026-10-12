@@ -2,6 +2,7 @@ mod biquad;
 mod coefficients;
 mod crossfade;
 mod curve;
+mod decimal;
 mod equalizer;
 mod filter;
 mod library;
