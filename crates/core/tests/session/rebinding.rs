@@ -1,14 +1,16 @@
 use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
+use arctis_core::protocol::Query;
 use arctis_core::session::timing::{
     ENUMERATION_SETTLE, HEADSET_OFF_POLL, REBIND_GIVE_UP, REBIND_NOTICE, REBIND_SETTLE,
     RESCAN_REBINDING,
 };
 use arctis_core::session::{Cadence, Interface};
+use arctis_core::settings::headset_settings::Setting;
 use arctis_core::testkit::{Emission, FakeHeadset, Flap, Simulation};
 
 use crate::support::{
     Arrow, SETTLED, arrow, assert_arrows, headset_off, observed, percent, probing, probing_silent,
-    published, ready, sent, settling, syncing, syncing_silent, with_sidetone,
+    published, ready, sent, setter, settling, syncing, syncing_silent, with_sidetone,
 };
 
 const QUICK_FLAP: Flap = Flap {
@@ -170,7 +172,7 @@ fn a_flap_while_probing_resends_the_status_query() {
     simulation.flap(QUICK_FLAP);
     simulation.run_for(FLAP_DONE);
     assert_eq!(simulation.phase(), Phase::Syncing);
-    assert_eq!(sent(&simulation, 0xB0), 2);
+    assert_eq!(sent(&simulation, Query::Status.id()), 2);
 }
 
 #[test]
@@ -294,7 +296,7 @@ fn a_write_lost_to_eio_is_redone_and_verified_after_reopen() {
     simulation.fail_next_write();
     simulation.desire(desired.clone(), SyncPolicy::Enforce);
     simulation.run_for(FLAP_DONE + 1_000);
-    assert_eq!(sent(&simulation, 0x39), 2);
+    assert_eq!(sent(&simulation, setter(Setting::Sidetone)), 2);
     assert_eq!(simulation.headset().settings(), &desired);
     assert_eq!(observed(&simulation), Some(desired));
     let failures = published(&simulation, |update| {
@@ -358,7 +360,7 @@ fn a_headset_off_poll_keeps_its_schedule_across_a_flap() {
     simulation.run_for(HEADSET_OFF_POLL - 1_000);
     simulation.flap(QUICK_FLAP);
     simulation.run_for(1_000 + FLAP_DONE);
-    assert_eq!(sent(&simulation, 0xB0), 1);
+    assert_eq!(sent(&simulation, Query::Status.id()), 1);
 }
 
 #[test]

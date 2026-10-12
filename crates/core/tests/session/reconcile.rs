@@ -1,16 +1,17 @@
 use arctis_core::messages::device::{Phase, SyncPolicy};
 use arctis_core::session::timing::VERIFY_BACKOFF;
-use arctis_core::settings::headset_settings::SettingChange;
+use arctis_core::settings::headset_settings::{Setting, SettingChange};
 use arctis_core::testkit::{Behaviour, FakeHeadset, Simulation};
 
 use crate::support::{
-    SETTLED, headset_off, mic, observed, plugged, ready, sent, sidetone, with_sidetone,
+    SETTLED, headset_off, mic, observed, plugged, ready, sent, setter, sidetone, with_sidetone,
 };
 
-const SETTERS: [u8; 7] = [0x27, 0x33, 0x35, 0x37, 0x39, 0xA3, 0xAE];
-
 fn setter_writes(simulation: &Simulation) -> usize {
-    SETTERS.iter().map(|id| sent(simulation, *id)).sum()
+    Setting::ALL
+        .into_iter()
+        .map(|setting| sent(simulation, setter(setting)))
+        .sum()
 }
 
 #[test]
@@ -39,7 +40,7 @@ fn enforce_writes_only_the_drifted_fields() {
     simulation.desire(desired, SyncPolicy::Enforce);
     simulation.run_for(1_000);
     assert_eq!(setter_writes(&simulation), 1);
-    assert_eq!(sent(&simulation, 0x39), 1);
+    assert_eq!(sent(&simulation, setter(Setting::Sidetone)), 1);
     assert_eq!(simulation.phase(), Phase::Ready);
 }
 
@@ -54,7 +55,7 @@ fn desired_settings_arriving_after_probing_are_applied_before_ready() {
     let sidetone_at = simulation
         .writes()
         .iter()
-        .find(|(_, frame)| frame.payload()[0] == 0x39)
+        .find(|(_, frame)| frame.payload()[0] == setter(Setting::Sidetone))
         .map(|(at, _)| *at);
     assert!(sidetone_at.is_some_and(|at| at < ready_at));
     assert_eq!(simulation.headset().settings(), &desired);
@@ -71,7 +72,7 @@ fn a_reconcile_while_syncing_waits_through_the_verify_backoff() {
     let desired = with_sidetone(simulation.headset().settings(), 6);
     simulation.desire(desired.clone(), SyncPolicy::Enforce);
     simulation.run_until(Phase::Ready, SETTLED);
-    assert_eq!(sent(&simulation, 0x39), 1);
+    assert_eq!(sent(&simulation, setter(Setting::Sidetone)), 1);
     assert_eq!(simulation.headset().settings(), &desired);
 }
 
@@ -102,7 +103,7 @@ fn a_reconnect_writes_only_the_fields_that_drifted() {
     simulation.power_on();
     simulation.run_until(Phase::Ready, SETTLED);
     assert_eq!(setter_writes(&simulation), 1);
-    assert_eq!(sent(&simulation, 0x37), 1);
+    assert_eq!(sent(&simulation, setter(Setting::MicVolume)), 1);
     assert_eq!(simulation.headset().settings().sidetone, sidetone(6));
 }
 

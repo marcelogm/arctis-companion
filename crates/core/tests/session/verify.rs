@@ -1,31 +1,29 @@
 use arctis_core::eq::{Curve, FilterKind};
-use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
+use arctis_core::messages::device::{DeviceUpdate, Phase};
+use arctis_core::protocol::Query;
 use arctis_core::protocol::status::Link;
 use arctis_core::session::timing::{COMMAND_SPACING, REPLY_TIMEOUT, VERIFY_BACKOFF};
 use arctis_core::settings::headset_settings::{HeadsetSettings, Setting};
 use arctis_core::settings::values::{AutoPowerOff, MuteLight};
-use arctis_core::testkit::{Behaviour, FakeHeadset, Simulation};
+use arctis_core::testkit::{Behaviour, Simulation};
 
-use crate::support::{SETTLED, filter, mic, observed, published, ready_with, sent, with_sidetone};
-
-pub fn ready_behaving(behaviour: Behaviour) -> Simulation {
-    let mut simulation = ready_with(FakeHeadset::nova_5().with_behaviour(behaviour));
-    simulation.clear_logs();
-    simulation
-}
-
-pub fn desire(simulation: &mut Simulation, settings: &HeadsetSettings) {
-    simulation.desire(settings.clone(), SyncPolicy::Enforce);
-}
+use crate::support::{
+    SETTLED, desire, filter, mic, observed, published, ready_behaving, sent, setter, with_sidetone,
+};
 
 fn sidetone_bytes(simulation: &Simulation) -> Vec<u8> {
     simulation
         .writes()
         .iter()
         .map(|(_, frame)| frame.payload())
-        .filter(|payload| payload[0] == 0x39)
+        .filter(|payload| payload[0] == setter(Setting::Sidetone))
         .map(|payload| payload[1])
         .collect()
+}
+
+fn sidetone_attempt() -> Vec<u8> {
+    let audio = Query::Audio.id();
+    vec![setter(Setting::Sidetone), audio, audio, audio]
 }
 
 fn write_failures(simulation: &Simulation) -> Vec<Setting> {
@@ -46,7 +44,10 @@ fn a_setter_is_followed_by_its_readback_after_the_first_backoff() {
     desire(&mut simulation, &desired);
     simulation.run_for(1_000);
     let writes = simulation.writes();
-    assert_eq!(simulation.sent_ids(), [0x39, 0x20]);
+    assert_eq!(
+        simulation.sent_ids(),
+        [setter(Setting::Sidetone), Query::Audio.id()]
+    );
     assert_eq!(writes[1].0.since(writes[0].0), VERIFY_BACKOFF[0]);
     assert_eq!(observed(&simulation), Some(desired));
     assert!(write_failures(&simulation).is_empty());
@@ -61,7 +62,7 @@ fn a_value_visible_only_at_the_400_ms_readback_passes() {
     let desired = with_sidetone(simulation.headset().settings(), 6);
     desire(&mut simulation, &desired);
     simulation.run_for(1_000);
-    assert_eq!(simulation.sent_ids(), [0x39, 0x20, 0x20, 0x20]);
+    assert_eq!(simulation.sent_ids(), sidetone_attempt());
     let start = simulation.writes()[0].0;
     let offsets: Vec<u64> = simulation.writes()[1..]
         .iter()
@@ -81,8 +82,8 @@ fn a_mismatch_is_retried_once_then_reported() {
     let before = simulation.headset().settings().clone();
     desire(&mut simulation, &with_sidetone(&before, 6));
     simulation.run_for(10_000);
-    let attempt = [0x39, 0x20, 0x20, 0x20];
-    assert_eq!(simulation.sent_ids(), [attempt, attempt].concat());
+    let attempt = sidetone_attempt();
+    assert_eq!(simulation.sent_ids(), [attempt.clone(), attempt].concat());
     assert_eq!(write_failures(&simulation), [Setting::Sidetone]);
     assert_eq!(observed(&simulation), Some(before));
 }
@@ -101,7 +102,7 @@ fn a_failed_setting_waits_for_the_next_desired_change() {
     assert!(simulation.writes().is_empty());
     desire(&mut simulation, &desired);
     simulation.run_for(1);
-    assert_eq!(simulation.sent_ids(), [0x39]);
+    assert_eq!(simulation.sent_ids(), [setter(Setting::Sidetone)]);
 }
 
 #[test]
@@ -119,7 +120,7 @@ fn a_failed_setting_is_retried_on_the_next_syncing() {
     simulation.clear_logs();
     simulation.power_on();
     simulation.run_until(Phase::Ready, SETTLED);
-    assert_eq!(sent(&simulation, 0x39), 1);
+    assert_eq!(sent(&simulation, setter(Setting::Sidetone)), 1);
     assert_eq!(simulation.headset().settings(), &desired);
 }
 
@@ -136,7 +137,10 @@ fn a_headset_that_quantizes_q_passes_verify() {
     };
     desire(&mut simulation, &desired);
     simulation.run_for(1_000);
-    assert_eq!(simulation.sent_ids(), [0x33, 0x20]);
+    assert_eq!(
+        simulation.sent_ids(),
+        [setter(Setting::Equalizer), Query::Audio.id()]
+    );
     assert!(write_failures(&simulation).is_empty());
     let stored = &simulation.headset().settings().equalizer;
     assert_eq!(stored.filters()[0].q().milli(), 1_410);
@@ -149,7 +153,7 @@ fn a_slider_drag_writes_only_the_latest_value() {
     for level in 3..=6 {
         desire(&mut simulation, &with_sidetone(&base, level));
     }
-    simulation.run_until_sent(0x39, 1_000);
+    simulation.run_until_sent(setter(Setting::Sidetone), 1_000);
     for level in 7..=9 {
         desire(&mut simulation, &with_sidetone(&base, level));
     }
@@ -168,7 +172,15 @@ fn a_reconcile_batches_writes_then_reads_back_once_per_query_kind() {
     };
     desire(&mut simulation, &desired);
     simulation.run_for(2_000);
-    assert_eq!(simulation.sent_ids(), [0x37, 0x39, 0xAE, 0xA3, 0x20, 0xA0]);
+    let writes = [
+        Setting::MicVolume,
+        Setting::Sidetone,
+        Setting::MuteLight,
+        Setting::AutoPowerOff,
+    ]
+    .map(setter);
+    let reads = [Query::Audio, Query::Ux].map(Query::id);
+    assert_eq!(simulation.sent_ids(), [writes.as_slice(), &reads].concat());
     let readbacks = &simulation.writes()[4..];
     assert_eq!(readbacks[1].0.since(readbacks[0].0), COMMAND_SPACING);
     assert_eq!(observed(&simulation), Some(desired));
@@ -190,7 +202,7 @@ fn consecutive_writes_keep_the_command_spacing() {
             .windows(2)
             .all(|pair| pair[1].since(pair[0]) >= COMMAND_SPACING)
     );
-    assert_eq!(sent(&simulation, 0x20), 1);
+    assert_eq!(sent(&simulation, Query::Audio.id()), 1);
     let observations = published(&simulation, |update| {
         matches!(update, DeviceUpdate::Observed(_))
     });
@@ -202,7 +214,7 @@ fn an_unanswered_readback_after_an_ordinary_write_means_headset_off() {
     let mut simulation = ready_behaving(Behaviour::default());
     let desired = with_sidetone(simulation.headset().settings(), 6);
     desire(&mut simulation, &desired);
-    simulation.run_until_sent(0x39, 1_000);
+    simulation.run_until_sent(setter(Setting::Sidetone), 1_000);
     simulation.headset_mut().behaviour.reply_latency = None;
     simulation.run_for(VERIFY_BACKOFF[0] + 2 * REPLY_TIMEOUT);
     assert_eq!(simulation.phase(), Phase::HeadsetOff);
@@ -213,7 +225,7 @@ fn a_link_drop_during_an_ordinary_write_means_headset_off() {
     let mut simulation = ready_behaving(Behaviour::default());
     let desired = with_sidetone(simulation.headset().settings(), 6);
     desire(&mut simulation, &desired);
-    simulation.run_until_sent(0x39, 1_000);
+    simulation.run_until_sent(setter(Setting::Sidetone), 1_000);
     simulation.link(Link::HeadsetOff);
     simulation.run_for(1);
     assert_eq!(simulation.phase(), Phase::HeadsetOff);

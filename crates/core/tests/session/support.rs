@@ -2,9 +2,10 @@ use std::fs;
 use std::path::Path;
 
 use arctis_core::eq::{Filter, FilterKind};
-use arctis_core::messages::device::{DeviceUpdate, Phase};
+use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
+use arctis_core::protocol::{Command, encode};
 use arctis_core::session::timing::ENUMERATION_SETTLE;
-use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::settings::headset_settings::{HeadsetSettings, Setting};
 use arctis_core::settings::values::{MicVolume, Percent, Sidetone};
 use arctis_core::testkit::{Behaviour, FakeHeadset, Simulation};
 
@@ -46,6 +47,13 @@ pub fn assert_arrows(arrows: &[Arrow]) {
 pub fn silent() -> Behaviour {
     Behaviour {
         reply_latency: None,
+        ..Behaviour::default()
+    }
+}
+
+pub fn quiet() -> Behaviour {
+    Behaviour {
+        sends_events: false,
         ..Behaviour::default()
     }
 }
@@ -104,6 +112,16 @@ pub fn ready_with(headset: FakeHeadset) -> Simulation {
     simulation
 }
 
+pub fn ready_behaving(behaviour: Behaviour) -> Simulation {
+    let mut simulation = ready_with(FakeHeadset::nova_5().with_behaviour(behaviour));
+    simulation.clear_logs();
+    simulation
+}
+
+pub fn desire(simulation: &mut Simulation, settings: &HeadsetSettings) {
+    simulation.desire(settings.clone(), SyncPolicy::Enforce);
+}
+
 pub fn observed(simulation: &Simulation) -> Option<HeadsetSettings> {
     simulation
         .updates()
@@ -129,6 +147,11 @@ pub fn sent(simulation: &Simulation, id: u8) -> usize {
         .iter()
         .filter(|(_, frame)| frame.payload()[0] == id)
         .count()
+}
+
+pub fn setter(setting: Setting) -> u8 {
+    let value = FakeHeadset::nova_5().settings().value_of(setting);
+    encode(&Command::from(value)).payload()[0]
 }
 
 pub fn with_sidetone(settings: &HeadsetSettings, level: u8) -> HeadsetSettings {

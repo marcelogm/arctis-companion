@@ -5,12 +5,12 @@ use arctis_core::session::timing::{
     COMMAND_SPACING, ENUMERATION_SETTLE, HEADSET_OFF_POLL, REPLY_TIMEOUT, STATUS_SAFETY_POLL,
 };
 use arctis_core::session::{Cadence, Interface, Session};
-use arctis_core::testkit::{Behaviour, Emission, FakeHeadset, Simulation};
+use arctis_core::testkit::{Emission, FakeHeadset, Simulation};
 use arctis_core::time::Millis;
 
 use crate::support::{
     Arrow, SETTLED, absent, arrow, assert_arrows, headset_off, percent, plugged, probing,
-    probing_silent, ready, ready_with, settling, silent, syncing, syncing_silent,
+    probing_silent, quiet, ready, ready_with, settling, silent, syncing, syncing_silent,
 };
 
 const UNREAD_FIRMWARE: Firmware = Firmware {
@@ -246,11 +246,7 @@ fn probing_headset_off() -> Simulation {
 }
 
 fn headset_off_without_events() -> Simulation {
-    let quiet = Behaviour {
-        sends_events: false,
-        ..Behaviour::default()
-    };
-    let mut simulation = plugged(FakeHeadset::nova_5().powered_off().with_behaviour(quiet));
+    let mut simulation = plugged(FakeHeadset::nova_5().powered_off().with_behaviour(quiet()));
     simulation.run_until(Phase::HeadsetOff, SETTLED);
     simulation
 }
