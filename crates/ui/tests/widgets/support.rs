@@ -5,10 +5,9 @@ use std::sync::Once;
 
 use adw::prelude::*;
 use arctis_core::companion::Snapshot;
-use arctis_core::companion::seen_apps::SeenApp;
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::intent::Intent;
-use arctis_core::testkit::snapshots::{id, snapshot};
+use arctis_core::testkit::snapshots::{id, rules, snapshot};
 use arctis_core::view::headset_page::{HeadsetModel, HeadsetPageModel, headset_page};
 use arctis_ui::Window;
 use arctis_ui::intents::IntentSink;
@@ -154,23 +153,8 @@ pub fn assert_close(actual: f64, expected: f64) {
 
 pub fn ruled(entries: &[(&str, &str)]) -> Snapshot {
     let mut s = snapshot();
-    s.presets.rules = entries
-        .iter()
-        .map(|(app, preset)| ((*app).to_owned(), id(preset)))
-        .collect();
+    s.presets.rules = rules(entries);
     s
 }
 
-pub fn seen_app(name: &str, identifiers: &[&str]) -> SeenApp {
-    SeenApp {
-        key: identifiers
-            .first()
-            .map(|key| (*key).to_owned())
-            .unwrap_or_default(),
-        name: name.to_owned(),
-        identifiers: identifiers
-            .iter()
-            .map(|identifier| (*identifier).to_owned())
-            .collect(),
-    }
-}
+pub use arctis_core::testkit::snapshots::seen_app;

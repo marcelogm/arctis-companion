@@ -266,3 +266,17 @@ fn the_presented_dialog_follows_new_snapshots() {
     window.render(&std::rc::Rc::new(s));
     assert!(named::<adw::PreferencesGroup>(&dialog, "seen-group").get_visible());
 }
+
+#[gtk::test]
+fn the_header_button_presents_the_dialog_when_rules_exist() {
+    let (window, _) = rendered_window(ruled(&[("firefox", "footsteps")]));
+    window.present();
+    let page = open_app_presets(&window);
+    named::<gtk::Button>(&page, "add-rule").emit_clicked();
+    assert!(
+        window
+            .visible_dialog()
+            .and_downcast::<AddRuleDialog>()
+            .is_some()
+    );
+}

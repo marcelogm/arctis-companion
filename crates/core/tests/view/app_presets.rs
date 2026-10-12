@@ -6,20 +6,9 @@ use arctis_core::view::app_presets::{
 use arctis_core::view::presets::preset_items;
 use arctis_core::view::text::Text;
 
-use crate::support::{id, rules, snapshot};
+use arctis_core::testkit::snapshots::seen_app as seen;
 
-fn seen(name: &str, identifiers: &[&str]) -> SeenApp {
-    SeenApp {
-        key: identifiers
-            .first()
-            .map_or_else(String::new, |key| (*key).to_owned()),
-        name: name.to_owned(),
-        identifiers: identifiers
-            .iter()
-            .map(|identifier| (*identifier).to_owned())
-            .collect(),
-    }
-}
+use crate::support::{id, rules, snapshot};
 
 fn rows(content: AppPresetsContent) -> Vec<RuleRowModel> {
     match content {

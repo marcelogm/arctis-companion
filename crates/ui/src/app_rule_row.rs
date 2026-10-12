@@ -9,7 +9,7 @@ use gtk::glib;
 use crate::app_icons::display_icon_name;
 use crate::intents::IntentSink;
 use crate::text::resolve;
-use crate::widget_values::{index, show_choices};
+use crate::widget_values::{chosen, show_choices};
 
 mod imp {
     use std::cell::RefCell;
@@ -109,13 +109,12 @@ impl AppRuleRow {
         ));
     }
 
+    fn chosen_preset(&self) -> Option<PresetId> {
+        chosen(&self.imp().choices.borrow(), self.selected())?
+    }
+
     fn chosen_intent(&self) -> Option<Intent> {
-        let preset = self
-            .imp()
-            .choices
-            .borrow()
-            .get(index(self.selected())?)?
-            .clone()?;
+        let preset = self.chosen_preset()?;
         Some(Intent::SetAppRule {
             identifier: self.identifier(),
             preset,
@@ -124,12 +123,15 @@ impl AppRuleRow {
 }
 
 fn rule_choices(model: &RuleRowModel, presets: &[PresetItem]) -> Vec<(Option<PresetId>, String)> {
-    let missing = model
-        .preset
-        .is_none()
-        .then(|| (None, resolve(&model.subtitle)));
     let library = presets
         .iter()
         .map(|item| (Some(item.id.clone()), resolve(&item.title)));
-    missing.into_iter().chain(library).collect()
+    missing_choice(model).into_iter().chain(library).collect()
+}
+
+fn missing_choice(model: &RuleRowModel) -> Option<(Option<PresetId>, String)> {
+    match model.preset {
+        None => Some((None, resolve(&model.subtitle))),
+        Some(_) => None,
+    }
 }
