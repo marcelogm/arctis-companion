@@ -4073,11 +4073,10 @@ Expected: `rules`, `test`, `ui`, `extension`, `flatpak` all pass. On failure, re
 
 ---
 
-### Task 24: After the PR merges — ruleset, merge settings, hooks
+### Task 24: Before the PR merges — ruleset, merge settings, hooks
 
-Run only once the PR is merged into `main` with rebase (`gh pr merge --rebase`), so other branches can see the
-`rules` check before it becomes required. The executor does not merge on its own initiative: if whoever drives
-the sub-projects has not merged the PR, stop after Task 23 and report Task 24 as pending.
+Done on 2026-10-12 before merging PR #2, so the PR itself can only be rebase-merged and every worktree keeps a
+commit-msg guard (ruleset id 24908577; see Deviations 13 and 15).
 
 - [ ] **Step 1: Restrict merge methods and apply the ruleset**
 
@@ -4110,8 +4109,6 @@ gap in the SP1 summary (see Deviations).
 - [ ] **Step 3: Install the hooks for every worktree**
 
 ```bash
-git -C /home/marcelo/Desenvolvimento/arctis-wt/sp1 fetch origin
-git -C /home/marcelo/Desenvolvimento/arctis-wt/sp1 checkout --detach origin/main
 cd /home/marcelo/Desenvolvimento/arctis-wt/sp1 && cargo xtask install-hooks
 git -C /home/marcelo/Desenvolvimento/arctis-companion config --get core.hooksPath || echo unset
 ```
@@ -4130,7 +4127,7 @@ git commit --allow-empty -m "chore: probe" -m "Co-Authored-By: Someone <someone@
 git log -1 --format=%s
 ```
 
-Expected: both commits are rejected (`exit=1`) and `git log` still shows the merged SP1 commit, not a probe.
+Expected: both commits are rejected (`exit=1`) and `git log` still shows the last SP1 commit, not a probe.
 
 ---
 
@@ -4169,20 +4166,25 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     `io.github.marcelogm.ArctisCompanion.Headset1.xml` must be byte-equal to the `data/dbus/` source.
 13. **Hooks adapt to checkouts without `xtask/`**: git config and hooks are shared by every worktree and sibling
     branches predate xtask. There `pre-commit` exits 0 and `commit-msg` runs the branch's tracked
-    `.githooks/commit-msg`, so unsetting `core.hooksPath` never drops the attribution guard. `install-hooks` runs
-    once, on the host, after SP1 merges (Task 24).
+    `.githooks/commit-msg`, so unsetting `core.hooksPath` never drops the attribution guard. `install-hooks` ran on
+    the host before the merge (Task 24): deleting `.githooks/` on this branch had left it without any guard. It
+    unsets only a local `core.hooksPath`, fails when a global or system one would hide `.git/hooks`, and replaces
+    only hooks that call `cargo xtask`. The scripts live in `xtask/hooks/` so the hash-comment rule reads them.
 14. **CI scope in SP1**: the `extension` job runs ESLint only (gjs tests and `gnome-extensions pack` arrive with
     SP13); `audio-integration` arrives with SP7; `release.yml` with SP14; nightly mutation testing covers all of
     `arctis-core` until SP2/SP4/SP6 add the modules the spec names. Weston runs with `GSK_RENDERER=cairo`. The i18n
     gates of quality §2 (stale POT, `msgfmt --check`, untranslated `pt_BR`) and the optional nested-shell smoke
     arrive with the first `po/` directory (SP9) and the extension (SP13): SP1 has no catalogue to check.
-15. **Ruleset applied after merge** (Task 24), with the repository's merge settings also set to rebase-only. The
-    ruleset JSON is tracked in `.github/rulesets/main.json`. If GitHub refuses rulesets on this private repository
-    (plan limit), the merge settings plus the `rules` job on every push to `main` remain, and the gap is reported.
+15. **Ruleset applied before the merge** (Task 24, ruleset id 24908577), with the repository's merge settings
+    set to rebase-only, so PR #2 itself can only be rebase-merged. The ruleset JSON is tracked in
+    `.github/rulesets/main.json`. Branches of other sub-projects get the required `rules` check once they rebase
+    onto a `main` that contains `.github/workflows/ci.yml`.
 16. **Meson always builds cargo with `--release`**; day-to-day development uses `cargo run`.
 17. **Forbidden words in commit and PR text**: `co-authored-by`, `generated with`, `claude`, `anthropic`,
-    `openai`, `chatgpt`, `copilot` and the robot emoji, case-insensitive. Git comment lines and everything after a
-    verbose-commit scissors line are ignored in `--message` mode.
+    `openai`, `chatgpt`, `copilot` and the robot emoji, case-insensitive. In `--message` mode everything after a
+    verbose-commit scissors line is ignored, and `#` lines are skipped only when looking for the subject: with
+    `git commit -m` git keeps them, so they are scanned for attribution. Known false positive: in editor mode a
+    staged path containing a forbidden word shows up in git's `#` status lines and fails the hook.
 18. **`gettext-rs` deferred to SP9**: the empty window has one translatable string in Blueprint; no Rust code
     resolves text yet.
 19. **`check-pure` checks build and target-specific dependencies too**: the spec frees only dev-dependencies and
@@ -4200,3 +4202,34 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     of Task 5 Step 2 fails as the plan expects.
 24. **Coverage gate not run locally**: the toolbox Rust is the Fedora package without rustup, so Task 22 Step 2
     relies on the CI `test` job, as the plan allows.
+25. **Staged mode reads the index** (`xtask/src/check_rules/snapshot.rs::Snapshot`): `check-rules --staged` reads
+    each staged file, the root manifest and the Headset1 XML copies with `git show :<path>`. The XML copies are
+    compared on every run, not only when a copy is staged, so a change to only the source is caught.
+26. **Comment rule fails closed**: a readable text file whose syntax is unknown is an error naming
+    `comments::syntax_of`. Syntaxes: Rust; C-like (`js`, `mjs`, `cjs`, `ts`, `blp`, `scss`); CSS, block comments
+    only, so `url(http://…)` is accepted; hash (`toml`, `lock`, `yml`, `yaml`, `sh`, `py`, `ini`, `conf`,
+    `desktop`, `service`, `rules`, `po`, `pot`, `meson.build`, `Containerfile`, `Dockerfile`, git attribute and
+    ignore files, and any file starting with a `#!/` shebang); XML (`xml`, `ui`, `svg`, `policy`); Markdown,
+    `<!--` outside fenced blocks and code spans; plain (`json`, `txt`). Known false positives: an unquoted
+    `url(//…)` in SCSS, and the regex-literal case of deviation 3.
+27. **Hash rule quoting**: a backslash escapes only inside double quotes, so a TOML literal string or a shell
+    single-quoted string ending in `\` closes normally. `#` inside a word (`C#`, `$#`) is not a comment.
+28. **Exempt files split** (`xtask/src/check_rules/exempt.rs`): generated (lockfiles, `po`, `pot`, `LINGUAS`,
+    `POTFILES`) and verbatim (`LICENSE`, binary images). SVG goes through the XML comment rule and is exempt only
+    from the line limit.
+29. **Plans are exempt from the line limit** (`xtask/src/check_rules/line_limit.rs`) instead of trimming this
+    plan: it is the execution record of SP1 and its code blocks are a snapshot, not the source of truth; the code
+    under `xtask/` and `crates/` is authoritative.
+30. **Public foreign items**: inside an `extern` block every `pub` item not marked `safe` is rejected, beside
+    `pub unsafe fn` (`xtask/src/check_rules/unsafe_api.rs::check`).
+31. **Flags are per command** (`xtask/src/cli.rs::parse`): a flag of another command exits 2 with
+    `unknown flag … for <command>`.
+32. **`expect_used` not denied**: clippy's `allow-expect-in-tests` covers `#[test]` functions and `#[cfg(test)]`
+    modules but not helper functions of integration-test crates, so the lint would force an allow attribute on
+    every `tests/*.rs` crate root, including those of sibling sub-projects. The spec asks only for `unwrap_used`.
+    The non-test `expect` calls were removed instead: `crates/app/src/application.rs::run` logs a critical
+    message and exits with failure when the resource bundle does not register, and `crates/ui/build.rs::main`
+    returns errors.
+33. **`xtask/tests/support/mod.rs` keeps a module-wide `dead_code` allow**: every helper is unused by at least one
+    test binary, so per-item allows would cover every item anyway. The one field no test read
+    (`Outcome::stdout`) was removed.

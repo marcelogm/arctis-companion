@@ -26,7 +26,7 @@ flowchart BT
 | `crates/hid/` | `crates/hid/src/lib.rs` |
 | `crates/audio/` | `crates/audio/src/lib.rs::init` |
 | `crates/ui/` | `crates/ui/src/lib.rs::register_resources`, `crates/ui/src/window.rs::Window` |
-| `crates/app/` | `crates/app/src/main.rs::main`, `crates/app/src/application.rs::build` |
+| `crates/app/` | `crates/app/src/main.rs::main`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::build` |
 | `xtask/` | `xtask/src/main.rs::run` |
 
 Workspace manifest and lint policy: `Cargo.toml`, `clippy.toml`, `rustfmt.toml`, `.cargo/config.toml`.
@@ -36,12 +36,17 @@ Workspace manifest and lint policy: `Cargo.toml`, `clippy.toml`, `rustfmt.toml`,
 ```mermaid
 sequenceDiagram
     participant M as main
-    participant A as application::build
+    participant A as application::run
     participant U as arctis_ui
     M->>M: arctis_audio::init()
-    M->>A: build().run()
-    A->>U: startup: register_resources()
-    A->>U: activate: Window::new(app).present()
+    M->>A: run()
+    A->>U: register_resources()
+    alt resources registered
+        A->>A: build().run()
+        A->>U: activate: Window::new(app).present()
+    else bundle invalid
+        A-->>M: g_critical, ExitCode::FAILURE
+    end
 ```
 
 The window template is `crates/ui/resources/window.blp`, compiled by `crates/ui/build.rs::main` through
