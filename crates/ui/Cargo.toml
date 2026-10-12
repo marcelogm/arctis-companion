@@ -9,6 +9,10 @@ publish.workspace = true
 arctis-core.workspace = true
 gtk.workspace = true
 adw.workspace = true
+gettext-rs.workspace = true
+
+[dev-dependencies]
+arctis-core = { workspace = true, features = ["testkit"] }
 
 [build-dependencies]
 glib-build-tools.workspace = true

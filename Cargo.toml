@@ -14,6 +14,7 @@ arctis-audio = { path = "crates/audio" }
 arctis-core = { path = "crates/core" }
 arctis-hid = { path = "crates/hid" }
 arctis-ui = { path = "crates/ui" }
+gettext-rs = { version = "0.7.7", features = ["gettext-system"] }
 glib-build-tools = "0.22"
 gtk = { package = "gtk4", version = "0.11", features = ["gnome_50"] }
 pipewire = "0.10"

@@ -1,8 +1,9 @@
 use gtk::prelude::{GtkWindowExt, WidgetExt};
 
+use crate::support::init;
+
 fn new_window() -> arctis_ui::Window {
-    adw::init().expect("libadwaita initialises");
-    arctis_ui::register_resources().expect("bundled resources register");
+    init();
     gtk::glib::Object::new()
 }
 
