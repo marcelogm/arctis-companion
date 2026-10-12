@@ -8,7 +8,7 @@ use crate::settings::headset_settings::{HeadsetSettings, SettingChange};
 use crate::settings::values::Percent;
 use crate::time::Millis;
 
-const STEP_LIMIT: usize = 20_000;
+const STEP_LIMIT: usize = 2_000;
 
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 pub struct Flap {
