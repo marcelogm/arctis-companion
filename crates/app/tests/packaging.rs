@@ -56,7 +56,10 @@ fn the_sandbox_grants_hidraw_pipewire_and_a_display() {
 
 #[test]
 fn the_bundle_keeps_its_translations() {
-    assert_eq!(manifest()["separate-locales"], serde_json::Value::Bool(false));
+    assert_eq!(
+        manifest()["separate-locales"],
+        serde_json::Value::Bool(false)
+    );
 }
 
 #[test]
