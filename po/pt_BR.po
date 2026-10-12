@@ -1,17 +1,14 @@
-# Portuguese translations for arctis-companion package
-# Traduções em português brasileiro para o pacote arctis-companion.
-# Copyright (C) 2026 THE arctis-companion'S COPYRIGHT HOLDER
+# Brazilian Portuguese translation for arctis-companion.
 # This file is distributed under the same license as the arctis-companion package.
-# Automatically generated, 2026.
 #
 msgid ""
 msgstr ""
-"Project-Id-Version: arctis-companion\n"
-"Report-Msgid-Bugs-To: \n"
+"Project-Id-Version: arctis-companion 0.1.0\n"
+"Report-Msgid-Bugs-To: https://github.com/marcelogm/arctis-companion/issues\n"
 "POT-Creation-Date: 2026-10-12 14:35-0300\n"
-"PO-Revision-Date: 2026-10-12 14:29-0300\n"
-"Last-Translator: Automatically generated\n"
-"Language-Team: none\n"
+"PO-Revision-Date: 2026-10-12 12:00-0300\n"
+"Last-Translator: marcelogm\n"
+"Language-Team: Brazilian Portuguese\n"
 "Language: pt_BR\n"
 "MIME-Version: 1.0\n"
 "Content-Type: text/plain; charset=UTF-8\n"
@@ -21,502 +18,517 @@ msgstr ""
 #: crates/app/src/platform/background.rs
 #, rust-format
 msgid "Headset connected, {percent}"
-msgstr ""
+msgstr "Headset conectado, {percent}"
 
 #: crates/app/src/platform/background.rs
 msgid "No headset"
-msgstr ""
+msgstr "Nenhum headset"
 
 #: crates/app/src/platform/portal.rs
 msgid ""
 "Keep battery warnings, battery history and app presets working with the "
 "window closed"
 msgstr ""
+"Manter os avisos de bateria, o histórico da bateria e as predefinições de "
+"apps funcionando com a janela fechada"
 
 #: crates/core/src/companion/alerts.rs
 msgid "Headset Battery Critical"
-msgstr ""
+msgstr "Bateria do headset crítica"
 
 #: crates/core/src/companion/alerts.rs
 msgid "Headset Battery Low"
-msgstr ""
+msgstr "Bateria do headset fraca"
 
 #: crates/core/src/companion/alerts.rs
 #, rust-format
 msgid "{percent} remaining"
-msgstr ""
+msgstr "{percent} restantes"
 
 #: crates/core/src/companion/alerts.rs
 #, rust-format
 msgid "{percent} remaining. Charge the headset soon."
-msgstr ""
+msgstr "{percent} restantes. Carregue o headset em breve."
 
 #: crates/core/src/eq/library.rs
 msgid "Bass Boost"
-msgstr ""
+msgstr "Reforço de graves"
 
 #: crates/core/src/eq/library.rs
 msgid "Bass Reduction"
-msgstr ""
+msgstr "Redução de graves"
 
 #: crates/core/src/eq/library.rs
 msgid "Flat"
-msgstr ""
+msgstr "Plano"
 
 #: crates/core/src/eq/library.rs
 msgid "Footsteps"
-msgstr ""
+msgstr "Passos"
 
 #: crates/core/src/eq/library.rs
 msgid "Late Night"
-msgstr ""
+msgstr "Madrugada"
 
 #: crates/core/src/eq/library.rs
 msgid "Movie Night"
-msgstr ""
+msgstr "Noite de cinema"
 
 #: crates/core/src/eq/library.rs
 msgid "Podcast"
-msgstr ""
+msgstr "Podcast"
 
 #: crates/core/src/eq/library.rs
 msgid "Treble Soften"
-msgstr ""
+msgstr "Agudos suaves"
 
 #: crates/core/src/eq/library.rs
 msgid "V-Shape"
-msgstr ""
+msgstr "Formato em V"
 
 #: crates/core/src/eq/library.rs
 msgid "Vocal Clarity"
-msgstr ""
+msgstr "Clareza vocal"
 
 #: crates/core/src/view/app_presets.rs crates/ui/resources/add_rule_dialog.blp
 #: crates/ui/resources/app_presets_page.blp
 msgid "Add Rule"
-msgstr ""
+msgstr "Adicionar regra"
 
 #: crates/core/src/view/app_presets.rs
 msgid "Automatic App Presets is off"
-msgstr ""
+msgstr "As predefinições automáticas de apps estão desligadas"
 
 #: crates/core/src/view/app_presets.rs
 msgid "Choose a preset that applies while an app plays sound"
-msgstr ""
+msgstr "Escolha uma predefinição que vale enquanto um app reproduz som"
 
 #: crates/core/src/view/app_presets.rs
 msgid "Flatpak app id, application id or binary name"
-msgstr ""
+msgstr "ID do app Flatpak, ID do aplicativo ou nome do binário"
 
 #: crates/core/src/view/app_presets.rs
 msgid "No App Presets"
-msgstr ""
+msgstr "Nenhuma predefinição de app"
 
 #: crates/core/src/view/app_presets.rs
 msgid ""
 "On the 2.4 GHz connection the headset keeps an app's preset if this computer "
 "stops unexpectedly"
 msgstr ""
+"Na conexão de 2,4 GHz, o headset mantém a predefinição de um app se este "
+"computador parar inesperadamente"
 
 #: crates/core/src/view/app_presets.rs
 msgid "Other App…"
-msgstr ""
+msgstr "Outro app…"
 
 #: crates/core/src/view/app_presets.rs
 msgid "Preset missing"
-msgstr ""
+msgstr "Predefinição ausente"
 
 #: crates/core/src/view/battery_chart.rs
 #, rust-format
 msgid "Battery level over the last day, between {low} and {high}"
-msgstr ""
+msgstr "Nível da bateria no último dia, entre {low} e {high}"
 
 #: crates/core/src/view/battery_chart.rs
 #, rust-format
 msgid "Battery level over the last week, between {low} and {high}"
-msgstr ""
+msgstr "Nível da bateria na última semana, entre {low} e {high}"
 
 #: crates/core/src/view/battery_chart.rs
 msgid "History appears after the headset has been connected for a while"
-msgstr ""
+msgstr "O histórico aparece depois que o headset fica conectado por um tempo"
 
 #: crates/core/src/view/battery_chart.rs crates/core/src/view/headset_rows.rs
 msgid "Never"
-msgstr ""
+msgstr "Nunca"
 
 #: crates/core/src/view/battery_chart.rs
 msgid "No Battery History Yet"
-msgstr ""
+msgstr "Ainda sem histórico da bateria"
 
 #: crates/core/src/view/battery_chart.rs
 msgid "No battery readings in the last day"
-msgstr ""
+msgstr "Nenhuma leitura da bateria no último dia"
 
 #: crates/core/src/view/battery_chart.rs
 msgid "No battery readings in the last week"
-msgstr ""
+msgstr "Nenhuma leitura da bateria na última semana"
 
 #: crates/core/src/view/battery_chart.rs crates/core/src/view/headset_page.rs
 #, rust-format
 msgid "{percent}"
-msgstr ""
+msgstr "{percent}"
 
 #: crates/core/src/view/battery_chart.rs
 #, rust-format
 msgid "{time}"
-msgstr ""
+msgstr "{time}"
 
 #: crates/core/src/view/eq_editor.rs
 msgid "High Shelf"
-msgstr ""
+msgstr "Prateleira alta"
 
 #: crates/core/src/view/eq_editor.rs
 msgid "High-Pass"
-msgstr ""
+msgstr "Passa-altas"
 
 #: crates/core/src/view/eq_editor.rs
 msgid "Low Shelf"
-msgstr ""
+msgstr "Prateleira baixa"
 
 #: crates/core/src/view/eq_editor.rs
 msgid "Low-Pass"
-msgstr ""
+msgstr "Passa-baixas"
 
 #: crates/core/src/view/eq_editor.rs
 #, rust-format
 msgid "Nominal frequency response of {preset}, with {n} active band"
 msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Resposta de frequência nominal de {preset}, com {n} banda ativa"
+msgstr[1] "Resposta de frequência nominal de {preset}, com {n} bandas ativas"
 
 #: crates/core/src/view/eq_editor.rs
 msgid "Peak"
-msgstr ""
+msgstr "Pico"
 
 #: crates/core/src/view/eq_editor.rs
 #, rust-format
 msgid "{frequency} · {gain}"
-msgstr ""
+msgstr "{frequency} · {gain}"
 
 #: crates/core/src/view/eq_editor.rs
 #, rust-format
 msgid "{frequency} · {kind}"
-msgstr ""
+msgstr "{frequency} · {kind}"
 
 #: crates/core/src/view/equalizer_rows.rs
 #: crates/ui/resources/equalizer_group.blp
 msgid "2.4 GHz Preset"
-msgstr ""
+msgstr "Predefinição de 2,4 GHz"
 
 #: crates/core/src/view/equalizer_rows.rs
 msgid "App presets unavailable: audio service not reachable"
-msgstr ""
+msgstr "Predefinições de apps indisponíveis: serviço de áudio inacessível"
 
 #: crates/core/src/view/equalizer_rows.rs
 msgid "Applies when this computer plays to the headset over Bluetooth"
-msgstr ""
+msgstr "Vale quando este computador reproduz som no headset por Bluetooth"
 
 #: crates/core/src/view/equalizer_rows.rs
 #: crates/ui/resources/equalizer_group.blp
 msgid "Bluetooth from This Computer"
-msgstr ""
+msgstr "Bluetooth deste computador"
 
 #: crates/core/src/view/equalizer_rows.rs
 msgid "Choose “Arctis Nova 5 (Equalizer)” as output in Sound settings"
 msgstr ""
+"Escolha “Arctis Nova 5 (Equalizer)” como saída nas configurações de som"
 
 #: crates/core/src/view/equalizer_rows.rs
 msgid "EasyEffects is processing audio; the system equalizer is off"
 msgstr ""
+"O EasyEffects está processando o áudio; o equalizador do sistema está "
+"desligado"
 
 #: crates/core/src/view/equalizer_rows.rs
 msgid "Use Route Preset"
-msgstr ""
+msgstr "Usar predefinição da conexão"
 
 #: crates/core/src/view/equalizer_rows.rs
 #, rust-format
 msgid "{preset}, chosen by hand"
-msgstr ""
+msgstr "{preset}, escolhida manualmente"
 
 #: crates/core/src/view/equalizer_rows.rs
 #, rust-format
 msgid "{preset}, chosen for {app}"
-msgstr ""
+msgstr "{preset}, escolhida para {app}"
 
 #: crates/core/src/view/equalizer_rows.rs
 #, rust-format
 msgid "{preset}, until {app} stops"
-msgstr ""
+msgstr "{preset}, até {app} parar"
 
 #: crates/core/src/view/headset_page.rs
 #, rust-format
 msgid "Battery level unknown. {route}"
-msgstr ""
+msgstr "Nível da bateria desconhecido. {route}"
 
 #: crates/core/src/view/headset_page.rs
 #, rust-format
 msgid "Battery {percent}. {route}"
-msgstr ""
+msgstr "Bateria {percent}. {route}"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Charged"
-msgstr ""
+msgstr "Carregada"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Charging"
-msgstr ""
+msgstr "Carregando"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Connect the wireless dongle or pair the headset over Bluetooth"
-msgstr ""
+msgstr "Conecte o dongle sem fio ou pareie o headset por Bluetooth"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Connect the wireless dongle to change headset settings"
-msgstr ""
+msgstr "Conecte o dongle sem fio para alterar as configurações do headset"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Connecting…"
-msgstr ""
+msgstr "Conectando…"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change Automatic Power Off"
-msgstr ""
+msgstr "Não foi possível alterar o desligamento automático"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change Extended Range"
-msgstr ""
+msgstr "Não foi possível alterar o alcance estendido"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change Microphone Volume"
-msgstr ""
+msgstr "Não foi possível alterar o volume do microfone"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change Mute Light Brightness"
-msgstr ""
+msgstr "Não foi possível alterar o brilho da luz de mudo"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change Sidetone"
-msgstr ""
+msgstr "Não foi possível alterar o sidetone"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change Volume Limiter"
-msgstr ""
+msgstr "Não foi possível alterar o limitador de volume"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Could Not Change the Headset Equalizer"
-msgstr ""
+msgstr "Não foi possível alterar o equalizador do headset"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Discharging"
-msgstr ""
+msgstr "Descarregando"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Headset is off. Changes apply when it turns on."
-msgstr ""
+msgstr "O headset está desligado. As alterações valem quando ele ligar."
 
 #: crates/core/src/view/headset_page.rs
 msgid "No Headset Connected"
-msgstr ""
+msgstr "Nenhum headset conectado"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Not this computer's sound output"
-msgstr ""
+msgstr "Não é a saída de som deste computador"
 
 #: crates/core/src/view/headset_page.rs
 #: crates/ui/resources/permission_dialog.blp
 msgid "Permission Required"
-msgstr ""
+msgstr "Permissão necessária"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Permission is needed to use the wireless dongle"
-msgstr ""
+msgstr "É necessária permissão para usar o dongle sem fio"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Reconnecting…"
-msgstr ""
+msgstr "Reconectando…"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Show Instructions"
-msgstr ""
+msgstr "Mostrar instruções"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Sound from this computer over 2.4 GHz"
-msgstr ""
+msgstr "Som deste computador por 2,4 GHz"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Sound from this computer over Bluetooth"
-msgstr ""
+msgstr "Som deste computador por Bluetooth"
 
 #: crates/core/src/view/headset_page.rs
 msgid "The wireless dongle needs a udev rule before the app can use it"
 msgstr ""
+"O dongle sem fio precisa de uma regra do udev antes que o app possa usá-lo"
 
 #: crates/core/src/view/headset_page.rs
 msgid "Turn on the headset to read its settings"
-msgstr ""
+msgstr "Ligue o headset para ler as configurações dele"
 
 #: crates/core/src/view/headset_page.rs
 #, rust-format
 msgid "{percent} · {state}"
-msgstr ""
+msgstr "{percent} · {state}"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Automatic Power Off"
-msgstr ""
+msgstr "Desligamento automático"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Extended Range"
-msgstr ""
+msgstr "Alcance estendido"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "High"
-msgstr ""
+msgstr "Alto"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Increases range, lowers microphone quality"
-msgstr ""
+msgstr "Aumenta o alcance, reduz a qualidade do microfone"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Low"
-msgstr ""
+msgstr "Baixo"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Medium"
-msgstr ""
+msgstr "Médio"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Mute Light Brightness"
-msgstr ""
+msgstr "Brilho da luz de mudo"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Not applied"
-msgstr ""
+msgstr "Não aplicado"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Off"
-msgstr ""
+msgstr "Desligado"
 
 #: crates/core/src/view/headset_rows.rs
 #, rust-format
 msgid "Receiver {receiver}, headset {headset}"
-msgstr ""
+msgstr "Receptor {receiver}, headset {headset}"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Sidetone"
-msgstr ""
+msgstr "Sidetone"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Unknown"
-msgstr ""
+msgstr "desconhecida"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Untested model"
-msgstr ""
+msgstr "Modelo não testado"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Volume"
-msgstr ""
+msgstr "Volume"
 
 #: crates/core/src/view/headset_rows.rs
 msgid "Volume Limiter"
-msgstr ""
+msgstr "Limitador de volume"
 
 #: crates/core/src/view/headset_rows.rs
 #, rust-format
 msgid "{n} minute"
 msgid_plural "{n} minutes"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "{n} minuto"
+msgstr[1] "{n} minutos"
 
 #: crates/core/src/view/headset_rows.rs
 #, rust-format
 msgid "{value} of {max}"
-msgstr ""
+msgstr "{value} de {max}"
 
 #: crates/core/src/view/preferences.rs
 msgid "Allow it in Settings → Apps → Arctis Companion"
-msgstr ""
+msgstr "Permita em Configurações → Aplicativos → Arctis Companion"
 
 #: crates/core/src/view/preset_edits.rs
 #, rust-format
 msgid "Saved “{preset}”"
-msgstr ""
+msgstr "Predefinição “{preset}” salva"
 
 #: crates/core/src/view/preset_edits.rs
 #, rust-format
 msgid "{preset} (Copy)"
-msgstr ""
+msgstr "{preset} (cópia)"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "Could not export “{preset}”"
-msgstr ""
+msgstr "Não foi possível exportar “{preset}”"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "Could not read line {line} of “{file}”"
-msgstr ""
+msgstr "Não foi possível ler a linha {line} de “{file}”"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "Filter {filter}: {field}"
-msgstr ""
+msgstr "Filtro {filter}: {field}"
 
 #: crates/core/src/view/preset_files.rs
 msgid "Frequency"
-msgstr ""
+msgstr "Frequência"
 
 #: crates/core/src/view/preset_files.rs
 msgid "Gain"
-msgstr ""
+msgstr "Ganho"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "Imported “{preset}”"
-msgstr ""
+msgstr "Predefinição “{preset}” importada"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "Imported “{preset}”. {n} value was changed to fit the headset"
 msgid_plural "Imported “{preset}”. {n} values were changed to fit the headset"
 msgstr[0] ""
+"Predefinição “{preset}” importada. {n} valor foi alterado para caber no "
+"headset"
 msgstr[1] ""
+"Predefinição “{preset}” importada. {n} valores foram alterados para caber no "
+"headset"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "Line {line} of “{file}” uses a filter type the headset does not support"
 msgstr ""
+"A linha {line} de “{file}” usa um tipo de filtro que o headset não suporta"
 
 #: crates/core/src/view/preset_files.rs crates/ui/resources/eq_band_row.blp
 msgid "Q"
-msgstr ""
+msgstr "Q"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "“{file}” has no filters"
-msgstr ""
+msgstr "“{file}” não tem filtros"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "“{file}” has {n} filter; the headset takes at most {max}"
 msgid_plural "“{file}” has {n} filters; the headset takes at most {max}"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "“{file}” tem {n} filtro; o headset aceita no máximo {max}"
+msgstr[1] "“{file}” tem {n} filtros; o headset aceita no máximo {max}"
 
 #: crates/core/src/view/preset_files.rs
 #, rust-format
 msgid "“{file}” is not a preset file"
-msgstr ""
+msgstr "“{file}” não é um arquivo de predefinição"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”"
-msgstr ""
+msgstr "Predefinição “{preset}” excluída"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets"
 msgstr ""
+"Predefinição “{preset}” excluída. Era usada pelas predefinições de 2,4 GHz e "
+"Bluetooth"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
@@ -527,24 +539,34 @@ msgid_plural ""
 "Deleted “{preset}”. Used by the 2.4 GHz and Bluetooth presets and {n} app "
 "rules"
 msgstr[0] ""
+"Predefinição “{preset}” excluída. Era usada pelas predefinições de 2,4 GHz e "
+"Bluetooth e por {n} regra de app"
 msgstr[1] ""
+"Predefinição “{preset}” excluída. Era usada pelas predefinições de 2,4 GHz e "
+"Bluetooth e por {n} regras de apps"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”. Used by the 2.4 GHz preset"
 msgstr ""
+"Predefinição “{preset}” excluída. Era usada pela predefinição de 2,4 GHz"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rule"
 msgid_plural "Deleted “{preset}”. Used by the 2.4 GHz preset and {n} app rules"
 msgstr[0] ""
+"Predefinição “{preset}” excluída. Era usada pela predefinição de 2,4 GHz e "
+"por {n} regra de app"
 msgstr[1] ""
+"Predefinição “{preset}” excluída. Era usada pela predefinição de 2,4 GHz e "
+"por {n} regras de apps"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”. Used by the Bluetooth preset"
 msgstr ""
+"Predefinição “{preset}” excluída. Era usada pela predefinição de Bluetooth"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
@@ -552,333 +574,363 @@ msgid "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rule"
 msgid_plural ""
 "Deleted “{preset}”. Used by the Bluetooth preset and {n} app rules"
 msgstr[0] ""
+"Predefinição “{preset}” excluída. Era usada pela predefinição de Bluetooth e "
+"por {n} regra de app"
 msgstr[1] ""
+"Predefinição “{preset}” excluída. Era usada pela predefinição de Bluetooth e "
+"por {n} regras de apps"
 
 #: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”. Used by {n} app rule"
 msgid_plural "Deleted “{preset}”. Used by {n} app rules"
-msgstr[0] ""
-msgstr[1] ""
+msgstr[0] "Predefinição “{preset}” excluída. Era usada por {n} regra de app"
+msgstr[1] "Predefinição “{preset}” excluída. Era usada por {n} regras de apps"
 
 #: crates/core/src/view/presets.rs
 msgid "Duplicate or import a preset to customize it"
-msgstr ""
+msgstr "Duplique ou importe uma predefinição para personalizá-la"
 
 #: crates/ui/resources/add_rule_dialog.blp
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Preset"
-msgstr ""
+msgstr "Predefinição"
 
 #: crates/ui/resources/add_rule_dialog.blp
 msgid "Seen Playing"
-msgstr ""
+msgstr "Vistos reproduzindo"
 
 #: crates/ui/resources/app_presets_page.blp
 #: crates/ui/resources/equalizer_group.blp
 msgid "App Presets"
-msgstr ""
+msgstr "Predefinições de apps"
 
 #: crates/ui/resources/app_rule_row.blp
 msgid "Remove Rule"
-msgstr ""
+msgstr "Remover regra"
 
 #: crates/ui/resources/battery_chart.blp
 msgid "Battery Level Chart"
-msgstr ""
+msgstr "Gráfico do nível da bateria"
 
 #: crates/ui/resources/battery_page.blp crates/ui/resources/headset_page.blp
 msgid "Battery History"
-msgstr ""
+msgstr "Histórico da bateria"
 
 #: crates/ui/resources/battery_page.blp
 msgid "Battery Level"
-msgstr ""
+msgstr "Nível da bateria"
 
 #: crates/ui/resources/battery_page.blp
 msgid "Current Level"
-msgstr ""
+msgstr "Nível atual"
 
 #: crates/ui/resources/battery_page.blp
 msgid "Day"
-msgstr ""
+msgstr "Dia"
 
 #: crates/ui/resources/battery_page.blp
 msgid "Last Full Charge"
-msgstr ""
+msgstr "Última carga completa"
 
 #: crates/ui/resources/battery_page.blp
 msgid "Week"
-msgstr ""
+msgstr "Semana"
 
 #: crates/ui/resources/eq_band_row.blp
 msgid "Enabled"
-msgstr ""
+msgstr "Ativada"
 
 #: crates/ui/resources/eq_band_row.blp
 msgid "Frequency (Hz)"
-msgstr ""
+msgstr "Frequência (Hz)"
 
 #: crates/ui/resources/eq_band_row.blp
 msgid "Gain (dB)"
-msgstr ""
+msgstr "Ganho (dB)"
 
 #: crates/ui/resources/eq_band_row.blp
 msgid "Remove Band"
-msgstr ""
+msgstr "Remover banda"
 
 #: crates/ui/resources/eq_band_row.blp
 msgid "Type"
-msgstr ""
+msgstr "Tipo"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Add Band"
-msgstr ""
+msgstr "Adicionar banda"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Bands"
-msgstr ""
+msgstr "Bandas"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Duplicate Preset"
-msgstr ""
+msgstr "Duplicar predefinição"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Plays through this preset while the page is open"
-msgstr ""
+msgstr "Reproduz com esta predefinição enquanto a página está aberta"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Preset Menu"
-msgstr ""
+msgstr "Menu da predefinição"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Preview"
-msgstr ""
+msgstr "Pré-visualizar"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "Preview Through This Preset"
-msgstr ""
+msgstr "Pré-visualizar com esta predefinição"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "_Delete"
-msgstr ""
+msgstr "_Excluir"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "_Export…"
-msgstr ""
+msgstr "E_xportar…"
 
 #: crates/ui/resources/eq_editor_page.blp
 msgid "_Rename…"
-msgstr ""
+msgstr "_Renomear…"
 
 #: crates/ui/resources/equalizer_group.blp
 msgid "Automatic App Presets"
-msgstr ""
+msgstr "Predefinições automáticas de apps"
 
 #: crates/ui/resources/equalizer_group.blp
 msgid "Equalizer"
-msgstr ""
+msgstr "Equalizador"
 
 #: crates/ui/resources/equalizer_group.blp
 msgid "Now Playing"
-msgstr ""
+msgstr "Reproduzindo agora"
 
 #: crates/ui/resources/equalizer_group.blp crates/ui/resources/presets_page.blp
 #: crates/ui/src/preset_files.rs
 msgid "Presets"
-msgstr ""
+msgstr "Predefinições"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Device"
-msgstr ""
+msgstr "Dispositivo"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Firmware"
-msgstr ""
+msgstr "Firmware"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Microphone"
-msgstr ""
+msgstr "Microfone"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Model"
-msgstr ""
+msgstr "Modelo"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Power"
-msgstr ""
+msgstr "Energia"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Sound"
-msgstr ""
+msgstr "Som"
 
 #: crates/ui/resources/headset_page.blp
 msgid "Wireless"
-msgstr ""
+msgstr "Sem fio"
 
 #: crates/ui/resources/permission_dialog.blp
 msgid "Copy Command"
-msgstr ""
+msgstr "Copiar comando"
 
 #: crates/ui/resources/permission_dialog.blp
 msgid "Copy Rule"
-msgstr ""
+msgstr "Copiar regra"
 
 #: crates/ui/resources/permission_dialog.blp
 msgid "Save this rule as /etc/udev/rules.d/70-arctis-companion.rules"
-msgstr ""
+msgstr "Salve esta regra como /etc/udev/rules.d/70-arctis-companion.rules"
 
 #: crates/ui/resources/permission_dialog.blp
 msgid "Then reload the rules and reconnect the dongle"
-msgstr ""
+msgstr "Depois recarregue as regras e reconecte o dongle"
 
 #: crates/ui/resources/preferences_dialog.blp
 msgid "GNOME Shell Integration"
-msgstr ""
+msgstr "Integração com o GNOME Shell"
 
 #: crates/ui/resources/preferences_dialog.blp
 msgid "Low Battery Warning"
-msgstr ""
+msgstr "Aviso de bateria fraca"
 
 #: crates/ui/resources/preferences_dialog.blp
 msgid "Run in Background"
-msgstr ""
+msgstr "Executar em segundo plano"
 
 #: crates/ui/resources/presets_page.blp
 msgid "Built-in"
-msgstr ""
+msgstr "Integradas"
 
 #: crates/ui/resources/presets_page.blp
 msgid "Custom"
-msgstr ""
+msgstr "Personalizadas"
 
 #: crates/ui/resources/presets_page.blp
 msgid "Import an Equalizer APO or preset file"
-msgstr ""
+msgstr "Importar um arquivo do Equalizer APO ou de predefinição"
 
 #: crates/ui/resources/presets_page.blp
 msgid "_Import…"
-msgstr ""
+msgstr "_Importar…"
 
 #: crates/ui/resources/shortcuts_dialog.blp
 msgid "Close Window"
-msgstr ""
+msgstr "Fechar janela"
 
 #: crates/ui/resources/shortcuts_dialog.blp
 msgid "Keyboard Shortcuts"
-msgstr ""
+msgstr "Atalhos de teclado"
 
 #: crates/ui/resources/shortcuts_dialog.blp
 msgid "Preferences"
-msgstr ""
+msgstr "Preferências"
 
 #: crates/ui/resources/window.blp
 #: data/io.github.marcelogm.ArctisCompanion.desktop.in
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid "Arctis Companion"
-msgstr ""
+msgstr "Arctis Companion"
 
 #: crates/ui/resources/window.blp
 msgid "Main Menu"
-msgstr ""
+msgstr "Menu principal"
 
 #: crates/ui/resources/window.blp
 msgid "_About Arctis Companion"
-msgstr ""
+msgstr "_Sobre o Arctis Companion"
 
 #: crates/ui/resources/window.blp
 msgid "_Keyboard Shortcuts"
-msgstr ""
+msgstr "_Atalhos de teclado"
 
 #: crates/ui/resources/window.blp
 msgid "_Preferences"
-msgstr ""
+msgstr "_Preferências"
 
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "Name"
-msgstr ""
+msgstr "Nome"
 
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "Rename Preset"
-msgstr ""
+msgstr "Renomear predefinição"
 
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "_Cancel"
-msgstr ""
+msgstr "_Cancelar"
 
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "_Rename"
-msgstr ""
+msgstr "_Renomear"
 
 #: crates/ui/src/preset_files.rs
 msgid "Export Preset"
-msgstr ""
+msgstr "Exportar predefinição"
 
 #: crates/ui/src/preset_files.rs
 msgid "Import Preset"
-msgstr ""
+msgstr "Importar predefinição"
 
 #: crates/ui/src/services.rs
 msgid "Changed to Fit the Headset"
-msgstr ""
+msgstr "Alterados para caber no headset"
 
 #: crates/ui/src/services.rs
 msgid "Details"
-msgstr ""
+msgstr "Detalhes"
 
 #: crates/ui/src/services.rs
 msgid "Undo"
-msgstr ""
+msgstr "Desfazer"
 
 #: crates/ui/src/services.rs
 msgid "_Close"
-msgstr ""
+msgstr "_Fechar"
 
 #: crates/ui/src/toasts.rs
 msgid "Retry"
-msgstr ""
+msgstr "Tentar novamente"
 
 #: data/io.github.marcelogm.ArctisCompanion.desktop.in
 msgid "Control your SteelSeries Arctis headset"
-msgstr ""
+msgstr "Controle seu headset SteelSeries Arctis"
 
 #: data/io.github.marcelogm.ArctisCompanion.desktop.in
 msgid "headset;equalizer;battery;sidetone;"
-msgstr ""
+msgstr "headset;fone;equalizador;bateria;sidetone;"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "Control your SteelSeries Arctis Nova 5 headset"
+msgid "A Quick Settings toggle through the companion GNOME Shell extension"
 msgstr ""
+"Um botão nas configurações rápidas por meio da extensão do GNOME Shell que "
+"acompanha o app"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid ""
-"Change the headset’s settings and equalizer, let presets follow the app that "
-"plays sound, and keep an eye on the battery."
+msgid "App presets that switch the equalizer while a chosen app plays"
 msgstr ""
+"Predefinições de apps que trocam o equalizador enquanto um app escolhido "
+"reproduz som"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid ""
-"Sidetone, microphone volume, mute light, volume limiter, wireless mode and "
-"automatic power off"
-msgstr ""
+msgid "Battery history and low battery notifications"
+msgstr "Histórico da bateria e notificações de bateria fraca"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid ""
 "Built-in and custom equalizer presets with a parametric editor and Equalizer "
 "APO import"
 msgstr ""
+"Predefinições de equalizador integradas e personalizadas, com editor "
+"paramétrico e importação do Equalizer APO"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "App presets that switch the equalizer while a chosen app plays"
+msgid ""
+"Change the headset’s settings and equalizer, let presets follow the app that "
+"plays sound, and keep an eye on the battery."
 msgstr ""
+"Altere as configurações e o equalizador do headset, deixe as predefinições "
+"acompanharem o app que reproduz som e fique de olho na bateria."
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "Battery history and low battery notifications"
-msgstr ""
+msgid "Control your SteelSeries Arctis Nova 5 headset"
+msgstr "Controle seu headset SteelSeries Arctis Nova 5"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "A Quick Settings toggle through the companion GNOME Shell extension"
+msgid "First release."
+msgstr "Primeira versão."
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "Not supported yet:"
+msgstr "Ainda não suportado:"
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"Sidetone, microphone volume, mute light, volume limiter, wireless mode and "
+"automatic power off"
 msgstr ""
+"Sidetone, volume do microfone, luz de mudo, limitador de volume, modo sem "
+"fio e desligamento automático"
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "Switching the headset between 2.4 GHz and Bluetooth audio"
+msgstr "Alternar o áudio do headset entre 2,4 GHz e Bluetooth"
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "The Bluetooth equalizer preset for audio from a phone"
+msgstr "A predefinição de equalizador Bluetooth para áudio vindo de um celular"
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid ""
@@ -886,19 +938,7 @@ msgid ""
 "all devices and a udev rule on the computer, 70-arctis-companion.rules. When "
 "permission is missing, the app shows the rule and the command to load it."
 msgstr ""
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "Not supported yet:"
-msgstr ""
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "Switching the headset between 2.4 GHz and Bluetooth audio"
-msgstr ""
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "The Bluetooth equalizer preset for audio from a phone"
-msgstr ""
-
-#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "First release."
-msgstr ""
+"O dongle sem fio é acessado por hidraw, então o app precisa de acesso a "
+"todos os dispositivos e de uma regra do udev no computador, 70-arctis-"
+"companion.rules. Quando falta permissão, o app mostra a regra e o comando "
+"para carregá-la."
