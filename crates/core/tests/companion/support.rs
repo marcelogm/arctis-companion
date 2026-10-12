@@ -4,6 +4,8 @@ use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
+use arctis_core::protocol::firmware::{Firmware, Version};
+use arctis_core::protocol::model::{Model, ModelLookup};
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::headset_settings::HeadsetSettings;
 use arctis_core::settings::values::Percent;
@@ -76,4 +78,24 @@ pub fn reading(value: u8, charging: Charging, link: Link) -> Reading {
 
 pub fn discharging(value: u8) -> Reading {
     reading(value, Charging::Discharging, Link::Connected)
+}
+
+pub const NOVA_5: u16 = 0x2232;
+
+pub fn nova_5() -> Model {
+    let ModelLookup::Supported(model) = Model::lookup(NOVA_5) else {
+        panic!("the Nova 5 is supported");
+    };
+    model
+}
+
+pub const fn firmware(minor: u8) -> Firmware {
+    Firmware {
+        receiver: Some(Version {
+            major: 1,
+            minor,
+            patch: 0,
+        }),
+        headset: None,
+    }
 }
