@@ -53,7 +53,8 @@ sequenceDiagram
 burst is remembered for Undo, `burst_ended` (toast gone) opens the next burst, `undo` returns the preset as it was
 before the burst. The page keeps the toast handle only to dismiss it when another preset opens or the preset is
 deleted, and Undo does nothing once the preset is gone from the snapshot. An edit that rounds back to the saved value
-saves nothing and re-renders the row with that value.
+saves nothing and re-renders the row with that value. Each band row finds its index when it fires, and Remove Band
+drops that row itself and focuses the next band, so no other band inherits its expanded state or focus.
 
 | Concern | Code |
 |---|---|

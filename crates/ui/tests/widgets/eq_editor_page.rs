@@ -281,3 +281,29 @@ fn an_off_grid_gain_that_saves_nothing_shows_the_saved_value() {
     assert_close(gain.value(), 2.0);
     assert!(editor.log.borrow().is_empty());
 }
+
+fn two_peaks() -> Preset {
+    custom_preset(&[
+        filter(FilterKind::Peaking, 250, 4, 1_000),
+        filter(FilterKind::Peaking, 4_000, -2, 1_000),
+    ])
+}
+
+#[gtk::test]
+fn removing_a_band_leaves_the_next_band_collapsed_and_focused() {
+    let (window, _) = rendered_window(with_preset(&two_peaks()));
+    window.present();
+    let page = open_editor(&window, "mine");
+    let removed = band_rows(&page).remove(0);
+    let next_title = band_rows(&page)[1].title();
+    removed.set_expanded(true);
+    let remove = named::<adw::ButtonRow>(&removed, "band-remove");
+    assert!(remove.grab_focus());
+    remove.emit_by_name::<()>("activated", &[]);
+    let rows = band_rows(&page);
+    assert_eq!(rows[0].title(), next_title);
+    assert!(!rows[0].is_expanded());
+    let focus = gtk::prelude::RootExt::focus(&window).expect("a focused widget");
+    assert!(focus.is_ancestor(&rows[0]) || focus == *rows[0].upcast_ref::<gtk::Widget>());
+    assert_ne!(focus.widget_name(), "band-remove");
+}

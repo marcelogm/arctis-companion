@@ -8,7 +8,9 @@ use arctis_core::companion::Snapshot;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::intent::Intent;
 use arctis_core::view::eq_editor::{EqEditorModel, PreviewState, eq_editor_for};
-use arctis_core::view::preset_edits::{WorkingCopy, apply_edit, remove_band, saved_toast};
+use arctis_core::view::preset_edits::{
+    BandEdit, WorkingCopy, apply_edit, remove_band, saved_toast,
+};
 use gtk::glib;
 
 use crate::eq_band_row::EqBandRow;
@@ -195,26 +197,61 @@ impl EqEditorPage {
             imp.bands.remove(&row);
         }
         while rows.len() < count {
-            let row = self.band_row(rows.len());
+            let row = self.band_row();
             imp.bands.add(&row);
             rows.push(row);
         }
     }
 
-    fn band_row(&self, index: usize) -> EqBandRow {
+    fn band_row(&self) -> EqBandRow {
         let row = EqBandRow::default();
         row.set_widget_name("band-row");
         row.connect_edit(glib::clone!(
             #[weak(rename_to = page)]
             self,
-            move |edit| page.save_change(|preset| apply_edit(preset, index, edit))
+            #[weak]
+            row,
+            move |edit| page.edit_band(&row, edit)
         ));
         row.connect_remove(glib::clone!(
             #[weak(rename_to = page)]
             self,
-            move || page.save_change(|preset| remove_band(preset, index))
+            #[weak]
+            row,
+            move || page.remove_band_row(&row)
         ));
         row
+    }
+
+    fn band_index(&self, row: &EqBandRow) -> Option<usize> {
+        let rows = self.imp().band_rows.borrow();
+        rows.iter().position(|known| known == row)
+    }
+
+    fn edit_band(&self, row: &EqBandRow, edit: BandEdit) {
+        if let Some(index) = self.band_index(row) {
+            self.save_change(|preset| apply_edit(preset, index, edit));
+        }
+    }
+
+    fn remove_band_row(&self, row: &EqBandRow) {
+        let Some(index) = self.band_index(row) else {
+            return;
+        };
+        let imp = self.imp();
+        imp.band_rows.borrow_mut().remove(index);
+        imp.bands.remove(row);
+        self.save_change(|preset| remove_band(preset, index));
+        self.focus_band(index);
+    }
+
+    fn focus_band(&self, index: usize) {
+        let imp = self.imp();
+        let next = imp.band_rows.borrow().get(index).cloned();
+        match next {
+            Some(row) => row.grab_focus(),
+            None => imp.add_band.grab_focus(),
+        };
     }
 
     fn save_change(&self, change: impl FnOnce(&Preset) -> Option<Preset>) {
