@@ -48,8 +48,10 @@ pub fn any_filter() -> impl Strategy<Value = Filter> {
 }
 
 pub const BLOCK: usize = 512;
+pub const RATE: u32 = 48_000;
 
-pub fn sine(hz: f32, rate: f32, frames: usize) -> Vec<f32> {
+pub fn sine(hz: f32, rate: u32, frames: usize) -> Vec<f32> {
+    let rate = f32::from(u16::try_from(rate).expect("rate below 65536 Hz"));
     let step = TAU * hz / rate;
     std::iter::successors(Some(0.0_f32), |phase| Some((phase + step) % TAU))
         .take(frames)

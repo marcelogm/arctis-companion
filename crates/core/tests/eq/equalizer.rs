@@ -1,9 +1,8 @@
 use arctis_core::eq::response::preamp_db;
 use arctis_core::eq::{Coefficients, Curve, Equalizer, library, response};
 
-use crate::support::{assert_close, bits, peaking, processed, sine, stereo};
+use crate::support::{RATE, assert_close, bits, peaking, processed, sine, stereo};
 
-const RATE: u32 = 48_000;
 const SECOND: usize = 48_000;
 const LAST_FIFTH: usize = 38_400;
 
@@ -20,7 +19,7 @@ fn flat_is_a_bit_exact_identity() {
     for rate in [44_100, 48_000] {
         let coefficients = Coefficients::design(library::flat().curve(), rate);
         let mut equalizer = Equalizer::new(&coefficients, 2);
-        let input = stereo(&sine(997.0, 48_000.0, 4_800));
+        let input = stereo(&sine(997.0, RATE, 4_800));
         assert_eq!(bits(&processed(&mut equalizer, &input)), bits(&input));
     }
 }
@@ -28,7 +27,7 @@ fn flat_is_a_bit_exact_identity() {
 #[test]
 fn each_channel_keeps_its_own_state() {
     let coefficients = Coefficients::design(&Curve::from_array([peaking(1_000, 12, 1_000)]), RATE);
-    let left = sine(440.0, 48_000.0, 2_400);
+    let left = sine(440.0, RATE, 2_400);
     let mono = processed(&mut Equalizer::new(&coefficients, 1), &left);
     let left_and_silence: Vec<f32> = left.iter().flat_map(|&sample| [sample, 0.0]).collect();
     let both = processed(&mut Equalizer::new(&coefficients, 2), &left_and_silence);
@@ -47,7 +46,7 @@ fn processing_follows_the_response_minus_the_preamp() {
     let curve = Curve::from_array([peaking(1_000, 12, 1_000)]);
     for hz in [100.0, 1_000.0] {
         let mut equalizer = Equalizer::new(&Coefficients::design(&curve, RATE), 1);
-        let input = sine(hz, 48_000.0, SECOND);
+        let input = sine(hz, RATE, SECOND);
         let output = processed(&mut equalizer, &input);
         let measured = 20.0 * (peak(&output[LAST_FIFTH..]) / peak(&input[LAST_FIFTH..])).log10();
         let expected = f64::from(response(&curve, &[hz])[0]) + preamp_db(&curve);
