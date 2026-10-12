@@ -17,7 +17,8 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: tag matches the meson version
-        run: grep -q "^  version: '${GITHUB_REF_NAME#v}'," meson.build
+        run: |
+          grep -q "^  version: '${GITHUB_REF_NAME#v}'," meson.build
 
   flatpak:
     runs-on: ubuntu-latest

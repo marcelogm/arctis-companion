@@ -243,6 +243,7 @@ extension:
 | 21 | The adopted preset name "Headset Curve" (`crates/core/src/companion/catalog.rs::HEADSET_CURVE_NAME`) stays English | it is saved as a custom preset's name in the user's data and shown verbatim; translating it would need gettext in the pure core |
 | 22 | The census APO input is built with `collect::<Vec<String>>().concat()` | clippy's `format_collect` rejects collecting `format!` into a `String` |
 | 23 | The extension is installed but GNOME Shell lists it only after the next login | on Wayland the Shell does not rescan `~/.local/share/gnome-shell/extensions`; the extension stays not enabled |
+| 24 | The `version` step of `release.yml` uses a block scalar, and the workflow was checked with the `actionlint` 1.7.7 release binary | the plain `run:` scalar held `: ` and GitHub rejected the file; Fedora ships no `actionlint` package and the workspace has no YAML parser for a packaging test |
 
 ---
 
