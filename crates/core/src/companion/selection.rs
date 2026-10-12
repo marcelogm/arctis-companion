@@ -1,13 +1,13 @@
 use super::adoption::AdoptionStatus;
 use super::app_settings::AppRules;
 use super::catalog::Catalog;
+use super::deadlines::earliest;
+use super::per_path::PerPath;
 use super::routing::Route;
 use super::timing::{RULE_ENTER, RULE_LEAVE};
 use crate::eq::preset::PresetId;
 use crate::messages::audio::{SoundPath, StreamInfo};
 use crate::time::Millis;
-
-pub const PATHS: [SoundPath; 2] = [SoundPath::Dongle, SoundPath::Bluetooth];
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
 pub enum PresetReason {
@@ -54,23 +54,11 @@ pub struct RuledSet {
 
 impl RuledSet {
     pub fn observe(&mut self, running: &[Candidate], now: Millis) {
-        self.arriving
-            .retain(|(waiting, _)| is_running(running, &waiting.key));
-        self.leaving.retain(|(key, _)| !is_running(running, key));
-        for candidate in running {
-            self.track(candidate, now);
-        }
+        self.drop_stopped_arrivals(running);
+        self.cancel_resumed_departures(running);
+        self.track_newcomers(running, now);
         self.refresh(running);
-        let silent: Vec<String> = self
-            .members
-            .iter()
-            .map(|member| member.candidate.key.clone())
-            .filter(|key| {
-                !is_running(running, key) && !self.leaving.iter().any(|(gone, _)| gone == key)
-            })
-            .collect();
-        self.leaving
-            .extend(silent.into_iter().map(|key| (key, now)));
+        self.start_leaving(running, now);
     }
 
     pub fn advance(&mut self, now: Millis) -> bool {
@@ -108,18 +96,47 @@ impl RuledSet {
         changed
     }
 
-    fn track(&mut self, candidate: &Candidate, now: Millis) {
-        let known = self
+    fn drop_stopped_arrivals(&mut self, running: &[Candidate]) {
+        self.arriving
+            .retain(|(waiting, _)| is_running(running, &waiting.key));
+    }
+
+    fn cancel_resumed_departures(&mut self, running: &[Candidate]) {
+        self.leaving.retain(|(key, _)| !is_running(running, key));
+    }
+
+    fn track_newcomers(&mut self, running: &[Candidate], now: Millis) {
+        let newcomers: Vec<(Candidate, Millis)> = running
+            .iter()
+            .filter(|candidate| !self.is_known(&candidate.key))
+            .map(|candidate| (candidate.clone(), now))
+            .collect();
+        self.arriving.extend(newcomers);
+    }
+
+    fn is_known(&self, key: &str) -> bool {
+        self.is_member(key) || self.arriving.iter().any(|(waiting, _)| waiting.key == key)
+    }
+
+    fn is_member(&self, key: &str) -> bool {
+        self.members
+            .iter()
+            .any(|member| member.candidate.key == key)
+    }
+
+    fn is_leaving(&self, key: &str) -> bool {
+        self.leaving.iter().any(|(gone, _)| gone == key)
+    }
+
+    fn start_leaving(&mut self, running: &[Candidate], now: Millis) {
+        let silent: Vec<String> = self
             .members
             .iter()
-            .any(|member| member.candidate.key == candidate.key)
-            || self
-                .arriving
-                .iter()
-                .any(|(waiting, _)| waiting.key == candidate.key);
-        if !known {
-            self.arriving.push((candidate.clone(), now));
-        }
+            .map(|member| member.candidate.key.clone())
+            .filter(|key| !is_running(running, key) && !self.is_leaving(key))
+            .collect();
+        self.leaving
+            .extend(silent.into_iter().map(|key| (key, now)));
     }
 
     fn refresh(&mut self, running: &[Candidate]) {
@@ -164,6 +181,24 @@ fn is_running(running: &[Candidate], key: &str) -> bool {
 pub struct ManualPick {
     pub preset: PresetId,
     pub preview: bool,
+}
+
+impl ManualPick {
+    #[must_use]
+    pub const fn lasting(preset: PresetId) -> Self {
+        Self {
+            preset,
+            preview: false,
+        }
+    }
+
+    #[must_use]
+    pub const fn preview(preset: PresetId) -> Self {
+        Self {
+            preset,
+            preview: true,
+        }
+    }
 }
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
@@ -221,39 +256,27 @@ impl PathSelection {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
-pub struct Selection {
-    dongle: PathSelection,
-    bluetooth: PathSelection,
-}
+pub type Selection = PerPath<PathSelection>;
 
 impl Selection {
-    #[must_use]
-    pub const fn path(&self, path: SoundPath) -> &PathSelection {
-        match path {
-            SoundPath::Dongle => &self.dongle,
-            SoundPath::Bluetooth => &self.bluetooth,
-        }
-    }
-
-    pub fn path_mut(&mut self, path: SoundPath) -> &mut PathSelection {
-        match path {
-            SoundPath::Dongle => &mut self.dongle,
-            SoundPath::Bluetooth => &mut self.bluetooth,
-        }
-    }
-
     pub fn end_manual_picks(&mut self) {
-        self.dongle.manual = None;
-        self.bluetooth.manual = None;
+        for selection in self.values_mut() {
+            selection.manual = None;
+        }
+    }
+
+    pub fn end_previews(&mut self) {
+        for selection in self.values_mut() {
+            selection.end_preview();
+        }
     }
 
     #[must_use]
     pub fn next_deadline(&self) -> Option<Millis> {
-        [&self.dongle, &self.bluetooth]
-            .into_iter()
-            .filter_map(|selection| selection.ruled.next_deadline())
-            .min()
+        earliest(
+            self.values()
+                .map(|selection| selection.ruled.next_deadline()),
+        )
     }
 }
 

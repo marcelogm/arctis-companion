@@ -71,7 +71,7 @@ fn the_bluetooth_row_appears_after_a_bluez_node_was_seen() {
 #[test]
 fn now_playing_explains_an_app_preset() {
     let mut s = snapshot();
-    s.presets.dongle = active("footsteps", app("Firefox"));
+    s.presets.active.dongle = active("footsteps", app("Firefox"));
     let group = equalizer_group(&s);
     assert_eq!(
         now_playing_text(&group).as_deref(),
@@ -96,7 +96,7 @@ fn now_playing_explains_a_manual_pick() {
     ];
     for (reason, expected) in cases {
         let mut s = snapshot();
-        s.presets.dongle = active("bass-boost", reason);
+        s.presets.active.dongle = active("bass-boost", reason);
         assert_eq!(
             now_playing_text(&equalizer_group(&s)).as_deref(),
             Some(expected)
@@ -108,7 +108,14 @@ fn now_playing_explains_a_manual_pick() {
 fn now_playing_hides_while_the_route_preset_plays() {
     let mut s = snapshot();
     assert!(equalizer_group(&s).now_playing.is_none());
-    s.presets.dongle = active("flat", app("Firefox"));
+    s.presets.active.dongle = active("flat", app("Firefox"));
+    assert!(equalizer_group(&s).now_playing.is_none());
+}
+
+#[test]
+fn now_playing_hides_while_a_held_route_preset_plays() {
+    let mut s = snapshot();
+    s.presets.active.dongle = ActivePreset::route(id("podcast"));
     assert!(equalizer_group(&s).now_playing.is_none());
 }
 
@@ -116,8 +123,8 @@ fn now_playing_hides_while_the_route_preset_plays() {
 fn now_playing_follows_the_picked_path() {
     let mut s = snapshot();
     s.audio.route = Route::Bluetooth;
-    s.presets.dongle = active("footsteps", app("Firefox"));
-    s.presets.bluetooth = active("podcast", app("Spotify"));
+    s.presets.active.dongle = active("footsteps", app("Firefox"));
+    s.presets.active.bluetooth = active("podcast", app("Spotify"));
     let row = equalizer_group(&s).now_playing.expect("Now Playing");
     assert_eq!(row.path, SoundPath::Bluetooth);
     assert_eq!(english(&row.subtitle), "Podcast, chosen for Spotify");
@@ -127,7 +134,7 @@ fn now_playing_follows_the_picked_path() {
 fn a_custom_preset_keeps_its_name() {
     let mut s = snapshot();
     s.presets.all.push(custom("Mine"));
-    s.presets.dongle = active("mine", app("Firefox"));
+    s.presets.active.dongle = active("mine", app("Firefox"));
     assert_eq!(
         now_playing_text(&equalizer_group(&s)).as_deref(),
         Some("Mine, chosen for Firefox")

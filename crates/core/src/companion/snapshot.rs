@@ -3,19 +3,17 @@ use std::rc::Rc;
 use super::adoption::AdoptionStatus;
 use super::alerts::BatteryWarning;
 use super::app_settings::{AppRules, HeadsetValues, RoutePresets};
-use super::catalog::fresh_id;
+use super::catalog::{find_in, fresh_id, resolve_id_in, resolve_in};
 use super::dongle::WriteFailure;
+use super::per_path::PerPath;
 use super::reducer::Companion;
-use super::routing::{AudioService, Route};
+use super::routing::{AudioService, Route, easy_effects_active};
 use super::seen_apps::SeenApp;
 use super::selection::ActivePreset;
 use super::selection::{ActivateError, picked_path};
 use crate::battery::sample::{Reading, Sample};
-use crate::eq::library::{self, FLAT_ID};
-use crate::eq::preset::Preset;
-use crate::eq::preset::PresetId;
-use crate::messages::audio::DefaultSink;
-use crate::messages::audio::SoundPath;
+use crate::eq::preset::{Preset, PresetId};
+use crate::messages::audio::{DefaultSink, SoundPath};
 use crate::messages::device::Phase;
 use crate::protocol::firmware::Firmware;
 use crate::protocol::model::Model;
@@ -47,8 +45,7 @@ pub struct AudioSnapshot {
 pub struct PresetsSnapshot {
     pub all: Vec<Preset>,
     pub route_presets: RoutePresets,
-    pub dongle: ActivePreset,
-    pub bluetooth: ActivePreset,
+    pub active: PerPath<ActivePreset>,
     pub rules: AppRules,
     pub automatic: bool,
     pub seen_apps: Vec<SeenApp>,
@@ -73,37 +70,31 @@ pub struct Snapshot {
 impl DongleSnapshot {
     #[must_use]
     pub const fn is_present(&self) -> bool {
-        !matches!(self.phase, Phase::Absent | Phase::PermissionDenied)
+        self.phase.is_present()
+    }
+}
+
+impl AudioSnapshot {
+    #[must_use]
+    pub const fn easy_effects_active(&self) -> bool {
+        easy_effects_active(self.default_sink)
     }
 }
 
 impl PresetsSnapshot {
     #[must_use]
-    pub const fn active(&self, path: SoundPath) -> &ActivePreset {
-        match path {
-            SoundPath::Dongle => &self.dongle,
-            SoundPath::Bluetooth => &self.bluetooth,
-        }
-    }
-
-    #[must_use]
     pub fn find(&self, id: &PresetId) -> Option<&Preset> {
-        self.all.iter().find(|preset| preset.id() == id)
+        find_in(&self.all, id)
     }
 
     #[must_use]
     pub fn resolve(&self, id: &PresetId) -> Preset {
-        self.find(id).cloned().unwrap_or_else(library::flat)
+        resolve_in(&self.all, id)
     }
 
     #[must_use]
     pub fn route_preset(&self, path: SoundPath) -> PresetId {
-        let id = self.route_presets.get(path);
-        if self.find(id).is_some() {
-            id.clone()
-        } else {
-            PresetId::new(FLAT_ID)
-        }
+        resolve_id_in(&self.all, self.route_presets.get(path))
     }
 }
 
@@ -159,10 +150,9 @@ impl Companion {
 
     fn presets_snapshot(&self) -> PresetsSnapshot {
         PresetsSnapshot {
-            all: self.catalog.all(),
+            all: self.catalog.all().to_vec(),
             route_presets: self.settings.route_presets.clone(),
-            dongle: self.active(SoundPath::Dongle),
-            bluetooth: self.active(SoundPath::Bluetooth),
+            active: PerPath::from_fn(|path| self.active(path)),
             rules: self.settings.app_rules.clone(),
             automatic: self.settings.automatic_presets,
             seen_apps: self.seen_apps.clone(),

@@ -1,6 +1,8 @@
 use arctis_core::companion::Input;
 use arctis_core::companion::selection::ActivePreset;
+use arctis_core::intent::Intent;
 use arctis_core::messages::audio::{AudioCommand, SinkKind, SoundPath};
+use arctis_core::settings::values::Sidetone;
 
 use crate::support::{
     Harness, START, audio_commands, chosen_for, curve_of, custom, default_sink, device_curves, id,
@@ -16,7 +18,7 @@ fn a_ruled_app_switches_the_headset_after_one_second() {
     let joined = h.at(2_000).send(Input::Woke);
     assert_eq!(device_curves(&joined), [curve_of("footsteps")]);
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         chosen_for("footsteps", "firefox")
     );
 }
@@ -31,7 +33,10 @@ fn the_route_preset_returns_ten_seconds_after_the_app_stops() {
     assert_eq!(wakes(&stopped), [START.after(50_000)]);
     let left = h.at(50_000).send(Input::Woke);
     assert_eq!(device_curves(&left), [curve_of("flat")]);
-    assert_eq!(h.snapshot().presets.dongle, ActivePreset::route(id("flat")));
+    assert_eq!(
+        h.snapshot().presets.active.dongle,
+        ActivePreset::route(id("flat"))
+    );
 }
 
 #[test]
@@ -44,7 +49,7 @@ fn pausing_and_resuming_within_ten_seconds_changes_nothing() {
     let _ = h.at(8_000).audio(playing(&["firefox"], SoundPath::Dongle));
     assert!(device_curves(&h.at(13_000).send(Input::Woke)).is_empty());
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         chosen_for("footsteps", "firefox")
     );
 }
@@ -70,7 +75,7 @@ fn the_app_that_joined_last_chooses() {
         [AudioCommand::Retarget(curve_of("podcast"))]
     );
     assert_eq!(
-        h.snapshot().presets.bluetooth,
+        h.snapshot().presets.active.bluetooth,
         chosen_for("podcast", "spotify")
     );
 }
@@ -92,7 +97,7 @@ fn the_headset_switches_at_most_once_per_thirty_seconds() {
     assert!(device_curves(&held).is_empty());
     assert_eq!(wakes(&held), [START.after(32_000)]);
     assert_eq!(
-        h.snapshot().presets.active(SoundPath::Dongle),
+        h.snapshot().presets.active.get(SoundPath::Dongle),
         &chosen_for("footsteps", "firefox")
     );
     let _ = h
@@ -108,7 +113,10 @@ fn the_same_preset_for_an_app_only_relabels() {
     let mut h = ruled(&[("firefox", "flat"), ("spotify", "podcast")]);
     let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
     assert!(device_curves(&h.at(2_000).send(Input::Woke)).is_empty());
-    assert_eq!(h.snapshot().presets.dongle, chosen_for("flat", "firefox"));
+    assert_eq!(
+        h.snapshot().presets.active.dongle,
+        chosen_for("flat", "firefox")
+    );
     let _ = h
         .at(5_000)
         .audio(playing(&["firefox", "spotify"], SoundPath::Dongle));
@@ -129,7 +137,10 @@ fn a_switch_to_the_curve_on_the_headset_spends_no_budget() {
         device_curves(&h.at(2_000).send(Input::Woke)),
         [curve_of("flat")]
     );
-    assert_eq!(h.snapshot().presets.dongle, chosen_for("copy", "firefox"));
+    assert_eq!(
+        h.snapshot().presets.active.dongle,
+        chosen_for("copy", "firefox")
+    );
     let _ = h
         .at(5_000)
         .audio(playing(&["firefox", "spotify"], SoundPath::Dongle));
@@ -160,7 +171,10 @@ fn a_rule_naming_a_missing_preset_never_switches() {
     let mut h = ruled(&[("firefox", "deleted")]);
     let started = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
     assert!(wakes(&started).is_empty());
-    assert_eq!(h.snapshot().presets.dongle, ActivePreset::route(id("flat")));
+    assert_eq!(
+        h.snapshot().presets.active.dongle,
+        ActivePreset::route(id("flat"))
+    );
 }
 
 #[test]
@@ -181,7 +195,46 @@ fn a_rule_applies_only_on_its_path() {
         .audio(playing(&["firefox"], SoundPath::Bluetooth));
     assert!(device_curves(&h.at(2_000).send(Input::Woke)).is_empty());
     assert_eq!(
-        h.snapshot().presets.bluetooth,
+        h.snapshot().presets.active.bluetooth,
         chosen_for("footsteps", "firefox")
+    );
+}
+
+#[test]
+fn an_unrelated_intent_leaves_a_held_switch_held() {
+    let mut h = ruled(&[("firefox", "footsteps"), ("spotify", "podcast")]);
+    let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
+    let _ = h.at(2_000).send(Input::Woke);
+    let _ = h.headset_holds("footsteps");
+    let _ = h
+        .at(5_000)
+        .audio(playing(&["firefox", "spotify"], SoundPath::Dongle));
+    let _ = h.at(6_000).send(Input::Woke);
+    let sidetone = Sidetone::try_from(5).expect("sidetone");
+    let unrelated = h.at(7_000).intent(Intent::SetSidetone(sidetone));
+    assert_eq!(device_curves(&unrelated), [curve_of("footsteps")]);
+    assert_eq!(
+        device_curves(&h.at(32_000).send(Input::Woke)),
+        [curve_of("podcast")]
+    );
+}
+
+#[test]
+fn an_unrelated_intent_leaves_a_held_bluetooth_switch_held() {
+    let mut h = ruled(&[("firefox", "footsteps"), ("spotify", "podcast")]);
+    let _ = h.audio(default_sink(SinkKind::NovaBluetooth));
+    let _ = h
+        .at(1_000)
+        .audio(playing(&["firefox"], SoundPath::Bluetooth));
+    let _ = h.at(2_000).send(Input::Woke);
+    let _ = h
+        .at(2_500)
+        .audio(playing(&["firefox", "spotify"], SoundPath::Bluetooth));
+    let _ = h.at(3_500).send(Input::Woke);
+    let unrelated = h.at(3_600).intent(Intent::SetAutomaticPresets(true));
+    assert!(audio_commands(&unrelated).is_empty());
+    assert_eq!(
+        audio_commands(&h.at(4_000).send(Input::Woke)),
+        [AudioCommand::Retarget(curve_of("podcast"))]
     );
 }

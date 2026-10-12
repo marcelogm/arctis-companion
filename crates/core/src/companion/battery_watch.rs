@@ -45,7 +45,14 @@ impl BatteryWatch {
         self.alerts.update(reading, threshold)
     }
 
-    pub fn disconnect(&mut self, now: Millis) -> Option<Sample> {
+    pub fn disconnect(&mut self, now: Millis) -> BatteryUpdate {
+        BatteryUpdate {
+            sample: self.close_line(now),
+            alerts: self.alerts.reset(),
+        }
+    }
+
+    fn close_line(&mut self, now: Millis) -> Option<Sample> {
         let last = self
             .reading
             .take()

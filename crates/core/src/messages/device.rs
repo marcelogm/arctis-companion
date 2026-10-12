@@ -30,6 +30,18 @@ pub enum Phase {
     Rebinding,
 }
 
+impl Phase {
+    #[must_use]
+    pub const fn is_present(self) -> bool {
+        !matches!(self, Self::Absent | Self::PermissionDenied)
+    }
+
+    #[must_use]
+    pub const fn is_connecting(self) -> bool {
+        matches!(self, Self::Settling | Self::Probing | Self::Syncing)
+    }
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum DeviceUpdate {
     Phase(Phase),

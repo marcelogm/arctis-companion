@@ -136,6 +136,15 @@ fn a_critical_reading_withdraws_the_low_notification() {
 }
 
 #[test]
+fn a_dongle_that_leaves_withdraws_the_battery_warning() {
+    let mut h = Harness::new(persisted());
+    let _ = h.device(status(14));
+    let actions = h.device(DeviceUpdate::Phase(Phase::Absent));
+    assert!(actions.contains(&Action::Withdraw(AlertId::LowBattery)));
+    assert_eq!(h.snapshot().battery.warning, BatteryWarning::None);
+}
+
+#[test]
 fn restored_history_is_in_the_snapshot() {
     let mut saved = persisted();
     saved.battery = vec![Sample {
@@ -166,7 +175,10 @@ fn a_missing_route_preset_resolves_to_flat() {
     saved.settings.route_presets.dongle = id("gone");
     let snapshot = Harness::new(saved).snapshot();
     assert_eq!(snapshot.presets.route_preset(SoundPath::Dongle), id("flat"));
-    assert_eq!(snapshot.presets.dongle, ActivePreset::route(id("flat")));
+    assert_eq!(
+        snapshot.presets.active.dongle,
+        ActivePreset::route(id("flat"))
+    );
     assert_eq!(snapshot.presets.resolve(&id("gone")).id(), &id("flat"));
 }
 

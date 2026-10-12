@@ -1,5 +1,5 @@
 use super::text::{Text, preset_arg, preset_title};
-use crate::companion::selection::PATHS;
+use crate::companion::per_path::PATHS;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::preset::{Preset, PresetId, PresetKind};
 use crate::messages::audio::SoundPath;

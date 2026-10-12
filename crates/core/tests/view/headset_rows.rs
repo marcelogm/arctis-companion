@@ -1,8 +1,9 @@
 use arctis_core::companion::snapshot::DongleSnapshot;
+use arctis_core::intent::Intent;
 use arctis_core::messages::device::Phase;
 use arctis_core::protocol::model::{Capabilities, Model, Support};
 use arctis_core::settings::headset_settings::Setting;
-use arctis_core::settings::values::{Sidetone, WirelessMode};
+use arctis_core::settings::values::{MuteLight, Sidetone, WirelessMode};
 use arctis_core::testkit::english::english;
 use arctis_core::view::headset_rows::{
     HeadsetGroupsModel, ScaleModel, headset_groups, sidetone_text,
@@ -64,6 +65,19 @@ fn mute_light_steps_are_labelled() {
     assert_eq!((light.value, light.max), (1, 3));
     assert_eq!(english(&light.value_text), "Low");
     assert_eq!(mark_labels(&light), ["Off", "Low", "Medium", "High"]);
+}
+
+#[test]
+fn every_mute_light_step_turns_back_into_its_level() {
+    for light in MuteLight::ALL {
+        let mut s = snapshot();
+        s.dongle.desired.mute_light = light;
+        let row = groups(&s.dongle).mute_light.expect("mute light row");
+        assert_eq!(
+            Intent::from_scale(Setting::MuteLight, row.value),
+            Some(Intent::SetMuteLight(light))
+        );
+    }
 }
 
 #[test]

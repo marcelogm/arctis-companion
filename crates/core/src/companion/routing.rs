@@ -41,6 +41,11 @@ pub const fn needs_equalizer(sink: DefaultSink) -> bool {
         && !sink.via_easy_effects
 }
 
+#[must_use]
+pub const fn easy_effects_active(default_sink: Option<DefaultSink>) -> bool {
+    matches!(default_sink, Some(sink) if sink.via_easy_effects)
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub enum AudioService {
     Unknown,
@@ -76,7 +81,7 @@ impl AudioState {
 
     #[must_use]
     pub const fn easy_effects_active(&self) -> bool {
-        matches!(self.default_sink, Some(sink) if sink.via_easy_effects)
+        easy_effects_active(self.default_sink)
     }
 
     pub fn apply(&mut self, event: &AudioEvent) {

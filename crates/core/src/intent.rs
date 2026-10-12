@@ -13,7 +13,7 @@ pub enum Intent {
     SetVolumeLimiter(bool),
     SetExtendedRange(bool),
     SetAutoPowerOff(AutoPowerOff),
-    RetryWrite(Setting),
+    RetryWrite,
     SetRoutePreset(SoundPath, PresetId),
     ActivatePreset(PresetId),
     UseRoutePreset(SoundPath),
@@ -50,10 +50,7 @@ impl Intent {
         match setting {
             Setting::MicVolume => MicVolume::try_from(step).ok().map(Self::SetMicVolume),
             Setting::Sidetone => Sidetone::try_from(step).ok().map(Self::SetSidetone),
-            Setting::MuteLight => MuteLight::ALL
-                .get(usize::from(step))
-                .copied()
-                .map(Self::SetMuteLight),
+            Setting::MuteLight => MuteLight::from_step(step).map(Self::SetMuteLight),
             _ => None,
         }
     }

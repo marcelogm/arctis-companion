@@ -300,7 +300,7 @@ fn a_write_failure_offers_a_retry_toast() {
     let toast = headset(headset_page(&s)).failure_toast.expect("toast");
     assert_eq!(toast.serial, 3);
     assert_eq!(english(&toast.title), "Could Not Change Sidetone");
-    assert_eq!(toast.retry, Intent::RetryWrite(Setting::Sidetone));
+    assert_eq!(toast.retry, Intent::RetryWrite);
 }
 
 #[test]

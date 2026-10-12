@@ -88,19 +88,17 @@ fn holds(visible: &[Sample], now: UnixSeconds) -> impl Iterator<Item = (Sample, 
 }
 
 fn segments(visible: &[Sample], now: UnixSeconds) -> Vec<Vec<Point>> {
-    let mut segments: Vec<Vec<Point>> = Vec::new();
-    let mut open = false;
-    for (sample, until) in holds(visible, now) {
-        let connected = sample.reading.is_connected();
-        if connected && !open {
-            segments.push(Vec::new());
-        }
-        open = connected;
-        if let (true, Some(segment)) = (connected, segments.last_mut()) {
-            segment.extend([point(sample.at, &sample), point(until, &sample)]);
-        }
-    }
-    segments
+    let held: Vec<(Sample, UnixSeconds)> = holds(visible, now).collect();
+    held.chunk_by(|(a, _), (b, _)| a.reading.is_connected() == b.reading.is_connected())
+        .filter(|run| run.iter().all(|(sample, _)| sample.reading.is_connected()))
+        .map(line)
+        .collect()
+}
+
+fn line(run: &[(Sample, UnixSeconds)]) -> Vec<Point> {
+    run.iter()
+        .flat_map(|(sample, until)| [point(sample.at, sample), point(*until, sample)])
+        .collect()
 }
 
 fn charging_spans(visible: &[Sample], now: UnixSeconds) -> Vec<Span> {

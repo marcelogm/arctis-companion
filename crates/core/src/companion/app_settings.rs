@@ -1,6 +1,7 @@
 use std::collections::BTreeMap;
 
 use super::adoption::DongleIdentity;
+use super::per_path::PerPath;
 use super::seen_apps::SeenApp;
 use crate::battery::sample::Sample;
 use crate::eq::curve::Curve;
@@ -48,34 +49,19 @@ impl HeadsetValues {
     }
 
     pub fn apply(&mut self, change: &SettingChange) {
-        let mut settings = self.with_curve(Curve::default());
-        settings.apply(change.clone());
-        *self = Self::from_settings(&settings);
-    }
-}
-
-#[derive(Clone, Debug, PartialEq, Eq, Hash)]
-pub struct RoutePresets {
-    pub dongle: PresetId,
-    pub bluetooth: PresetId,
-}
-
-impl RoutePresets {
-    #[must_use]
-    pub const fn get(&self, path: SoundPath) -> &PresetId {
-        match path {
-            SoundPath::Dongle => &self.dongle,
-            SoundPath::Bluetooth => &self.bluetooth,
-        }
-    }
-
-    pub fn set(&mut self, path: SoundPath, preset: PresetId) {
-        match path {
-            SoundPath::Dongle => self.dongle = preset,
-            SoundPath::Bluetooth => self.bluetooth = preset,
+        match *change {
+            SettingChange::MicVolume(value) => self.mic_volume = value,
+            SettingChange::Sidetone(value) => self.sidetone = value,
+            SettingChange::MuteLight(value) => self.mute_light = value,
+            SettingChange::VolumeLimiter(value) => self.volume_limiter = value,
+            SettingChange::WirelessMode(value) => self.wireless_mode = value,
+            SettingChange::AutoPowerOff(value) => self.auto_power_off = value,
+            SettingChange::Equalizer(_) => {}
         }
     }
 }
+
+pub type RoutePresets = PerPath<PresetId>;
 
 #[derive(Clone, Debug, Default, PartialEq, Eq, Hash)]
 pub struct AppRules(BTreeMap<String, PresetId>);

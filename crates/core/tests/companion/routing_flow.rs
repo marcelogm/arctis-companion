@@ -2,6 +2,7 @@ use arctis_core::companion::Action;
 use arctis_core::companion::app_settings::PersistedChange;
 use arctis_core::companion::routing::{AudioService, Route};
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, SinkKind, SoundPath};
+use arctis_core::view::equalizer_rows::equalizer_group;
 
 use crate::support::{
     Harness, adopted, audio_commands, curve_of, default_sink, id, observed, persisted,
@@ -109,6 +110,17 @@ fn a_bluez_node_seen_once_is_remembered() {
     );
     assert!(persisted_changes(&h.audio(AudioEvent::BluetoothNodeSeen)).is_empty());
     assert!(h.snapshot().audio.bluetooth_sink_seen);
+}
+
+#[test]
+fn a_bluetooth_default_sink_counts_as_a_seen_bluez_node() {
+    let mut h = Harness::new(persisted());
+    let actions = h.audio(default_sink(SinkKind::NovaBluetooth));
+    assert_eq!(
+        persisted_changes(&actions),
+        [PersistedChange::BluetoothSinkSeen]
+    );
+    assert!(equalizer_group(&h.snapshot()).bluetooth_preset.is_some());
 }
 
 #[test]

@@ -27,7 +27,7 @@ impl Companion {
         if self.quit == Quit::Running {
             self.quit = Quit::Waiting(now.after(QUIT_GRACE));
             self.remove_equalizer(out);
-            out.extend(self.battery.disconnect(now).map(Action::RecordBattery));
+            out.extend(Action::from_battery(self.battery.disconnect(now)));
         }
     }
 

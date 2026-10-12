@@ -51,20 +51,19 @@ pub fn equalizer_group(snapshot: &Snapshot) -> EqualizerGroupModel {
 }
 
 #[must_use]
-pub fn now_playing_text(preset: &Preset, reason: &PresetReason) -> Text {
+pub fn now_playing_text(preset: &Preset, reason: &PresetReason) -> Option<Text> {
     let name = ("preset", preset_arg(preset));
     match reason {
-        PresetReason::App(app) => Text::format(
+        PresetReason::App(app) => Some(Text::format(
             "{preset}, chosen for {app}",
             vec![name, ("app", Arg::Str(app.clone()))],
-        ),
-        PresetReason::Manual(Some(app)) => Text::format(
+        )),
+        PresetReason::Manual(Some(app)) => Some(Text::format(
             "{preset}, until {app} stops",
             vec![name, ("app", Arg::Str(app.clone()))],
-        ),
-        PresetReason::Manual(None) | PresetReason::Route => {
-            Text::format("{preset}, chosen by hand", vec![name])
-        }
+        )),
+        PresetReason::Manual(None) => Some(Text::format("{preset}, chosen by hand", vec![name])),
+        PresetReason::Route => None,
     }
 }
 
@@ -93,14 +92,14 @@ fn preset_combo(snapshot: &Snapshot, path: SoundPath) -> PresetComboModel {
 
 fn now_playing(snapshot: &Snapshot) -> Option<NowPlayingModel> {
     let path = snapshot.picked_path().ok()?;
-    let active = snapshot.presets.active(path);
+    let active = snapshot.presets.active.get(path);
     if active.preset == snapshot.presets.route_preset(path) {
         return None;
     }
     let preset = snapshot.presets.resolve(&active.preset);
     Some(NowPlayingModel {
         path,
-        subtitle: now_playing_text(&preset, &active.reason),
+        subtitle: now_playing_text(&preset, &active.reason)?,
         button: Text::plain("Use Route Preset"),
         use_route_preset: Intent::UseRoutePreset(path),
     })
@@ -108,14 +107,13 @@ fn now_playing(snapshot: &Snapshot) -> Option<NowPlayingModel> {
 
 fn warnings(snapshot: &Snapshot) -> Vec<Text> {
     let audio = &snapshot.audio;
-    let easy_effects = audio.default_sink.is_some_and(|sink| sink.via_easy_effects);
     [
         (
             audio.manager_denied,
             "Choose “Arctis Nova 5 (Equalizer)” as output in Sound settings",
         ),
         (
-            easy_effects,
+            audio.easy_effects_active(),
             "EasyEffects is processing audio; the system equalizer is off",
         ),
         (
