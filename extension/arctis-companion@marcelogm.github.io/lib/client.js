@@ -2,6 +2,7 @@ import Gio from 'gi://Gio';
 import GLib from 'gi://GLib';
 
 export const BUS_NAME = 'io.github.marcelogm.ArctisCompanion';
+export const DESKTOP_ID = `${BUS_NAME}.desktop`;
 export const OBJECT_PATH = '/io/github/marcelogm/ArctisCompanion';
 export const INTERFACE_NAME = 'io.github.marcelogm.ArctisCompanion.Headset1';
 
@@ -32,6 +33,13 @@ export function createProxy(connection) {
         g_interface_info: interfaceInfo(),
         g_flags: Gio.DBusProxyFlags.DO_NOT_AUTO_START,
     });
+}
+
+export function platformData(activationToken) {
+    if (activationToken === null)
+        return {};
+    const token = GLib.Variant.new_string(activationToken);
+    return {'activation-token': token, 'desktop-startup-id': token};
 }
 
 export class HeadsetClient {
@@ -69,8 +77,8 @@ export class HeadsetClient {
         return this.#proxy.call('ActivatePreset', new GLib.Variant('(s)', [id]), CALL_FLAGS, DEFAULT_TIMEOUT, null);
     }
 
-    activateApplication() {
-        const parameters = new GLib.Variant('(a{sv})', [{}]);
+    activateApplication(activationToken = null) {
+        const parameters = new GLib.Variant('(a{sv})', [platformData(activationToken)]);
         return this.#proxy.get_connection().call(BUS_NAME, OBJECT_PATH, 'org.freedesktop.Application', 'Activate',
             parameters, null, CALL_FLAGS, DEFAULT_TIMEOUT, null);
     }

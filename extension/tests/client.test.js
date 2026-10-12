@@ -102,6 +102,12 @@ test('Headset Settings activates the app', () => withRunningApp(async (client, s
     assertEqual(service.activations, 1);
 }));
 
+test('Headset Settings hands over the activation token', () => withRunningApp(async (client, service) => {
+    await client.activateApplication('token-1');
+    await client.activateApplication(null);
+    assertEqual(service.activationTokens, ['token-1', null]);
+}));
+
 test('neither the proxy nor its calls start the app', async () => {
     const marker = await armActivationMarker();
     const client = await startClient();

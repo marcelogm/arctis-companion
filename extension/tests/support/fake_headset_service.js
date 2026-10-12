@@ -23,6 +23,7 @@ export class FakeHeadsetService {
     automaticPresetWrites = [];
     activatedPresets = [];
     activations = 0;
+    activationTokens = [];
     #bag;
     #connection = null;
     #headset = null;
@@ -61,7 +62,7 @@ export class FakeHeadsetService {
         this.#connection = await Gio.DBusConnection.new_for_address(address, CONNECTION_FLAGS, null, null);
         this.#headset = Gio.DBusExportedObject.wrapJSObject(interfaceXml(), this.#headsetImplementation());
         this.#headset.export(this.#connection, OBJECT_PATH);
-        this.#application = Gio.DBusExportedObject.wrapJSObject(APPLICATION_XML, {Activate: () => this.#activate()});
+        this.#application = Gio.DBusExportedObject.wrapJSObject(APPLICATION_XML, {Activate: platformData => this.#activate(platformData)});
         this.#application.export(this.#connection, OBJECT_PATH);
         this.#ownerId = Gio.bus_own_name_on_connection(this.#connection, BUS_NAME, Gio.BusNameOwnerFlags.NONE,
             () => this.#acquired(), null);
@@ -98,8 +99,9 @@ export class FakeHeadsetService {
         invocation.return_value(null);
     }
 
-    #activate() {
+    #activate(platformData) {
         this.activations += 1;
+        this.activationTokens.push(platformData['activation-token']?.unpack() ?? null);
     }
 
     #acquired() {
