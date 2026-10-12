@@ -8,8 +8,8 @@ use arctis_ui::PermissionDialog;
 use crate::app_presets_page::rendered_page;
 use crate::battery_history::{shown_battery_page, synthetic_week, with_history};
 use crate::support::{
-    custom_preset, descendants, filter, open_editor, open_page, open_presets, rendered_window,
-    rich_snapshot, ruled, seen_app, shown, with_preset,
+    custom_preset, descendants, filter, named, one_peak, open_editor, open_page, open_presets,
+    rendered_window, rich_snapshot, ruled, seen_app, shown, standalone_editor, with_preset,
 };
 
 const NARROWEST: i32 = 360;
@@ -162,4 +162,51 @@ fn the_opened_battery_page_fits_the_narrowest_window() {
 fn the_battery_page_never_scrolls_horizontally() {
     let page = shown_battery_page(with_history(synthetic_week()));
     assert_never_scrolls_horizontally(&page, "the battery page");
+}
+
+const CONTENT_MAX: f32 = 720.0;
+
+fn bounds_in(widget: &gtk::Widget, page: &impl IsA<gtk::Widget>) -> gtk::graphene::Rect {
+    widget.compute_bounds(page).expect("an allocated widget")
+}
+
+fn allocated_editor(width: i32) -> arctis_ui::EqEditorPage {
+    let editor = standalone_editor(with_preset(&one_peak()), "mine");
+    let page = editor.page;
+    page.measure(gtk::Orientation::Horizontal, -1);
+    page.measure(gtk::Orientation::Vertical, width);
+    page.allocate(width, 1000, -1, None);
+    page
+}
+
+#[gtk::test]
+fn a_wide_editor_keeps_one_centered_column() {
+    let page = allocated_editor(1920);
+    let graph = bounds_in(&named::<gtk::Widget>(&page, "response-graph"), &page);
+    let bands = bounds_in(&named::<gtk::Widget>(&page, "bands"), &page);
+    for (what, rect) in [("graph", &graph), ("bands", &bands)] {
+        assert!(
+            rect.width() <= CONTENT_MAX,
+            "{what} is {} wide",
+            rect.width()
+        );
+        let center = rect.x() + rect.width() / 2.0;
+        assert!(
+            (center - 960.0).abs() <= 1.0,
+            "{what} is centered at {center}"
+        );
+    }
+    assert!(
+        graph.y() + graph.height() <= bands.y(),
+        "the graph sits above the bands"
+    );
+}
+
+#[gtk::test]
+fn a_narrow_editor_spends_its_width_on_the_graph_and_the_bands() {
+    let page = allocated_editor(440);
+    for name in ["response-graph", "bands"] {
+        let rect = bounds_in(&named::<gtk::Widget>(&page, name), &page);
+        assert!(rect.width() >= 400.0, "{name} is {} wide", rect.width());
+    }
 }
