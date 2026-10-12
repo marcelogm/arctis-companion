@@ -4,6 +4,7 @@ use crate::eq::curve::{Curve, MAX_FILTERS};
 use crate::eq::decimal::thousandths_of;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
 use crate::eq::preset::{Preset, PresetKind};
+use crate::l10n::msgid;
 
 pub const NEW_BAND: Filter = match Filter::from_parts(FilterKind::Peaking, 1_000, 0, 1_410) {
     Ok(filter) => filter,
@@ -112,7 +113,10 @@ pub fn renamed(preset: &Preset, name: &str) -> Option<Preset> {
 
 #[must_use]
 pub fn copy_name(preset: &Preset) -> Text {
-    Text::format("{preset} (Copy)", vec![("preset", preset_arg(preset))])
+    Text::format(
+        msgid("{preset} (Copy)"),
+        vec![("preset", preset_arg(preset))],
+    )
 }
 
 #[must_use]
@@ -126,7 +130,10 @@ pub fn duplicate(snapshot: &Snapshot, source: &Preset, name: &str) -> Preset {
 
 #[must_use]
 pub fn saved_toast(preset: &Preset) -> Text {
-    Text::format("Saved “{preset}”", vec![("preset", preset_arg(preset))])
+    Text::format(
+        msgid("Saved “{preset}”"),
+        vec![("preset", preset_arg(preset))],
+    )
 }
 
 fn editable_filters(preset: &Preset) -> Option<Vec<Filter>> {

@@ -3,6 +3,7 @@ use crate::companion::snapshot::Snapshot;
 use crate::eq::apo::{self, ApoError, Clamp, Field, Import};
 use crate::eq::curve::{Curve, MAX_FILTERS};
 use crate::eq::preset::Preset;
+use crate::l10n::{forms, msgid};
 
 const APO_EXTENSION: &str = ".txt";
 const JSON_EXTENSION: &str = ".json";
@@ -52,7 +53,7 @@ pub fn export_file_name(name: &str) -> String {
 #[must_use]
 pub fn export_failed(preset: &Preset) -> Text {
     Text::format(
-        "Could not export “{preset}”",
+        msgid("Could not export “{preset}”"),
         vec![("preset", preset_arg(preset))],
     )
 }
@@ -96,12 +97,12 @@ fn stem(file_name: &str) -> &str {
 fn imported_toast(preset: &Preset, clamped: usize) -> Text {
     let name = vec![("preset", preset_arg(preset))];
     match saturating_count(clamped) {
-        0 => Text::format("Imported “{preset}”", name),
+        0 => Text::format(msgid("Imported “{preset}”"), name),
         n => Text::plural(
-            [
+            forms(
                 "Imported “{preset}”. {n} value was changed to fit the headset",
                 "Imported “{preset}”. {n} values were changed to fit the headset",
-            ],
+            ),
             n,
             name,
         ),
@@ -110,12 +111,12 @@ fn imported_toast(preset: &Preset, clamped: usize) -> Text {
 
 fn clamp_line(clamp: &Clamp) -> Text {
     let field = match clamp.field {
-        Field::Frequency => "Frequency",
-        Field::Gain => "Gain",
-        Field::Q => "Q",
+        Field::Frequency => msgid("Frequency"),
+        Field::Gain => msgid("Gain"),
+        Field::Q => msgid("Q"),
     };
     Text::format(
-        "Filter {filter}: {field}",
+        msgid("Filter {filter}: {field}"),
         vec![
             ("filter", Arg::Number(saturating_count(clamp.position + 1))),
             ("field", Arg::Msgid(field.to_owned())),
@@ -124,19 +125,21 @@ fn clamp_line(clamp: &Clamp) -> Text {
 }
 
 fn not_a_preset(file_name: &str) -> Text {
-    Text::format("“{file}” is not a preset file", file_args(file_name))
+    Text::format(msgid("“{file}” is not a preset file"), file_args(file_name))
 }
 
 fn apo_problem(file_name: &str, error: ApoError) -> Text {
     match error {
-        ApoError::NoFilters => Text::format("“{file}” has no filters", file_args(file_name)),
+        ApoError::NoFilters => Text::format(msgid("“{file}” has no filters"), file_args(file_name)),
         ApoError::TooManyFilters(found) => too_many_filters(file_name, found),
-        ApoError::Malformed { line } => {
-            bad_line(file_name, "Could not read line {line} of “{file}”", line)
-        }
+        ApoError::Malformed { line } => bad_line(
+            file_name,
+            msgid("Could not read line {line} of “{file}”"),
+            line,
+        ),
         ApoError::UnsupportedKind { line } => bad_line(
             file_name,
-            "Line {line} of “{file}” uses a filter type the headset does not support",
+            msgid("Line {line} of “{file}” uses a filter type the headset does not support"),
             line,
         ),
     }
@@ -146,10 +149,10 @@ fn too_many_filters(file_name: &str, found: usize) -> Text {
     let mut args = file_args(file_name);
     args.push(("max", Arg::Number(saturating_count(MAX_FILTERS))));
     Text::plural(
-        [
+        forms(
             "“{file}” has {n} filter; the headset takes at most {max}",
             "“{file}” has {n} filters; the headset takes at most {max}",
-        ],
+        ),
         saturating_count(found),
         args,
     )

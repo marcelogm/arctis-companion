@@ -1,6 +1,7 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use arctis_core::intent::Intent;
+use arctis_core::l10n::msgid;
 use arctis_core::view::preset_edits::{WorkingCopy, copy_name, duplicate, renamed};
 use arctis_core::view::preset_files::{export_failed, export_file_name, export_text};
 use arctis_core::view::presets::deleted_toast;
@@ -128,16 +129,16 @@ fn rename_dialog(name: &str) -> (adw::AlertDialog, gtk::Entry) {
         .text(name)
         .activates_default(true)
         .build();
-    entry.update_property(&[Property::Label(&resolve(&Text::plain("Name")))]);
+    entry.update_property(&[Property::Label(&resolve(&Text::plain(msgid("Name"))))]);
     let dialog = adw::AlertDialog::builder()
-        .heading(resolve(&Text::plain("Rename Preset")))
+        .heading(resolve(&Text::plain(msgid("Rename Preset"))))
         .extra_child(&entry)
         .default_response(RENAME)
         .close_response(CANCEL)
         .build();
     dialog.add_responses(&[
-        (CANCEL, &resolve(&Text::plain("_Cancel"))),
-        (RENAME, &resolve(&Text::plain("_Rename"))),
+        (CANCEL, &resolve(&Text::plain(msgid("_Cancel")))),
+        (RENAME, &resolve(&Text::plain(msgid("_Rename")))),
     ]);
     dialog.set_response_appearance(RENAME, adw::ResponseAppearance::Suggested);
     (dialog, entry)

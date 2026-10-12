@@ -6,6 +6,7 @@ use crate::companion::selection::PresetReason;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::preset::Preset;
 use crate::intent::Intent;
+use crate::l10n::msgid;
 use crate::messages::audio::SoundPath;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -55,14 +56,16 @@ pub fn now_playing_text(preset: &Preset, reason: &PresetReason) -> Option<Text> 
     let name = ("preset", preset_arg(preset));
     match reason {
         PresetReason::App(app) => Some(Text::format(
-            "{preset}, chosen for {app}",
+            msgid("{preset}, chosen for {app}"),
             vec![name, ("app", Arg::Str(app.clone()))],
         )),
         PresetReason::Manual(Some(app)) => Some(Text::format(
-            "{preset}, until {app} stops",
+            msgid("{preset}, until {app} stops"),
             vec![name, ("app", Arg::Str(app.clone()))],
         )),
-        PresetReason::Manual(None) => Some(Text::format("{preset}, chosen by hand", vec![name])),
+        PresetReason::Manual(None) => {
+            Some(Text::format(msgid("{preset}, chosen by hand"), vec![name]))
+        }
         PresetReason::Route => None,
     }
 }
@@ -75,10 +78,12 @@ fn preset_combo(snapshot: &Snapshot, path: SoundPath) -> PresetComboModel {
         .position(|item| item.id == route_preset)
         .unwrap_or(0);
     let (title, subtitle) = match path {
-        SoundPath::Dongle => ("2.4 GHz Preset", None),
+        SoundPath::Dongle => (msgid("2.4 GHz Preset"), None),
         SoundPath::Bluetooth => (
-            "Bluetooth from This Computer",
-            Some("Applies when this computer plays to the headset over Bluetooth"),
+            msgid("Bluetooth from This Computer"),
+            Some(msgid(
+                "Applies when this computer plays to the headset over Bluetooth",
+            )),
         ),
     };
     PresetComboModel {
@@ -100,7 +105,7 @@ fn now_playing(snapshot: &Snapshot) -> Option<NowPlayingModel> {
     Some(NowPlayingModel {
         path,
         subtitle: now_playing_text(&preset, &active.reason)?,
-        button: Text::plain("Use Route Preset"),
+        button: Text::plain(msgid("Use Route Preset")),
         use_route_preset: Intent::UseRoutePreset(path),
     })
 }
@@ -110,15 +115,15 @@ fn warnings(snapshot: &Snapshot) -> Vec<Text> {
     [
         (
             audio.manager_denied,
-            "Choose “Arctis Nova 5 (Equalizer)” as output in Sound settings",
+            msgid("Choose “Arctis Nova 5 (Equalizer)” as output in Sound settings"),
         ),
         (
             audio.easy_effects_active(),
-            "EasyEffects is processing audio; the system equalizer is off",
+            msgid("EasyEffects is processing audio; the system equalizer is off"),
         ),
         (
             audio.service == AudioService::Unavailable,
-            "App presets unavailable: audio service not reachable",
+            msgid("App presets unavailable: audio service not reachable"),
         ),
     ]
     .into_iter()

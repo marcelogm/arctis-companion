@@ -7,6 +7,7 @@ use crate::companion::adoption::AdoptionStatus;
 use crate::companion::routing::Route;
 use crate::companion::snapshot::Snapshot;
 use crate::intent::Intent;
+use crate::l10n::msgid;
 use crate::messages::device::Phase;
 use crate::protocol::status::Charging;
 use crate::settings::headset_settings::Setting;
@@ -120,9 +121,9 @@ pub fn battery_icon(reading: Option<Reading>) -> String {
 #[must_use]
 pub const fn route_msgid(route: Route) -> &'static str {
     match route {
-        Route::Dongle => "Sound from this computer over 2.4 GHz",
-        Route::Bluetooth => "Sound from this computer over Bluetooth",
-        Route::None => "Not this computer's sound output",
+        Route::Dongle => msgid("Sound from this computer over 2.4 GHz"),
+        Route::Bluetooth => msgid("Sound from this computer over Bluetooth"),
+        Route::None => msgid("Not this computer's sound output"),
     }
 }
 
@@ -139,8 +140,8 @@ fn headset(snapshot: &Snapshot) -> HeadsetModel {
 fn no_headset() -> StatusPageModel {
     StatusPageModel::new(
         "audio-headphones-symbolic",
-        "No Headset Connected",
-        "Connect the wireless dongle or pair the headset over Bluetooth",
+        msgid("No Headset Connected"),
+        msgid("Connect the wireless dongle or pair the headset over Bluetooth"),
         None,
     )
 }
@@ -148,20 +149,23 @@ fn no_headset() -> StatusPageModel {
 fn permission_required() -> StatusPageModel {
     StatusPageModel::new(
         "dialog-password-symbolic",
-        "Permission Required",
-        "The wireless dongle needs a udev rule before the app can use it",
-        Some("Show Instructions"),
+        msgid("Permission Required"),
+        msgid("The wireless dongle needs a udev rule before the app can use it"),
+        Some(msgid("Show Instructions")),
     )
 }
 
 fn banner_model(kind: BannerKind) -> BannerModel {
     let (title, button) = match kind {
         BannerKind::PermissionNeeded => (
-            "Permission is needed to use the wireless dongle",
-            Some("Show Instructions"),
+            msgid("Permission is needed to use the wireless dongle"),
+            Some(msgid("Show Instructions")),
         ),
-        BannerKind::TurnOnToRead => ("Turn on the headset to read its settings", None),
-        BannerKind::HeadsetOff => ("Headset is off. Changes apply when it turns on.", None),
+        BannerKind::TurnOnToRead => (msgid("Turn on the headset to read its settings"), None),
+        BannerKind::HeadsetOff => (
+            msgid("Headset is off. Changes apply when it turns on."),
+            None,
+        ),
     };
     BannerModel {
         kind,
@@ -173,9 +177,9 @@ fn banner_model(kind: BannerKind) -> BannerModel {
 fn settings_area(snapshot: &Snapshot) -> SettingsArea {
     let dongle = &snapshot.dongle;
     if !dongle.is_present() {
-        return SettingsArea::BluetoothOnly(Text::plain(
+        return SettingsArea::BluetoothOnly(Text::plain(msgid(
             "Connect the wireless dongle to change headset settings",
-        ));
+        )));
     }
     if dongle.adoption != AdoptionStatus::Adopted {
         return SettingsArea::Hidden;
@@ -205,8 +209,8 @@ fn header(snapshot: &Snapshot) -> HeaderModel {
 
 fn connection_subtitle(snapshot: &Snapshot) -> Option<Text> {
     match snapshot.dongle.phase {
-        phase if phase.is_connecting() => Some(Text::plain("Connecting…")),
-        Phase::Rebinding => Some(Text::plain("Reconnecting…")),
+        phase if phase.is_connecting() => Some(Text::plain(msgid("Connecting…"))),
+        Phase::Rebinding => Some(Text::plain(msgid("Reconnecting…"))),
         _ => None,
     }
 }
@@ -215,18 +219,18 @@ fn battery_text(reading: Reading) -> Text {
     let level = ("percent", Arg::Percent(reading.percent));
     match charging_msgid(reading.charging) {
         Some(state) => Text::format(
-            "{percent} · {state}",
+            msgid("{percent} · {state}"),
             vec![level, ("state", Arg::Msgid(state.to_owned()))],
         ),
-        None => Text::format("{percent}", vec![level]),
+        None => Text::format(msgid("{percent}"), vec![level]),
     }
 }
 
 const fn charging_msgid(charging: Charging) -> Option<&'static str> {
     match charging {
-        Charging::Charging => Some("Charging"),
-        Charging::PluggedIn => Some("Charged"),
-        Charging::Discharging => Some("Discharging"),
+        Charging::Charging => Some(msgid("Charging")),
+        Charging::PluggedIn => Some(msgid("Charged")),
+        Charging::Discharging => Some(msgid("Discharging")),
         Charging::Unknown => None,
     }
 }
@@ -235,10 +239,10 @@ fn header_description(reading: Option<Reading>, route: &str) -> Text {
     let route = ("route", Arg::Msgid(route.to_owned()));
     match reading {
         Some(level) => Text::format(
-            "Battery {percent}. {route}",
+            msgid("Battery {percent}. {route}"),
             vec![("percent", Arg::Percent(level.percent)), route],
         ),
-        None => Text::format("Battery level unknown. {route}", vec![route]),
+        None => Text::format(msgid("Battery level unknown. {route}"), vec![route]),
     }
 }
 
@@ -257,12 +261,12 @@ fn failure_toast(snapshot: &Snapshot) -> Option<ToastModel> {
 
 const fn failure_msgid(setting: Setting) -> &'static str {
     match setting {
-        Setting::MicVolume => "Could Not Change Microphone Volume",
-        Setting::Sidetone => "Could Not Change Sidetone",
-        Setting::MuteLight => "Could Not Change Mute Light Brightness",
-        Setting::VolumeLimiter => "Could Not Change Volume Limiter",
-        Setting::WirelessMode => "Could Not Change Extended Range",
-        Setting::AutoPowerOff => "Could Not Change Automatic Power Off",
-        Setting::Equalizer => "Could Not Change the Headset Equalizer",
+        Setting::MicVolume => msgid("Could Not Change Microphone Volume"),
+        Setting::Sidetone => msgid("Could Not Change Sidetone"),
+        Setting::MuteLight => msgid("Could Not Change Mute Light Brightness"),
+        Setting::VolumeLimiter => msgid("Could Not Change Volume Limiter"),
+        Setting::WirelessMode => msgid("Could Not Change Extended Range"),
+        Setting::AutoPowerOff => msgid("Could Not Change Automatic Power Off"),
+        Setting::Equalizer => msgid("Could Not Change the Headset Equalizer"),
     }
 }

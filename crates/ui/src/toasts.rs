@@ -1,5 +1,6 @@
 use std::cell::Cell;
 
+use arctis_core::l10n::msgid;
 use arctis_core::view::headset_page::ToastModel;
 use arctis_core::view::text::Text;
 
@@ -43,7 +44,7 @@ pub fn button_toast(title: &Text, label: &Text, on_click: impl Fn() + 'static) -
 fn failure_toast(model: &ToastModel, sink: &IntentSink) -> adw::Toast {
     let retry = model.retry.clone();
     let sink = sink.clone();
-    button_toast(&model.title, &Text::plain("Retry"), move || {
+    button_toast(&model.title, &Text::plain(msgid("Retry")), move || {
         sink.emit(retry.clone());
     })
 }

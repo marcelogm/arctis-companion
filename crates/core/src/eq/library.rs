@@ -1,6 +1,7 @@
 use super::curve::Curve;
 use super::filter::{Filter, FilterKind};
 use super::preset::{Preset, PresetId};
+use crate::l10n::msgid;
 
 pub const FLAT_ID: &str = "flat";
 
@@ -77,22 +78,22 @@ const LATE_NIGHT: [Filter; 3] = [
 
 #[must_use]
 pub fn flat() -> Preset {
-    built_in(FLAT_ID, "Flat", FLAT)
+    built_in(FLAT_ID, msgid("Flat"), FLAT)
 }
 
 #[must_use]
 pub fn library() -> Vec<Preset> {
     vec![
         flat(),
-        built_in("bass-boost", "Bass Boost", BASS_BOOST),
-        built_in("bass-reduction", "Bass Reduction", BASS_REDUCTION),
-        built_in("treble-soften", "Treble Soften", TREBLE_SOFTEN),
-        built_in("vocal-clarity", "Vocal Clarity", VOCAL_CLARITY),
-        built_in("footsteps", "Footsteps", FOOTSTEPS),
-        built_in("v-shape", "V-Shape", V_SHAPE),
-        built_in("movie-night", "Movie Night", MOVIE_NIGHT),
-        built_in("podcast", "Podcast", PODCAST),
-        built_in("late-night", "Late Night", LATE_NIGHT),
+        built_in("bass-boost", msgid("Bass Boost"), BASS_BOOST),
+        built_in("bass-reduction", msgid("Bass Reduction"), BASS_REDUCTION),
+        built_in("treble-soften", msgid("Treble Soften"), TREBLE_SOFTEN),
+        built_in("vocal-clarity", msgid("Vocal Clarity"), VOCAL_CLARITY),
+        built_in("footsteps", msgid("Footsteps"), FOOTSTEPS),
+        built_in("v-shape", msgid("V-Shape"), V_SHAPE),
+        built_in("movie-night", msgid("Movie Night"), MOVIE_NIGHT),
+        built_in("podcast", msgid("Podcast"), PODCAST),
+        built_in("late-night", msgid("Late Night"), LATE_NIGHT),
     ]
 }
 

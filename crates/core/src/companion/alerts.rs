@@ -2,6 +2,7 @@ use std::mem;
 
 use super::timing::{BATTERY_HYSTERESIS, CRITICAL_BATTERY};
 use crate::battery::sample::Reading;
+use crate::l10n::msgid;
 use crate::settings::values::Percent;
 use crate::view::text::{Arg, Text};
 
@@ -141,9 +142,9 @@ impl Alerts {
 fn low_alert(level: Percent) -> Alert {
     Alert {
         id: AlertId::LowBattery,
-        title: Text::plain("Headset Battery Low"),
+        title: Text::plain(msgid("Headset Battery Low")),
         body: Text::format(
-            "{percent} remaining",
+            msgid("{percent} remaining"),
             vec![("percent", Arg::Percent(level))],
         ),
     }
@@ -152,9 +153,9 @@ fn low_alert(level: Percent) -> Alert {
 fn critical_alert(level: Percent) -> Alert {
     Alert {
         id: AlertId::CriticalBattery,
-        title: Text::plain("Headset Battery Critical"),
+        title: Text::plain(msgid("Headset Battery Critical")),
         body: Text::format(
-            "{percent} remaining. Charge the headset soon.",
+            msgid("{percent} remaining. Charge the headset soon."),
             vec![("percent", Arg::Percent(level))],
         ),
     }
