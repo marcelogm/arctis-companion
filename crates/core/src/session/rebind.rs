@@ -32,6 +32,12 @@ impl Rebinding {
         self.settle_until = Some(now.after(REBIND_SETTLE));
     }
 
+    pub(crate) fn link_up(&mut self, now: Millis) {
+        if let Resume::HeadsetOff(_) = self.resume {
+            self.resume = Resume::HeadsetOff(now);
+        }
+    }
+
     pub(crate) fn vanished(&mut self) {
         self.settle_until = None;
     }

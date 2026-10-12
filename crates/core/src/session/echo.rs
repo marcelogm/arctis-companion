@@ -33,7 +33,7 @@ impl EchoFilter {
         }
     }
 
-    pub(crate) fn consume(&mut self, change: &SettingChange, now: Millis) -> bool {
+    pub(crate) fn is_echo(&mut self, change: &SettingChange, now: Millis) -> bool {
         self.forget_expired(now);
         self.written.iter().any(|written| written.change == *change)
     }

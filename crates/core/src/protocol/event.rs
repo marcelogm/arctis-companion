@@ -5,8 +5,8 @@ use crate::settings::headset_settings::SettingChange;
 use crate::settings::values::{AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone};
 
 const CHAT_MIX: u8 = 0x45;
-const BATTERY: u8 = 0xB7;
-const LINK: u8 = 0xB9;
+pub(crate) const BATTERY: u8 = 0xB7;
+pub(crate) const LINK: u8 = 0xB9;
 const CHARGING: u8 = 0xBB;
 
 #[derive(Clone, Debug, PartialEq, Eq)]

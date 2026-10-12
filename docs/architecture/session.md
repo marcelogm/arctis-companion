@@ -17,9 +17,10 @@ flowchart LR
     rebind["rebind.rs<br/>Rebinding"] --> phase
     syncing["syncing.rs<br/>Readings"] --> phase
     exchange["exchange.rs<br/>pacing, one query in flight"] --> drive
-    reconcile["reconcile.rs<br/>drift, readbacks"] --> verify["verify.rs<br/>Transaction"]
-    verify --> drive
-    echo["echo.rs<br/>EchoFilter"] --> frames
+    verify["verify.rs<br/>Transaction"] --> reconcile["reconcile.rs<br/>Reconciler: desired, observed, drift"]
+    echo["echo.rs<br/>EchoFilter"] --> reconcile
+    reconcile --> drive
+    reconcile --> frames
     timing["timing.rs<br/>constants"] --> drive
     drive --> effect["effect.rs<br/>Effect, Cadence"]
 ```
@@ -33,9 +34,10 @@ flowchart LR
 | Phases and resume points | `crates/core/src/session/phase.rs::Stage`, `crates/core/src/session/phase.rs::Resume`, `crates/core/src/session/phase.rs::restart` |
 | Syncing reads | `crates/core/src/session/syncing.rs::Readings` |
 | Pacing, reply matching, resend | `crates/core/src/session/exchange.rs::Exchange`, `crates/core/src/session/exchange.rs::answer`, `crates/core/src/session/exchange.rs::expire` |
-| Drift and readbacks | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/reconcile.rs::readbacks`, `crates/core/src/session/reconcile.rs::same` |
+| Desired, observed, failures, the open transaction and echoes | `crates/core/src/session/reconcile.rs::Reconciler`, `crates/core/src/session/reconcile.rs::drift` |
+| Readbacks and curve comparison | `crates/core/src/session/verify.rs::readbacks`, `crates/core/src/session/verify.rs::same` |
 | Write then verify | `crates/core/src/session/verify.rs::Transaction`, `crates/core/src/session/verify.rs::check`, `crates/core/src/session/verify.rs::Progress` |
-| Echoes | `crates/core/src/session/echo.rs::EchoFilter`, `crates/core/src/session/echo.rs::consume` |
+| Echoes | `crates/core/src/session/echo.rs::EchoFilter`, `crates/core/src/session/echo.rs::is_echo` |
 | Rebinding | `crates/core/src/session/rebind.rs::Rebinding`, `crates/core/src/session/rebind.rs::RebindStep` |
 
 ## One call to `handle`
@@ -45,15 +47,16 @@ Every input runs the same four steps, so a late `Woke` and an early reply are ha
 ```mermaid
 flowchart LR
     A["apply(input)<br/>reducer.rs"] --> E["expire()<br/>reply timeout, grace, settle, rebind"]
-    E --> D["drive()<br/>reconcile, at most one write"]
+    E --> D["drive()<br/>due command, at most one write"]
     D --> S["schedule()<br/>one WakeAt when the earliest deadline changes"]
 ```
 
-`crates/core/src/session/drive.rs::drive` sends at most one frame per call and only when
+`crates/core/src/session/drive.rs::due` is the one place that says, per stage, which command comes next and when
+(probe, headset-off poll, Syncing read, reconcile write or readback, safety poll).
+`crates/core/src/session/drive.rs::drive` sends at most one frame per call, only once that time has come and
 `crates/core/src/session/exchange.rs::free_at` allows it (`COMMAND_SPACING` after the last write, nothing in
-flight). `crates/core/src/session/drive.rs::next_wake` is the earliest of: the spacing gate, the next timed command
-(headset-off poll, safety poll, verify backoff), the reply deadline, the settle or rebind deadline and the end of a
-wireless-mode grace.
+flight). `crates/core/src/session/drive.rs::next_wake` is the earliest of: the next command from `due` (no earlier
+than the spacing gate), the reply deadline, the settle or rebind deadline and the end of a wireless-mode grace.
 
 ## Lifecycle
 
@@ -91,7 +94,7 @@ stateDiagram-v2
 | `Lost` from any phase forgets the dongle, desired settings included | `crates/core/src/session/reducer.rs::lost` |
 | Frames on iface 3 are drained while Settling and Rebinding | `crates/core/src/session/phase.rs::drains_command_frames`, `crates/core/src/session/frames.rs::command_frame` |
 | A query unanswered twice means HeadsetOff, unless asked inside a wireless-mode grace | `crates/core/src/session/drive.rs::unanswered`, `crates/core/src/session/verify.rs::tolerates` |
-| Link events | `crates/core/src/session/frames.rs::on_link_event`, `crates/core/src/session/frames.rs::on_link` |
+| Link events; `B9` link 3 while HeadsetOff, or while Rebinding from HeadsetOff, polls `B0` at once | `crates/core/src/session/frames.rs::on_link_event`, `crates/core/src/session/frames.rs::poll_status_now`, `crates/core/src/session/rebind.rs::link_up`, `crates/core/src/session/frames.rs::on_link` |
 | Rebinding sends nothing, publishes `Phase::Rebinding` only after `REBIND_NOTICE`, resumes the interrupted phase | `crates/core/src/session/rebind.rs::step`, `crates/core/src/session/drive.rs::rebinding_step`, `crates/core/src/session/reducer.rs::command_port_lost` |
 | The published phase never repeats | `crates/core/src/session/reducer.rs::announce` |
 
@@ -114,14 +117,15 @@ sequenceDiagram
 
 | Rule | Code |
 |---|---|
-| No desired settings, no write; `Adopt` writes nothing and republishes observed | `crates/core/src/session/reducer.rs::desire` |
-| Only drifted fields are written, wireless mode last, failed fields skipped until the next `Change::Desired` or the next Syncing | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/drive.rs::reconcile`, `crates/core/src/session/reducer.rs::enter` |
+| No desired settings, no write; `Adopt` ends any open transaction, writes nothing and republishes observed | `crates/core/src/session/reconcile.rs::desire` |
+| A newer desired value drops the older target from the open transaction, so only the latest value is written and verified | `crates/core/src/session/verify.rs::keep_wanted` |
+| Only drifted fields are written, wireless mode last, failed fields skipped until the next `Change::Desired` or the next Syncing | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/reconcile.rs::next`, `crates/core/src/session/reducer.rs::enter` |
 | One readback per query kind, backoff steps, one retry | `crates/core/src/session/verify.rs::next`, `crates/core/src/session/verify.rs::check` |
-| Curves compare with `equivalent` | `crates/core/src/session/reconcile.rs::same`, `crates/core/src/eq/curve.rs::equivalent` |
-| A wireless-mode write opens a grace: link drops and silence wait for it | `crates/core/src/session/verify.rs::link_lost_at`, `crates/core/src/session/frames.rs::link_down` |
-| An echo of a value written in the transaction or within `ECHO_WINDOW` is consumed; any other setting event is intent | `crates/core/src/session/frames.rs::on_setting_event`, `crates/core/src/session/echo.rs::close` |
-| A press on a setting in flight wins over the write | `crates/core/src/session/verify.rs::forget` |
-| The safety poll waits for the transaction and is postponed by battery events | `crates/core/src/session/drive.rs::ready_outgoing`, `crates/core/src/session/frames.rs::on_event` |
+| Curves compare with `equivalent` | `crates/core/src/session/verify.rs::same`, `crates/core/src/eq/curve.rs::equivalent` |
+| A wireless-mode write opens a grace: link drops and silence wait for it | `crates/core/src/session/verify.rs::link_lost_at`, `crates/core/src/session/frames.rs::on_link` |
+| An echo of a value written in the transaction or within `ECHO_WINDOW` is consumed; any other setting event is intent | `crates/core/src/session/reconcile.rs::on_setting_event`, `crates/core/src/session/echo.rs::close` |
+| A press on a setting in flight wins over the write | `crates/core/src/session/reconcile.rs::on_setting_event`, `crates/core/src/session/verify.rs::keep_wanted` |
+| The safety poll waits for the transaction and is postponed by battery events | `crates/core/src/session/drive.rs::due`, `crates/core/src/session/frames.rs::on_event` |
 
 ## Testkit
 

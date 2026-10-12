@@ -2,14 +2,31 @@ use super::effect::Effect;
 use super::exchange::{Expiry, Outgoing, Unanswered};
 use super::phase::Stage;
 use super::rebind::RebindStep;
-use super::reconcile::drift;
 use super::reducer::Session;
 use super::timing::{HEADSET_OFF_POLL, STATUS_SAFETY_POLL};
-use super::verify::Transaction;
 use crate::messages::device::Phase;
 use crate::protocol::Query;
-use crate::settings::headset_settings::SettingChange;
 use crate::time::Millis;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Next {
+    Status,
+    HeadsetOffPoll,
+    SyncRead,
+    Reconcile,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+struct Due {
+    at: Millis,
+    next: Next,
+}
+
+impl Due {
+    const fn at(at: Millis, next: Next) -> Self {
+        Self { at, next }
+    }
+}
 
 impl Session {
     pub(super) fn expire(&mut self) {
@@ -18,21 +35,14 @@ impl Session {
             Some(Expiry::GaveUp(unanswered)) => self.unanswered(unanswered),
             None => {}
         }
-        if self
-            .transaction
-            .as_ref()
-            .is_some_and(|transaction| transaction.lost_link_for_good(self.now))
-        {
+        if self.reconciler.lost_link_for_good(self.now) {
             self.headset_off();
         }
         self.expire_stage();
     }
 
     fn unanswered(&mut self, unanswered: Unanswered) {
-        if let Some(transaction) = &mut self.transaction
-            && transaction.tolerates(unanswered.asked_at)
-        {
-            transaction.requeue(unanswered.query);
+        if self.reconciler.requeue_within_grace(unanswered) {
             return;
         }
         if matches!(
@@ -74,70 +84,81 @@ impl Session {
     }
 
     pub(super) fn drive(&mut self) {
-        let free = self.exchange.free_at().is_some_and(|free| self.now >= free);
-        self.reconcile(free);
-        if free && let Some(outgoing) = self.next_outgoing() {
+        self.finish_syncing_without_drift();
+        let Some(due) = self.due().filter(|due| self.can_send_at(due.at)) else {
+            return;
+        };
+        if let Some(outgoing) = self.take(due.next) {
             self.send(outgoing);
         }
     }
 
-    fn send(&mut self, outgoing: Outgoing) {
-        if let Outgoing::Write(change) = &outgoing {
-            self.echoes.record(change.clone());
-        }
-        let frame = self.exchange.send(outgoing, self.now);
-        self.outbox.push(Effect::Write(frame));
-    }
-
-    fn reconcile(&mut self, free: bool) {
-        if self.transaction.is_some() || !self.reconciles() {
-            return;
-        }
-        let changes = self.drift();
-        if changes.is_empty() && matches!(self.stage, Stage::Syncing(_)) {
+    fn finish_syncing_without_drift(&mut self) {
+        if let Stage::Syncing(readings) = &self.stage
+            && readings.is_complete()
+            && self.reconciler.is_in_sync()
+        {
             self.enter(Stage::Ready);
-        } else if !changes.is_empty() && free {
-            self.transaction = Some(Transaction::new(changes));
         }
     }
 
-    fn reconciles(&self) -> bool {
-        match &self.stage {
-            Stage::Syncing(readings) => readings.is_complete(),
-            Stage::Ready => true,
-            _ => false,
-        }
+    fn can_send_at(&self, at: Millis) -> bool {
+        self.exchange
+            .free_at()
+            .is_some_and(|free| self.now >= free.max(at))
     }
 
-    fn drift(&self) -> Vec<SettingChange> {
-        match (&self.desired, &self.observed) {
-            (Some(desired), Some(observed)) => drift(desired, observed, &self.failed),
-            _ => Vec::new(),
-        }
-    }
-
-    fn next_outgoing(&mut self) -> Option<Outgoing> {
+    fn due(&self) -> Option<Due> {
         let now = self.now;
-        match &mut self.stage {
-            Stage::Probing => Some(Outgoing::Ask(Query::Status)),
-            Stage::HeadsetOff { next_poll } if now >= *next_poll => {
-                *next_poll = now.after(HEADSET_OFF_POLL);
-                Some(Outgoing::Ask(Query::Status))
-            }
+        match &self.stage {
+            Stage::Probing => Some(Due::at(now, Next::Status)),
+            Stage::HeadsetOff { next_poll } => Some(Due::at(*next_poll, Next::HeadsetOffPoll)),
             Stage::Syncing(readings) if readings.wants_query() => {
-                readings.next_query().map(Outgoing::Ask)
+                Some(Due::at(now, Next::SyncRead))
             }
-            Stage::Syncing(_) => self.transaction.as_mut()?.next(now),
-            Stage::Ready => self.ready_outgoing(),
+            Stage::Syncing(readings) if readings.is_complete() => self.reconcile_due(),
+            Stage::Ready if self.reconciler.is_in_sync() => {
+                Some(Due::at(self.safety_poll_at(), Next::Status))
+            }
+            Stage::Ready => self.reconcile_due(),
             _ => None,
         }
     }
 
-    fn ready_outgoing(&mut self) -> Option<Outgoing> {
-        match &mut self.transaction {
-            Some(transaction) => transaction.next(self.now),
-            None => (self.now >= self.safety_poll_at()).then_some(Outgoing::Ask(Query::Status)),
+    fn reconcile_due(&self) -> Option<Due> {
+        let at = self.reconciler.due_at(self.now)?;
+        Some(Due::at(at, Next::Reconcile))
+    }
+
+    fn take(&mut self, next: Next) -> Option<Outgoing> {
+        match next {
+            Next::Status => Some(Outgoing::Ask(Query::Status)),
+            Next::HeadsetOffPoll => {
+                self.postpone_headset_off_poll();
+                Some(Outgoing::Ask(Query::Status))
+            }
+            Next::SyncRead => self.next_sync_read(),
+            Next::Reconcile => self.reconciler.next(self.now),
         }
+    }
+
+    fn postpone_headset_off_poll(&mut self) {
+        let now = self.now;
+        if let Stage::HeadsetOff { next_poll } = &mut self.stage {
+            *next_poll = now.after(HEADSET_OFF_POLL);
+        }
+    }
+
+    fn next_sync_read(&mut self) -> Option<Outgoing> {
+        match &mut self.stage {
+            Stage::Syncing(readings) => readings.next_query().map(Outgoing::Ask),
+            _ => None,
+        }
+    }
+
+    fn send(&mut self, outgoing: Outgoing) {
+        let frame = self.exchange.send(outgoing, self.now);
+        self.outbox.push(Effect::Write(frame));
     }
 
     fn safety_poll_at(&self) -> Millis {
@@ -153,36 +174,19 @@ impl Session {
     }
 
     fn next_wake(&self) -> Option<Millis> {
-        let free = self.exchange.free_at();
-        let spacing = free.filter(|free| *free > self.now);
-        let timed = self
-            .timed_command()
-            .zip(free)
-            .map(|(due, free)| due.max(free));
+        let command = self
+            .due()
+            .zip(self.exchange.free_at())
+            .map(|(due, free)| due.at.max(free));
         [
-            spacing,
-            timed,
+            command,
             self.exchange.deadline(),
             self.stage_deadline(),
-            self.transaction
-                .as_ref()
-                .and_then(Transaction::link_lost_at),
+            self.reconciler.link_lost_at(),
         ]
         .into_iter()
         .flatten()
         .min()
-    }
-
-    fn timed_command(&self) -> Option<Millis> {
-        match &self.stage {
-            Stage::HeadsetOff { next_poll } => Some(*next_poll),
-            Stage::Syncing(_) => self.transaction.as_ref().and_then(Transaction::due_at),
-            Stage::Ready => self
-                .transaction
-                .as_ref()
-                .map_or(Some(self.safety_poll_at()), Transaction::due_at),
-            _ => None,
-        }
     }
 
     fn stage_deadline(&self) -> Option<Millis> {

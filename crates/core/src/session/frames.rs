@@ -1,14 +1,11 @@
 use super::input::Interface;
 use super::phase::Stage;
-use super::reconcile::readings;
 use super::reducer::Session;
 use super::syncing::Readings;
-use super::verify::Progress;
 use crate::messages::device::DeviceUpdate;
 use crate::protocol::Reply;
 use crate::protocol::event::{DeviceEvent, decode_event};
 use crate::protocol::status::{Link, Status};
-use crate::settings::headset_settings::{Setting, SettingChange};
 
 impl Session {
     pub(super) fn command_frame(&mut self, bytes: &[u8]) {
@@ -53,7 +50,8 @@ impl Session {
             self.after_read();
             return;
         }
-        self.verify(reply);
+        let updates = self.reconciler.on_readback(reply, self.now);
+        self.publish_all(updates);
     }
 
     fn after_read(&mut self) {
@@ -63,42 +61,17 @@ impl Session {
         let Some((settings, firmware)) = readings.finish() else {
             return;
         };
-        self.observed = Some(settings);
         self.publish_identity(firmware);
-        self.publish_observed();
-    }
-
-    fn verify(&mut self, reply: &Reply) {
-        let readings = readings(reply);
-        if let Some(observed) = &mut self.observed {
-            readings
-                .iter()
-                .cloned()
-                .for_each(|reading| observed.apply(reading));
-        }
-        let Some(transaction) = &mut self.transaction else {
-            return;
-        };
-        match transaction.check(&readings) {
-            Progress::Pending => {}
-            Progress::Done => self.finish_transaction(Vec::new()),
-            Progress::Failed(settings) => self.finish_transaction(settings),
-        }
-    }
-
-    fn finish_transaction(&mut self, failed: Vec<Setting>) {
-        self.transaction = None;
-        self.echoes.close(self.now);
-        for setting in &failed {
-            self.publish(DeviceUpdate::WriteFailed(*setting));
-        }
-        self.failed.extend(failed);
-        self.publish_observed();
+        let updates = self.reconciler.observe(settings);
+        self.publish_all(updates);
     }
 
     fn on_event(&mut self, bytes: &[u8]) {
         match decode_event(bytes) {
-            Some(DeviceEvent::Setting(change)) => self.on_setting_event(change),
+            Some(DeviceEvent::Setting(change)) => {
+                let updates = self.reconciler.on_setting_event(change, self.now);
+                self.publish_all(updates);
+            }
             Some(DeviceEvent::Battery(battery)) => {
                 self.last_status_at = self.now;
                 self.update_status(|status| status.battery = battery);
@@ -111,55 +84,34 @@ impl Session {
         }
     }
 
-    fn on_setting_event(&mut self, change: SettingChange) {
-        if self.echoes.consume(&change, self.now) {
-            return;
-        }
-        if let Some(desired) = &mut self.desired {
-            desired.apply(change.clone());
-        }
-        if let Some(observed) = &mut self.observed {
-            observed.apply(change.clone());
-        }
-        if self
-            .transaction
-            .as_mut()
-            .is_some_and(|transaction| transaction.forget(change.setting()))
-        {
-            self.finish_transaction(Vec::new());
-        }
-        self.publish(DeviceUpdate::HeadsetChanged(change));
-    }
-
     fn on_link_event(&mut self, link: Link) {
         self.update_status(|status| status.link = link);
-        if let Some(transaction) = &mut self.transaction {
-            transaction.link(link.is_connected());
+        match (&self.stage, link.is_connected()) {
+            (Stage::HeadsetOff { .. } | Stage::Rebinding(_), true) => self.poll_status_now(),
+            _ => self.on_link(link),
         }
-        if let Stage::HeadsetOff { next_poll } = &mut self.stage
-            && link.is_connected()
-        {
-            *next_poll = self.now;
-            return;
+    }
+
+    fn poll_status_now(&mut self) {
+        let now = self.now;
+        match &mut self.stage {
+            Stage::HeadsetOff { next_poll } => *next_poll = now,
+            Stage::Rebinding(rebinding) => rebinding.link_up(now),
+            _ => {}
         }
-        self.on_link(link);
     }
 
     fn on_link(&mut self, link: Link) {
+        self.reconciler.link(link);
         match (&self.stage, link.is_connected()) {
             (Stage::Probing | Stage::HeadsetOff { .. }, true) => {
                 self.enter(Stage::Syncing(Readings::default()));
             }
             (Stage::Probing, false) => self.headset_off(),
-            (Stage::Syncing(_) | Stage::Ready, false) => self.link_down(),
+            (Stage::Syncing(_) | Stage::Ready, false) if !self.reconciler.is_writing() => {
+                self.headset_off();
+            }
             _ => {}
-        }
-    }
-
-    fn link_down(&mut self) {
-        match &mut self.transaction {
-            Some(transaction) => transaction.link(false),
-            None => self.headset_off(),
         }
     }
 

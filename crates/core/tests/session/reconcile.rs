@@ -1,6 +1,6 @@
 use arctis_core::messages::device::{Phase, SyncPolicy};
 use arctis_core::session::timing::VERIFY_BACKOFF;
-use arctis_core::settings::headset_settings::{Setting, SettingChange};
+use arctis_core::settings::headset_settings::{HeadsetSettings, Setting, SettingChange};
 use arctis_core::testkit::{Behaviour, FakeHeadset, Simulation};
 
 use crate::support::{
@@ -30,6 +30,21 @@ fn adopt_writes_nothing_and_publishes_observed() {
     simulation.run_for(60_000);
     assert_eq!(setter_writes(&simulation), 0);
     assert_eq!(observed(&simulation), Some(headset));
+}
+
+#[test]
+fn adopt_during_a_transaction_stops_its_remaining_writes() {
+    let mut simulation = ready();
+    let desired = HeadsetSettings {
+        mic_volume: mic(7),
+        ..with_sidetone(simulation.headset().settings(), 6)
+    };
+    simulation.clear_logs();
+    simulation.desire(desired.clone(), SyncPolicy::Enforce);
+    simulation.run_until_sent(setter(Setting::MicVolume), 1_000);
+    simulation.desire(desired, SyncPolicy::Adopt);
+    simulation.run_for(60_000);
+    assert_eq!(setter_writes(&simulation), 1);
 }
 
 #[test]

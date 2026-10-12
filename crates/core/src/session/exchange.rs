@@ -52,7 +52,7 @@ impl Exchange {
 
     pub(crate) fn send(&mut self, outgoing: Outgoing, now: Millis) -> Frame {
         match outgoing {
-            Outgoing::Ask(query) => self.ask(query, now, now),
+            Outgoing::Ask(query) => self.ask(query, now),
             Outgoing::Write(change) => self.write(&Command::from(change), now),
         }
     }
@@ -70,11 +70,7 @@ impl Exchange {
     pub(crate) fn expire(&mut self, now: Millis) -> Option<Expiry> {
         let awaiting = self.awaiting.filter(|awaiting| now >= awaiting.deadline)?;
         if !awaiting.resent {
-            return Some(Expiry::Resend(self.ask(
-                awaiting.query,
-                awaiting.asked_at,
-                now,
-            )));
+            return Some(Expiry::Resend(self.resend(awaiting, now)));
         }
         self.awaiting = None;
         Some(Expiry::GaveUp(Unanswered {
@@ -87,14 +83,23 @@ impl Exchange {
         self.awaiting = None;
     }
 
-    fn ask(&mut self, query: Query, asked_at: Millis, now: Millis) -> Frame {
+    fn ask(&mut self, query: Query, now: Millis) -> Frame {
         self.awaiting = Some(Awaiting {
             query,
-            asked_at,
+            asked_at: now,
             deadline: now.after(REPLY_TIMEOUT),
-            resent: asked_at < now,
+            resent: false,
         });
         self.write(&Command::from(query), now)
+    }
+
+    fn resend(&mut self, awaiting: Awaiting, now: Millis) -> Frame {
+        self.awaiting = Some(Awaiting {
+            deadline: now.after(REPLY_TIMEOUT),
+            resent: true,
+            ..awaiting
+        });
+        self.write(&Command::from(awaiting.query), now)
     }
 
     fn write(&mut self, command: &Command, now: Millis) -> Frame {

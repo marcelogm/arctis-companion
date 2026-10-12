@@ -230,3 +230,35 @@ fn a_link_drop_during_an_ordinary_write_means_headset_off() {
     simulation.run_for(1);
     assert_eq!(simulation.phase(), Phase::HeadsetOff);
 }
+
+#[test]
+fn a_newer_value_preempts_the_verify_of_an_older_one() {
+    let mut simulation = ready_behaving(Behaviour {
+        drops_writes: true,
+        ..Behaviour::default()
+    });
+    let base = simulation.headset().settings().clone();
+    desire(&mut simulation, &with_sidetone(&base, 6));
+    simulation.run_for(100);
+    simulation.headset_mut().behaviour.drops_writes = false;
+    desire(&mut simulation, &with_sidetone(&base, 9));
+    simulation.run_for(60_000);
+    assert_eq!(sidetone_bytes(&simulation), [6, 9]);
+    assert!(write_failures(&simulation).is_empty());
+    assert_eq!(simulation.headset().settings(), &with_sidetone(&base, 9));
+}
+
+#[test]
+fn a_value_no_longer_desired_is_never_reported_as_failed() {
+    let mut simulation = ready_behaving(Behaviour {
+        drops_writes: true,
+        ..Behaviour::default()
+    });
+    let base = simulation.headset().settings().clone();
+    desire(&mut simulation, &with_sidetone(&base, 6));
+    simulation.run_for(100);
+    desire(&mut simulation, &with_sidetone(&base, 9));
+    simulation.run_for(10_000);
+    assert_eq!(sidetone_bytes(&simulation), [6, 9, 9]);
+    assert_eq!(write_failures(&simulation), [Setting::Sidetone]);
+}

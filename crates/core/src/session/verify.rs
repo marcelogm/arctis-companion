@@ -1,10 +1,11 @@
 use std::collections::VecDeque;
 
 use super::exchange::Outgoing;
-use super::reconcile::{readbacks, same};
 use super::timing::{VERIFY_BACKOFF, WIRELESS_MODE_GRACE};
-use crate::protocol::Query;
-use crate::settings::headset_settings::{Setting, SettingChange};
+use crate::eq::curve::equivalent;
+use crate::protocol::status::Link;
+use crate::protocol::{Command, Query};
+use crate::settings::headset_settings::{HeadsetSettings, Setting, SettingChange};
 use crate::time::Millis;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -45,20 +46,18 @@ impl Transaction {
             self.wrote(&change, now);
             return Some(Outgoing::Write(change));
         }
-        if self.due_at().is_none_or(|due| now < due) {
+        if self.readback_due_at().is_none_or(|due| now < due) {
             return None;
         }
         self.unread.pop_front().map(Outgoing::Ask)
     }
 
-    pub(crate) fn due_at(&self) -> Option<Millis> {
-        if !self.unwritten.is_empty() {
-            return Some(self.written_at);
+    pub(crate) fn due_at(&self, now: Millis) -> Option<Millis> {
+        if self.unwritten.is_empty() {
+            self.readback_due_at()
+        } else {
+            Some(now)
         }
-        if self.link_down || self.unread.is_empty() {
-            return None;
-        }
-        Some(self.written_at.after(backoff(self.step)))
     }
 
     pub(crate) fn check(&mut self, readings: &[SettingChange]) -> Progress {
@@ -73,10 +72,15 @@ impl Transaction {
         self.next_step()
     }
 
-    pub(crate) fn forget(&mut self, setting: Setting) -> bool {
-        self.targets.retain(|target| target.setting() != setting);
-        self.unwritten.retain(|change| change.setting() != setting);
-        self.targets.is_empty()
+    pub(crate) fn keep_wanted(&mut self, desired: &HeadsetSettings) -> Progress {
+        let wanted = |change: &SettingChange| same(change, &desired.value_of(change.setting()));
+        self.targets.retain(wanted);
+        self.unwritten.retain(wanted);
+        if self.targets.is_empty() {
+            Progress::Done
+        } else {
+            Progress::Pending
+        }
     }
 
     pub(crate) fn requeue(&mut self, query: Query) {
@@ -87,8 +91,8 @@ impl Transaction {
         self.grace_until.is_some_and(|until| asked_at < until)
     }
 
-    pub(crate) fn link(&mut self, up: bool) {
-        self.link_down = !up;
+    pub(crate) fn link(&mut self, link: Link) {
+        self.link_down = !link.is_connected();
     }
 
     pub(crate) fn link_lost_at(&self) -> Option<Millis> {
@@ -98,6 +102,13 @@ impl Transaction {
 
     pub(crate) fn lost_link_for_good(&self, now: Millis) -> bool {
         self.link_lost_at().is_some_and(|at| now >= at)
+    }
+
+    fn readback_due_at(&self) -> Option<Millis> {
+        if self.link_down || self.unread.is_empty() {
+            return None;
+        }
+        Some(self.written_at.after(backoff(self.step)))
     }
 
     fn wrote(&mut self, change: &SettingChange, now: Millis) {
@@ -124,6 +135,29 @@ impl Transaction {
         }
         Progress::Failed(self.targets.iter().map(SettingChange::setting).collect())
     }
+}
+
+#[must_use]
+pub(crate) fn same(a: &SettingChange, b: &SettingChange) -> bool {
+    match (a, b) {
+        (SettingChange::Equalizer(left), SettingChange::Equalizer(right)) => {
+            equivalent(left, right)
+        }
+        _ => a == b,
+    }
+}
+
+fn readbacks(changes: &[SettingChange]) -> Vec<Query> {
+    let mut queries = Vec::new();
+    for query in changes
+        .iter()
+        .filter_map(|change| Command::from(change.clone()).readback())
+    {
+        if !queries.contains(&query) {
+            queries.push(query);
+        }
+    }
+    queries
 }
 
 fn backoff(step: usize) -> u64 {

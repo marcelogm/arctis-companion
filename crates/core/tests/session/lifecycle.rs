@@ -3,14 +3,16 @@ use arctis_core::protocol::firmware::{Firmware, Version};
 use arctis_core::protocol::model::{Model, ModelLookup, Support};
 use arctis_core::session::timing::{
     COMMAND_SPACING, ENUMERATION_SETTLE, HEADSET_OFF_POLL, REPLY_TIMEOUT, STATUS_SAFETY_POLL,
+    VERIFY_BACKOFF,
 };
 use arctis_core::session::{Cadence, Interface, Session};
 use arctis_core::testkit::{Emission, FakeHeadset, Simulation};
 use arctis_core::time::Millis;
 
 use crate::support::{
-    Arrow, SETTLED, absent, arrow, assert_arrows, headset_off, percent, plugged, probing,
+    Arrow, SETTLED, absent, arrow, assert_arrows, desire, headset_off, percent, plugged, probing,
     probing_silent, quiet, ready, ready_with, settling, silent, syncing, syncing_silent,
+    with_sidetone,
 };
 
 const UNREAD_FIRMWARE: Firmware = Firmware {
@@ -18,7 +20,7 @@ const UNREAD_FIRMWARE: Firmware = Firmware {
     headset: None,
 };
 
-const ARROWS: [Arrow; 16] = [
+const ARROWS: [Arrow; 17] = [
     arrow(
         "Absent -> PermissionDenied: open EACCES",
         absent,
@@ -104,6 +106,12 @@ const ARROWS: [Arrow; 16] = [
         Phase::HeadsetOff,
     ),
     arrow("Ready -> Ready: events", ready, battery_event, Phase::Ready),
+    arrow(
+        "Ready -> Ready: desired change, write then verify",
+        ready,
+        desire_sidetone_and_verify,
+        Phase::Ready,
+    ),
     arrow(
         "Present -> Absent: Lost",
         ready,
@@ -285,6 +293,13 @@ fn power_off_with_event(simulation: &mut Simulation) {
 fn silence_then_safety_poll(simulation: &mut Simulation) {
     simulation.headset_mut().behaviour = silent();
     simulation.run_for(STATUS_SAFETY_POLL + 2 * REPLY_TIMEOUT);
+}
+
+fn desire_sidetone_and_verify(simulation: &mut Simulation) {
+    let desired = with_sidetone(simulation.headset().settings(), 6);
+    desire(simulation, &desired);
+    simulation.run_for(2 * VERIFY_BACKOFF.iter().sum::<u64>());
+    assert_eq!(simulation.headset().settings(), &desired);
 }
 
 fn battery_event(simulation: &mut Simulation) {
