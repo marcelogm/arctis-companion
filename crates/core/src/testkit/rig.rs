@@ -1,4 +1,4 @@
-use super::fake_headset::FakeHeadset;
+use super::fake_headset::{Emission, FakeHeadset};
 use super::simulation::{Flap, Simulation};
 use crate::messages::device::{DeviceUpdate, Phase, SyncPolicy};
 use crate::protocol::Frame;
@@ -19,6 +19,7 @@ pub trait Rig: Sized {
     fn press(&mut self, change: SettingChange);
     fn link(&mut self, link: Link);
     fn battery(&mut self, battery: Percent);
+    fn emit(&mut self, emissions: Vec<Emission>);
     fn run_for(&mut self, duration: u64);
     fn now(&self) -> Millis;
     fn phase(&self) -> Phase;
@@ -100,6 +101,10 @@ impl Rig for Simulation {
 
     fn battery(&mut self, battery: Percent) {
         Self::battery(self, battery);
+    }
+
+    fn emit(&mut self, emissions: Vec<Emission>) {
+        Self::emit(self, emissions);
     }
 
     fn run_for(&mut self, duration: u64) {

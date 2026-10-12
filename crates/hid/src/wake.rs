@@ -71,7 +71,8 @@ impl AsFd for Mailbox {
 }
 
 pub fn mailbox() -> io::Result<(DeviceChanges, Mailbox)> {
-    let (wake_reader, wake_writer) = rustix::pipe::pipe_with(PipeFlags::CLOEXEC | PipeFlags::NONBLOCK)?;
+    let (wake_reader, wake_writer) =
+        rustix::pipe::pipe_with(PipeFlags::CLOEXEC | PipeFlags::NONBLOCK)?;
     let (sender, receiver) = mpsc::channel();
     Ok((
         DeviceChanges {
