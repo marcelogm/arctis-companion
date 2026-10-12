@@ -35,10 +35,16 @@ row); ui part §1 (information architecture), §2 (headset page, banner priority
 - **Run (ui):** `X` means
 
   ```bash
-  toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp9 && export XDG_RUNTIME_DIR=$(mktemp -d) && { weston --backend=headless --socket=wl-sp9 --idle-time=0 >/dev/null 2>&1 & W=$!; } && until [ -S "$XDG_RUNTIME_DIR/wl-sp9" ]; do sleep 0.1; done; GDK_BACKEND=wayland GSK_RENDERER=cairo WAYLAND_DISPLAY=wl-sp9 X; S=$?; kill $W; exit $S'
+  toolbox run -c arctis bash -lc 'cd /home/marcelo/Desenvolvimento/arctis-wt/sp9 && export XDG_RUNTIME_DIR=$(mktemp -d) LC_ALL=C.UTF-8 && { weston --backend=headless --socket=wl-sp9 --idle-time=0 >/dev/null 2>&1 & W=$!; } && until [ -S "$XDG_RUNTIME_DIR/wl-sp9" ]; do sleep 0.1; done; GDK_BACKEND=wayland GSK_RENDERER=cairo WAYLAND_DISPLAY=wl-sp9 X; S=$?; kill $W; exit $S'
   ```
 
-  This is what the `ui` job of `.github/workflows/ci.yml` does. Git and `gh` run on the host in the worktree.
+  This is what the `ui` job of `.github/workflows/ci.yml` does (its `fedora:44` container has no `LANG`, so it
+  runs in the C locale too). `LC_ALL=C.UTF-8` keeps `NumberStyle::current()` on the decimal point whatever the
+  host locale is, so widget tests that compare against `english()` stay deterministic. Git and `gh` run on the
+  host in the worktree.
+- Never run the `arctis-companion` binary (`cargo run -p arctis-app`): once SP8 wires the device thread it opens
+  `/dev/hidraw*`, and with the real dongle plugged in only SP0 and SP5 may do that. Every template is loaded by
+  the widget tests instead.
 - No comments in any file of any language, doc comments and Blueprint included. Names and small functions carry
   the meaning. Blueprint strings shown to people are `_("…")`; widget `name:` values and icon names are not.
 - Clippy policy applies to tests too: cognitive complexity 8, 40 lines per function, nesting 3, at most 4
@@ -83,10 +89,11 @@ row); ui part §1 (information architecture), §2 (headset page, banner priority
 | Scope: `text.rs` | 4 |
 | `#[gtk::test]` headless: each `Phase` × `Route` renders the right page | 15 |
 | banner priority | 15 |
-| never-adopted HeadsetOff hides the headset groups (and the 2.4 GHz Preset row) | 10, 15 |
-| each control emits its `Intent` (preset combos, Use Route Preset, Automatic App Presets, three scales, two switches, Automatic Power Off, toast Retry, Run in Background, Low Battery Warning) | 6, 9, 10, 11, 13, 15 |
+| never-adopted HeadsetOff hides the headset groups (and the 2.4 GHz Preset row), also with adoption `Unknown` after a restart | 10, 15 |
+| each control emits its `Intent` (both preset combos, Use Route Preset, Automatic App Presets, three scales, two switches, Automatic Power Off, toast Retry, Run in Background, Low Battery Warning, navigation rows' targets) | 6, 9, 10, 11, 13, 15 |
 | rendering never emits an `Intent` | 5, 6, 9, 10, 13, 15 |
-| model → row values ("Not applied", value texts, sensitivity while connecting, capability-driven rows) | 6, 7, 9, 10 |
+| model → row values ("Not applied", value texts, capability-driven rows) | 6, 7, 9, 10 |
+| ui §2 states: Settling, Probing, Syncing insensitive until observed; HeadsetOff and Rebinding stay sensitive; Bluetooth only keeps Battery History and hides the 2.4 GHz Preset row | 10 |
 | accessibility walk: names, value texts, descriptions | 6, 7, 16 |
 | pt_BR number rendering ("+2,0 dB", "73 %") | 4 |
 | 360 px wide with no horizontal scroll | 16 |
@@ -174,6 +181,9 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 22 | The existing `crates/ui/tests/window.rs` moves into the `widgets` binary as `widgets/window.rs` | one GTK initialisation, one test binary |
 | 23 | The preferences dialog sets `search-enabled: false` | one page with three rows needs no search, and the search toggle is a libadwaita internal the accessibility walk would otherwise have to special-case |
 | 24 | The dialog actions are tested through their dialogs (Tasks 12–14), the primary menu's action names and the banner's action name; presenting a dialog on an unmapped test window is not | presenting needs a mapped toplevel; the actions are one-line `present` calls |
+| 25 | No smoke run of the `arctis-companion` binary in SP9 | after a rebase onto a `main` that carries SP8 the binary opens `/dev/hidraw*`, which only SP0 and SP5 may do with the real dongle plugged in; the widget tests already load every template |
+| 26 | Widget tests run with `LC_ALL=C.UTF-8` locally; the pt_BR rendering is checked through `NumberStyle::for_locale`, never through the process locale | `NumberStyle::current()` reads the environment, so a decimal-comma host would otherwise change what `resolve` returns next to `english()` |
+| 27 | Capability-driven rows are checked with a hand-built `Capabilities::new(&[…])` model: every model in `Model::SUPPORTED` has `ALL_SETTINGS` today | ADR 0013 needs a test that a missing capability hides its row and an emptied group |
 
 ---
 
@@ -2195,6 +2205,24 @@ fn rendering_a_new_route_preset_emits_nothing() {
     assert_eq!(combo_text(&named::<adw::ComboRow>(&group, "dongle-preset")), "Podcast");
     assert!(log.borrow().is_empty());
 }
+
+#[gtk::test]
+fn picking_a_bluetooth_preset_sets_its_route_preset() {
+    let mut s = snapshot();
+    s.audio.bluetooth_sink_seen = true;
+    let (group, _, log) = rendered(&s);
+    let items = equalizer_group(&s).bluetooth_preset.expect("bluetooth combo").items;
+    let target = items
+        .iter()
+        .position(|item| item.id == id("podcast"))
+        .expect("Podcast is a built-in");
+    named::<adw::ComboRow>(&group, "bluetooth-preset")
+        .set_selected(u32::try_from(target).expect("small index"));
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::SetRoutePreset(SoundPath::Bluetooth, id("podcast"))]
+    );
+}
 ```
 
 Add `mod equalizer_group;` to `crates/ui/tests/widgets/main.rs`.
@@ -2445,7 +2473,7 @@ In `crates/ui/src/lib.rs` add `mod equalizer_group;` and `pub use equalizer_grou
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (ui): `cargo test -p arctis-ui equalizer_group`
-Expected: PASS (8 tests).
+Expected: PASS (9 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -2474,7 +2502,7 @@ use arctis_core::companion::adoption::AdoptionStatus;
 use arctis_core::companion::routing::Route;
 use arctis_core::intent::Intent;
 use arctis_core::messages::device::Phase;
-use arctis_core::protocol::model::Support;
+use arctis_core::protocol::model::{Capabilities, Support};
 use arctis_core::settings::headset_settings::Setting;
 use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone};
 use arctis_core::testkit::english::english;
@@ -2502,9 +2530,15 @@ fn rendered(snapshot: &Snapshot) -> (HeadsetPage, IntentSink, Log) {
     (page, sink, log)
 }
 
-fn never_adopted(phase: Phase) -> Snapshot {
+fn unadopted(adoption: AdoptionStatus) -> Snapshot {
+    let mut s = with(Phase::HeadsetOff, Route::Dongle);
+    s.dongle.adoption = adoption;
+    s
+}
+
+fn unobserved(phase: Phase) -> Snapshot {
     let mut s = with(phase, Route::Dongle);
-    s.dongle.adoption = AdoptionStatus::NeverAdopted;
+    s.dongle.observed = None;
     s
 }
 
@@ -2557,17 +2591,21 @@ fn an_untested_model_shows_a_warning_row() {
 }
 
 #[gtk::test]
-fn a_never_adopted_headset_off_hides_the_headset_settings() {
-    let (page, _, _) = rendered(&never_adopted(Phase::HeadsetOff));
-    assert!(shown_groups(&page).is_empty());
-    assert!(!named::<adw::ComboRow>(&page, "auto-power-off").get_visible());
-    assert!(!named::<adw::ComboRow>(&page, "dongle-preset").get_visible());
-    assert!(named::<adw::ActionRow>(&page, "battery-history").get_visible());
+fn an_unadopted_headset_off_hides_the_headset_settings() {
+    for adoption in [AdoptionStatus::NeverAdopted, AdoptionStatus::Unknown] {
+        let (page, _, _) = rendered(&unadopted(adoption));
+        assert!(shown_groups(&page).is_empty(), "{adoption:?}");
+        assert!(!named::<adw::ComboRow>(&page, "auto-power-off").get_visible());
+        assert!(!named::<adw::ComboRow>(&page, "dongle-preset").get_visible());
+        assert!(named::<adw::ActionRow>(&page, "battery-history").get_visible());
+    }
 }
 
 #[gtk::test]
 fn bluetooth_only_replaces_the_settings_with_one_group() {
-    let (page, _, _) = rendered(&with(Phase::Absent, Route::Bluetooth));
+    let mut s = with(Phase::Absent, Route::Bluetooth);
+    s.audio.bluetooth_sink_seen = true;
+    let (page, _, _) = rendered(&s);
     let group = named::<adw::PreferencesGroup>(&page, "bluetooth-only-group");
     assert!(group.get_visible());
     assert_eq!(
@@ -2575,17 +2613,43 @@ fn bluetooth_only_replaces_the_settings_with_one_group() {
         Some("Connect the wireless dongle to change headset settings")
     );
     assert!(shown_groups(&page).is_empty());
+    assert!(!named::<adw::ComboRow>(&page, "dongle-preset").get_visible());
+    assert!(named::<adw::ComboRow>(&page, "bluetooth-preset").get_visible());
+    assert!(named::<adw::ActionRow>(&page, "battery-history").get_visible());
 }
 
 #[gtk::test]
-fn settings_are_insensitive_until_values_are_observed() {
-    let mut s = with(Phase::Syncing, Route::Dongle);
-    s.dongle.observed = None;
+fn settings_are_insensitive_while_connecting_until_values_are_observed() {
+    for phase in [Phase::Settling, Phase::Probing, Phase::Syncing] {
+        let (page, _, _) = rendered(&unobserved(phase));
+        let group = named::<adw::PreferencesGroup>(&page, "microphone-group");
+        assert!(!group.is_sensitive(), "{phase:?}");
+        assert!(!named::<adw::ComboRow>(&page, "auto-power-off").is_sensitive());
+    }
+}
+
+#[gtk::test]
+fn settings_stay_sensitive_while_off_or_reconnecting() {
+    for phase in [Phase::HeadsetOff, Phase::Rebinding] {
+        let (page, _, _) = rendered(&unobserved(phase));
+        let group = named::<adw::PreferencesGroup>(&page, "microphone-group");
+        assert!(group.is_sensitive(), "{phase:?}");
+        assert!(named::<adw::ComboRow>(&page, "auto-power-off").is_sensitive());
+    }
+}
+
+#[gtk::test]
+fn rows_the_model_lacks_are_omitted() {
+    let mut s = snapshot();
+    let mut model = s.dongle.model.expect("a model");
+    model.capabilities = Capabilities::new(&[Setting::MicVolume, Setting::AutoPowerOff]);
+    s.dongle.model = Some(model);
     let (page, _, _) = rendered(&s);
-    assert!(!named::<adw::PreferencesGroup>(&page, "microphone-group").is_sensitive());
-    assert!(!named::<adw::ComboRow>(&page, "auto-power-off").is_sensitive());
-    let (page, _, _) = rendered(&with(Phase::HeadsetOff, Route::Dongle));
-    assert!(named::<adw::PreferencesGroup>(&page, "microphone-group").is_sensitive());
+    assert_eq!(shown_groups(&page), ["microphone-group", "device-group"]);
+    assert!(named::<ScaleRow>(&page, "mic-volume").get_visible());
+    assert!(!named::<ScaleRow>(&page, "sidetone").get_visible());
+    assert!(!named::<ScaleRow>(&page, "mute-light").get_visible());
+    assert!(named::<adw::ComboRow>(&page, "auto-power-off").get_visible());
 }
 
 #[gtk::test]
@@ -2641,9 +2705,9 @@ fn rendering_new_values_emits_nothing() {
 }
 ```
 
-If `Model` has no public `support` field or `HeadsetSettings` no public `equalizer`/`sidetone` field, read
-`crates/core/src/protocol/model.rs` and `crates/core/src/settings/headset_settings.rs` and build the snapshot
-through their public constructors instead; the assertions stay.
+`Model` is `Copy` with public `support` and `capabilities` fields, `Capabilities::new` is a public `const fn`, and
+`HeadsetSettings` has public `sidetone` and `equalizer` fields (checked against `origin/main`), so the snapshots
+above build directly.
 
 Add `mod headset_page;` to `crates/ui/tests/widgets/main.rs`.
 
@@ -3013,7 +3077,7 @@ In `crates/ui/src/lib.rs` add `mod headset_groups;`, `mod headset_page;` and `pu
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (ui): `cargo test -p arctis-ui headset_page`
-Expected: PASS (9 tests).
+Expected: PASS (11 tests).
 
 - [ ] **Step 5: Commit**
 
@@ -3412,8 +3476,8 @@ fn copy_on_click(button: &gtk::Button, text: &'static str) {
 }
 ```
 
-`str::trim_ascii_end` is `const` since Rust 1.80, so `UDEV_RULE` stays a `const`. If the compiler rejects it,
-make `UDEV_RULE` a `pub fn udev_rule() -> &'static str` returning the trimmed text and update the test.
+`str::trim_ascii_end` is a stable `const fn` since Rust 1.80 (the toolbox has 1.98.1), so `UDEV_RULE` stays a
+`const`.
 
 In `crates/ui/src/lib.rs` add `mod permission_dialog;` and
 `pub use permission_dialog::{PermissionDialog, RELOAD_COMMAND, UDEV_RULE};`.
@@ -4019,6 +4083,33 @@ fn the_banner_shows_what_the_model_picks() {
 }
 
 #[gtk::test]
+fn an_unknown_adoption_after_a_restart_asks_to_turn_the_headset_on() {
+    let mut s = with(Phase::HeadsetOff, Route::Dongle);
+    s.dongle.adoption = AdoptionStatus::Unknown;
+    let (window, _) = rendered_window(s);
+    assert_eq!(
+        banner_of(&window),
+        owned("Turn on the headset to read its settings", None)
+    );
+}
+
+#[gtk::test]
+fn navigation_rows_target_their_pages() {
+    let (window, _) = rendered_window(snapshot());
+    let rows = [
+        ("presets-row", "presets"),
+        ("app-presets-row", "app-presets"),
+        ("battery-history", "battery"),
+    ];
+    for (name, tag) in rows {
+        let row = named::<adw::ActionRow>(&window, name);
+        assert_eq!(row.action_name().as_deref(), Some("win.show-page"), "{name}");
+        let target = row.action_target_value().and_then(|value| value.get::<String>());
+        assert_eq!(target.as_deref(), Some(tag), "{name}");
+    }
+}
+
+#[gtk::test]
 fn the_banner_button_opens_the_instructions() {
     let (window, _) = rendered_window(with(Phase::PermissionDenied, Route::Bluetooth));
     assert_eq!(
@@ -4541,6 +4632,16 @@ fn unnamed(root: &impl IsA<gtk::Widget>) -> Vec<String> {
 }
 
 #[gtk::test]
+fn the_walk_sees_the_controls() {
+    let (window, _) = rendered_window(rich_snapshot());
+    let controls = descendants(&window)
+        .into_iter()
+        .filter(|widget| needs_name(widget))
+        .count();
+    assert!(controls >= 6, "only {controls} controls need a name");
+}
+
+#[gtk::test]
 fn every_control_of_the_headset_page_has_a_name() {
     let (window, _) = rendered_window(rich_snapshot());
     assert_eq!(unnamed(&window), Vec::<String>::new());
@@ -4639,10 +4740,12 @@ fn the_dialogs_fit_the_narrowest_window() {
 #[gtk::test]
 fn nothing_shown_scrolls_horizontally() {
     let (window, _) = rendered_window(rich_snapshot());
-    let scrolled = descendants(&window)
+    let scrolled: Vec<gtk::ScrolledWindow> = descendants(&window)
         .into_iter()
         .filter(shown)
-        .filter_map(|widget| widget.downcast::<gtk::ScrolledWindow>().ok());
+        .filter_map(|widget| widget.downcast::<gtk::ScrolledWindow>().ok())
+        .collect();
+    assert!(!scrolled.is_empty(), "the headset page scrolls vertically");
     for view in scrolled {
         assert_eq!(view.hscrollbar_policy(), gtk::PolicyType::Never);
     }
@@ -4657,7 +4760,17 @@ Run (ui): `cargo test -p arctis-ui -- accessibility layout`
 Expected: PASS. A failure here is a real defect in a template from Tasks 6–15: fix the template (accessible
 label, `wrap: true`, `hscrollbar-policy: never`), never the rule.
 
-- [ ] **Step 3: Commit**
+- [ ] **Step 3: Watch the walk catch a defect**
+
+These checks are written after the templates, so prove they can fail before committing: delete the
+`tooltip-text` line and the `accessibility { label: … }` block of `copy_rule` in
+`crates/ui/resources/permission_dialog.blp`, Run (ui):
+`cargo test -p arctis-ui -- accessibility::every_control_of_the_dialogs_has_a_name`, expect FAIL naming
+`GtkButton copy-rule`, then `git checkout crates/ui/resources/permission_dialog.blp` and re-run to PASS. The
+`the_walk_sees_the_controls` test and the non-empty `scrolled` assertion keep both files from passing vacuously
+later.
+
+- [ ] **Step 4: Commit**
 
 ```bash
 git add crates/ui
@@ -4783,8 +4896,8 @@ to the page table, and replace the `crates/ui/` entry-point cell with
 - [ ] **Step 2: Check the paths**
 
 Run (core): `cargo xtask check-doc-paths && cargo xtask check-rules`
-Expected: PASS. If `check-doc-paths` rejects `crates/ui/src/window.rs::status_action` (a `const fn`), cite
-`crates/ui/src/window.rs::Window` alone in that cell.
+Expected: PASS. `xtask/src/check_doc_paths.rs::declares` matches the token pair `fn status_action`, so the
+`const fn` counts, and the `struct Window` inside `glib::wrapper!` counts for `Window`.
 
 - [ ] **Step 3: Commit**
 
@@ -4808,14 +4921,9 @@ Run (core): `cargo fmt --all --check && cargo clippy --workspace --all-targets -
 Run (ui): `cargo test -p arctis-ui`
 Expected: all PASS; `check-rules` may print line-limit warnings only.
 
-- [ ] **Step 2: Smoke-run the binary once**
+Do not run the `arctis-companion` binary (Deviation 25): every template is already loaded by the widget tests.
 
-Run (ui): `timeout 5 cargo run -p arctis-app; test $? -eq 124`
-Expected: the process stays up for 5 s (exit 124 from `timeout`) and prints no `CRITICAL` or `WARNING` from Gtk or
-Adw. Until SP8 calls `Window::render`, the window shows an empty status page; this checks that every template
-loads in the real binary, not an acceptance criterion.
-
-- [ ] **Step 3: Push and open the pull request**
+- [ ] **Step 2: Push and open the pull request**
 
 ```bash
 git push --force-with-lease
@@ -4824,7 +4932,7 @@ gh pr create --base main --head sp9-main-window \
   --body "Adds the main window with banner, toasts and navigation, the headset page, status pages, permission and preferences dialogs, and the locale-aware text resolver."
 ```
 
-- [ ] **Step 4: Watch the checks**
+- [ ] **Step 3: Watch the checks**
 
 ```bash
 gh pr checks --watch
