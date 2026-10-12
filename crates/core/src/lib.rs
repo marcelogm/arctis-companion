@@ -6,6 +6,7 @@ pub mod battery;
 pub mod companion;
 pub mod eq;
 pub mod intent;
+pub mod l10n;
 pub mod messages;
 pub mod ports;
 pub mod protocol;

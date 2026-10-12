@@ -1,5 +1,6 @@
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
+use arctis_core::l10n::{forms, msgid};
 use arctis_core::testkit::english::english;
 use arctis_core::view::text::{Arg, Text, preset_arg, preset_title};
 
@@ -77,4 +78,19 @@ fn user_text_may_contain_braces() {
         vec![("preset", Arg::Str("{Mine}".to_owned()))],
     );
     assert_eq!(english(&text), "{Mine}, chosen by hand");
+}
+
+#[test]
+fn markers_return_their_english_text() {
+    assert_eq!(msgid("Low"), "Low");
+    assert_eq!(
+        forms("{n} minute", "{n} minutes"),
+        ["{n} minute", "{n} minutes"]
+    );
+}
+
+#[test]
+fn markers_work_in_constants() {
+    const MARKS: [(u8, &str); 1] = [(0, msgid("Off"))];
+    assert_eq!(MARKS[0].1, "Off");
 }
