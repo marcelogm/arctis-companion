@@ -8,8 +8,14 @@ pub mod deadlines;
 pub mod dongle;
 pub mod engines;
 pub mod input;
+mod reducer;
 pub mod routing;
 pub mod seen_apps;
 pub mod selection;
 pub mod snapshot;
 pub mod timing;
+
+pub use action::{Action, PresetChange};
+pub use input::Input;
+pub use reducer::Companion;
+pub use snapshot::Snapshot;

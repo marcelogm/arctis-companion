@@ -4824,7 +4824,7 @@ git push
 From here on, `reducer.rs` grows task by task. Each later task shows the complete new version of every function it
 changes and the complete code of every function it adds.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod contract;` and `mod lifecycle;` to `crates/core/tests/companion/main.rs`.
 
@@ -5197,12 +5197,12 @@ fn fresh_preset_ids_avoid_every_known_preset() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: FAIL to compile (`arctis_core::companion::Companion` missing).
 
-- [ ] **Step 3: Implement the `Companion` core**
+- [x] **Step 3: Implement the `Companion` core**
 
 `crates/core/src/companion/reducer.rs`:
 
@@ -5347,7 +5347,7 @@ impl Companion {
 }
 ```
 
-- [ ] **Step 4: Build the snapshot**
+- [x] **Step 4: Build the snapshot**
 
 Append to `crates/core/src/companion/snapshot.rs` and merge these lines into its imports (`ActivePreset` and
 `Preset` are already there):
@@ -5496,12 +5496,12 @@ pub use input::Input;
 pub use snapshot::Snapshot;
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS (14 new tests in `contract` and `lifecycle`).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
