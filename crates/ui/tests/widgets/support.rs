@@ -1,6 +1,8 @@
 use adw::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::view::headset_page::{HeadsetModel, HeadsetPageModel, headset_page};
+use arctis_ui::Window;
+use gtk::glib;
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
@@ -74,4 +76,14 @@ pub fn combo_text(row: &adw::ComboRow) -> String {
         .and_downcast::<gtk::StringObject>()
         .map(|item| item.string().to_string())
         .unwrap_or_default()
+}
+
+pub fn rendered_window(snapshot: Snapshot) -> (Window, Log) {
+    init();
+    let window: Window = glib::Object::new();
+    let log = Log::default();
+    let writer = Rc::clone(&log);
+    window.connect_intent(move |intent| writer.borrow_mut().push(intent));
+    window.render(&Rc::new(snapshot));
+    (window, log)
 }

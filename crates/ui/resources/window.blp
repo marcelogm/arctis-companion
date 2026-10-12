@@ -8,8 +8,73 @@ template $ArctisWindow: Adw.ApplicationWindow {
   width-request: 360;
   height-request: 294;
 
-  content: Adw.ToolbarView {
-    [top]
-    Adw.HeaderBar {}
+  content: Adw.ToastOverlay toasts {
+    child: Adw.NavigationView navigation {
+      name: "navigation";
+
+      Adw.NavigationPage {
+        tag: "main";
+        title: _("Arctis Companion");
+
+        child: Adw.ToolbarView {
+          [top]
+          Adw.HeaderBar {
+            [end]
+            MenuButton {
+              name: "primary-menu";
+              icon-name: "open-menu-symbolic";
+              menu-model: primary_menu;
+              primary: true;
+              tooltip-text: _("Main Menu");
+
+              accessibility {
+                label: _("Main Menu");
+              }
+            }
+          }
+
+          [top]
+          Adw.Banner banner {
+            use-markup: false;
+            action-name: "win.permission-instructions";
+          }
+
+          content: Stack main_stack {
+            name: "main-stack";
+
+            StackPage {
+              name: "status";
+
+              child: $ArctisStatusView status_view {};
+            }
+
+            StackPage {
+              name: "headset";
+
+              child: $ArctisHeadsetPage headset_page {};
+            }
+          };
+        };
+      }
+    };
   };
+}
+
+menu primary_menu {
+  section {
+    item {
+      label: _("_Preferences");
+      action: "win.preferences";
+    }
+
+    item {
+      label: _("_Keyboard Shortcuts");
+      action: "win.shortcuts";
+    }
+
+    item {
+      label: _("_About Arctis Companion");
+      action: "win.about";
+    }
+  }
 }
