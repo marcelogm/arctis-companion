@@ -64,8 +64,9 @@ fn fresh_lockfile_and_translation_pass_check_rules() {
     assert!(outcome.succeeded(), "{}", outcome.stderr);
 }
 
-const EXEMPT: [&str; 10] = [
+const EXEMPT: [&str; 11] = [
     "Cargo.lock",
+    "THIRD_PARTY_LICENSES",
     "build-aux/cargo-sources.json",
     "extension/package-lock.json",
     "LICENSE",

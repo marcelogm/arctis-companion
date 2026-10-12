@@ -7,7 +7,7 @@ const GENERATED_NAMES: [&str; 4] = [
     "LINGUAS",
 ];
 const GENERATED_EXTENSIONS: [&str; 2] = ["po", "pot"];
-const VERBATIM_NAMES: [&str; 1] = ["LICENSE"];
+const VERBATIM_NAMES: [&str; 2] = ["LICENSE", "THIRD_PARTY_LICENSES"];
 const VERBATIM_EXTENSIONS: [&str; 6] = ["png", "jpg", "jpeg", "gif", "webp", "ico"];
 
 pub fn is_exempt(path: &Path) -> bool {
