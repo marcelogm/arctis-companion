@@ -1,0 +1,123 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisEqEditorPage: Adw.NavigationPage {
+  tag: "eq-editor";
+  title: _("Preset");
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      [end]
+      MenuButton menu {
+        name: "editor-menu";
+        icon-name: "view-more-symbolic";
+        menu-model: editor_menu;
+        tooltip-text: _("Preset Menu");
+
+        accessibility {
+          label: _("Preset Menu");
+        }
+      }
+
+      [end]
+      Button duplicate {
+        name: "duplicate";
+        label: _("_Duplicate");
+        use-underline: true;
+        action-name: "editor.duplicate";
+      }
+
+      [end]
+      ToggleButton preview {
+        name: "preview";
+        label: _("_Preview");
+        use-underline: true;
+        tooltip-text: _("Play through this preset while the page is open");
+      }
+    }
+
+    content: Adw.BreakpointBin {
+      width-request: 360;
+      height-request: 200;
+
+      child: Box layout {
+        name: "editor-layout";
+        orientation: horizontal;
+        spacing: 12;
+
+        $ArctisResponseGraph graph {
+          name: "response-graph";
+          height-request: 160;
+          hexpand: true;
+          valign: start;
+          margin-start: 12;
+          margin-end: 12;
+          margin-top: 12;
+        }
+
+        ScrolledWindow {
+          hscrollbar-policy: never;
+          hexpand: true;
+          vexpand: true;
+
+          child: Adw.Clamp {
+            margin-start: 12;
+            margin-end: 12;
+            margin-top: 12;
+            margin-bottom: 12;
+
+            child: Adw.PreferencesGroup bands {
+              name: "bands";
+              title: _("Bands");
+
+              header-suffix: Button add_band {
+                name: "add-band";
+                icon-name: "list-add-symbolic";
+                action-name: "editor.add-band";
+                tooltip-text: _("Add Band");
+
+                styles [
+                  "flat",
+                ]
+
+                accessibility {
+                  label: _("Add Band");
+                }
+              };
+            };
+          };
+        }
+      };
+
+      Adw.Breakpoint {
+        condition ("max-width: 720sp")
+
+        setters {
+          layout.orientation: vertical;
+        }
+      }
+    };
+  };
+}
+
+menu editor_menu {
+  section {
+    item {
+      label: _("_Rename…");
+      action: "editor.rename";
+    }
+
+    item {
+      label: _("_Export…");
+      action: "editor.export";
+    }
+  }
+
+  section {
+    item {
+      label: _("_Delete");
+      action: "editor.delete";
+    }
+  }
+}

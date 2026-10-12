@@ -3,6 +3,7 @@ use std::rc::Rc;
 use adw::prelude::*;
 use adw::subclass::prelude::*;
 use arctis_core::companion::Snapshot;
+use arctis_core::eq::preset::PresetId;
 use arctis_core::intent::Intent;
 use arctis_core::view::app_presets::{add_rule_dialog, app_presets};
 use arctis_core::view::headset_page::{
@@ -12,7 +13,11 @@ use arctis_core::view::preferences::{Background, preferences};
 use arctis_core::view::status_page::StatusPageModel;
 use gtk::{gio, glib};
 
+use crate::eq_editor_page::EDITOR_TAG;
 use crate::preferences_dialog::PreferencesDialog;
+use crate::preset_files::{PresetFiles, portal_files};
+use crate::presets_page::SHOW_PRESET_ACTION;
+use crate::services::Services;
 use crate::text::resolve;
 
 const PERMISSION_ACTION: &str = "win.permission-instructions";
@@ -29,10 +34,13 @@ mod imp {
 
     use crate::app_dialogs::{about_dialog, shortcuts_dialog};
     use crate::app_presets_page::AppPresetsPage;
+    use crate::eq_editor_page::EqEditorPage;
     use crate::headset_page::HeadsetPage;
     use crate::intents::IntentSink;
     use crate::permission_dialog::PermissionDialog;
     use crate::preferences_dialog::PreferencesDialog;
+    use crate::preset_files::PresetFiles;
+    use crate::presets_page::PresetsPage;
     use crate::status_pages::StatusView;
     use crate::toasts::ToastFeed;
 
@@ -53,6 +61,11 @@ mod imp {
         pub headset_page: TemplateChild<HeadsetPage>,
         #[template_child]
         pub app_presets_page: TemplateChild<AppPresetsPage>,
+        #[template_child]
+        pub presets_page: TemplateChild<PresetsPage>,
+        #[template_child]
+        pub eq_editor_page: TemplateChild<EqEditorPage>,
+        pub files: RefCell<Option<Rc<dyn PresetFiles>>>,
         pub sink: IntentSink,
         pub toast_feed: ToastFeed,
         pub snapshot: RefCell<Option<Rc<Snapshot>>>,
@@ -70,6 +83,8 @@ mod imp {
             StatusView::ensure_type();
             HeadsetPage::ensure_type();
             AppPresetsPage::ensure_type();
+            PresetsPage::ensure_type();
+            EqEditorPage::ensure_type();
             klass.bind_template();
             klass.install_action("win.preferences", None, |window, _, _| {
                 window.preferences_dialog().present(Some(window));
@@ -87,6 +102,11 @@ mod imp {
                 "win.show-page",
                 Some(glib::VariantTy::STRING),
                 |window, _, target| window.show_page(target.and_then(glib::Variant::str)),
+            );
+            klass.install_action(
+                super::SHOW_PRESET_ACTION,
+                Some(glib::VariantTy::STRING),
+                |window, _, target| window.show_preset(target.and_then(glib::Variant::str)),
             );
             klass.add_binding_action(
                 gdk::Key::comma,
@@ -111,6 +131,7 @@ mod imp {
             self.parent_constructed();
             self.headset_page.connect_intents(&self.sink);
             self.app_presets_page.connect_intents(&self.sink);
+            self.obj().connect_preset_pages();
         }
     }
 
@@ -146,6 +167,7 @@ impl Window {
             self.render_main(&headset_page(snapshot));
             self.render_app_presets(snapshot);
             self.render_preferences();
+            self.render_preset_pages(snapshot);
         });
     }
 
@@ -173,6 +195,44 @@ impl Window {
         if let Some(snapshot) = snapshot {
             let model = preferences(&snapshot, imp.background.get());
             self.preferences_dialog().render(&model);
+        }
+    }
+
+    pub fn set_preset_files(&self, files: Rc<dyn PresetFiles>) {
+        self.imp().files.replace(Some(files));
+        self.connect_preset_pages();
+    }
+
+    fn connect_preset_pages(&self) {
+        let imp = self.imp();
+        let services = Services {
+            sink: imp.sink.clone(),
+            toasts: imp.toasts.get(),
+            files: imp.files.borrow().clone().unwrap_or_else(portal_files),
+        };
+        imp.presets_page.set_services(services.clone());
+        imp.eq_editor_page.set_services(services);
+    }
+
+    fn render_preset_pages(&self, snapshot: &Rc<Snapshot>) {
+        let imp = self.imp();
+        imp.presets_page.render(snapshot);
+        imp.eq_editor_page.render(snapshot);
+    }
+
+    fn show_preset(&self, id: Option<&str>) {
+        let imp = self.imp();
+        let snapshot = imp.snapshot.borrow().clone();
+        let id = id.map(PresetId::new);
+        let (Some(snapshot), Some(id)) = (snapshot, id) else {
+            return;
+        };
+        if snapshot.presets.find(&id).is_none() {
+            return;
+        }
+        imp.eq_editor_page.open(&snapshot, &id);
+        if imp.navigation.visible_page_tag().as_deref() != Some(EDITOR_TAG) {
+            imp.navigation.push_by_tag(EDITOR_TAG);
         }
     }
 

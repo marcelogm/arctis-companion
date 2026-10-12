@@ -24,14 +24,26 @@ impl ToastFeed {
     }
 }
 
-fn failure_toast(model: &ToastModel, sink: &IntentSink) -> adw::Toast {
-    let toast = adw::Toast::builder()
-        .title(resolve(&model.title))
-        .button_label(resolve(&Text::plain("Retry")))
+#[must_use]
+pub fn plain_toast(title: &Text) -> adw::Toast {
+    adw::Toast::builder()
+        .title(resolve(title))
         .use_markup(false)
-        .build();
+        .build()
+}
+
+#[must_use]
+pub fn button_toast(title: &Text, label: &Text, on_click: impl Fn() + 'static) -> adw::Toast {
+    let toast = plain_toast(title);
+    toast.set_button_label(Some(&resolve(label)));
+    toast.connect_button_clicked(move |_| on_click());
+    toast
+}
+
+fn failure_toast(model: &ToastModel, sink: &IntentSink) -> adw::Toast {
     let retry = model.retry.clone();
     let sink = sink.clone();
-    toast.connect_button_clicked(move |_| sink.emit(retry.clone()));
-    toast
+    button_toast(&model.title, &Text::plain("Retry"), move || {
+        sink.emit(retry.clone());
+    })
 }

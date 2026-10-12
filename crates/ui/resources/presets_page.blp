@@ -1,0 +1,32 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisPresetsPage: Adw.NavigationPage {
+  tag: "presets";
+  title: _("Presets");
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {
+      [end]
+      Button import {
+        name: "import";
+        label: _("_Import…");
+        use-underline: true;
+        tooltip-text: _("Import an Equalizer APO or preset file");
+      }
+    }
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup built_in {
+        name: "built-in-presets";
+        title: _("Built-in");
+      }
+
+      Adw.PreferencesGroup custom {
+        name: "custom-presets";
+        title: _("Custom");
+      }
+    };
+  };
+}

@@ -1,7 +1,8 @@
 # Main window and widgets
 
 `crates/ui/` renders `core::view` models and turns user input into `core::intent::Intent`s. It reads no
-GSettings, no channel and no file. Design rationale: ui part §1, §2, §4; ADR 0013.
+GSettings, no channel and no app file; documents a person picks in the file chooser reach the preset pages
+through `crates/ui/src/preset_files.rs::PresetFiles` ([presets.md](presets.md)). Design rationale: ui part §1, §2, §4; ADR 0013.
 
 ## Widget tree
 

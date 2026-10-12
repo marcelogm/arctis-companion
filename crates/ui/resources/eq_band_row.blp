@@ -1,0 +1,64 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisEqBandRow: Adw.ExpanderRow {
+  use-markup: false;
+
+  Adw.ComboRow kind {
+    name: "band-kind";
+    title: _("Type");
+  }
+
+  Adw.SpinRow frequency {
+    name: "band-frequency";
+    title: _("Frequency (Hz)");
+    digits: 0;
+
+    adjustment: Adjustment {
+      lower: 20;
+      upper: 20000;
+      step-increment: 1;
+      page-increment: 100;
+    };
+  }
+
+  Adw.SpinRow gain {
+    name: "band-gain";
+    title: _("Gain (dB)");
+    digits: 1;
+
+    adjustment: Adjustment {
+      lower: -10;
+      upper: 10;
+      step-increment: 0.5;
+      page-increment: 2;
+    };
+  }
+
+  Adw.SpinRow q {
+    name: "band-q";
+    title: _("Q");
+    digits: 3;
+
+    adjustment: Adjustment {
+      lower: 0.2;
+      upper: 10;
+      step-increment: 0.01;
+      page-increment: 0.1;
+    };
+  }
+
+  Adw.SwitchRow enabled {
+    name: "band-enabled";
+    title: _("Enabled");
+  }
+
+  Adw.ButtonRow remove {
+    name: "band-remove";
+    title: _("Remove Band");
+
+    styles [
+      "destructive-action",
+    ]
+  }
+}

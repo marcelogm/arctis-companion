@@ -1,7 +1,16 @@
+use std::cell::Cell;
+
 use adw::prelude::*;
 use arctis_core::view::text::Text;
 
 use crate::text::{optional, resolve};
+
+pub fn while_rendering<T>(flag: &Cell<bool>, body: impl FnOnce() -> T) -> T {
+    let outer = flag.replace(true);
+    let result = body();
+    flag.set(outer);
+    result
+}
 
 #[must_use]
 pub fn nearest_step(value: f64, max: u8) -> u8 {

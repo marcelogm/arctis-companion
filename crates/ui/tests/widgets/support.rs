@@ -1,4 +1,4 @@
-use std::cell::RefCell;
+use std::cell::{Cell, RefCell};
 use std::ffi::CString;
 use std::rc::Rc;
 use std::sync::Once;
@@ -6,11 +6,15 @@ use std::sync::Once;
 use adw::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
+use arctis_core::eq::FilterKind;
+use arctis_core::eq::preset::Preset;
 use arctis_core::intent::Intent;
+pub use arctis_core::testkit::snapshots::{custom_preset, filter, with_preset};
 use arctis_core::testkit::snapshots::{id, rules, snapshot};
 use arctis_core::view::headset_page::{HeadsetModel, HeadsetPageModel, headset_page};
-use arctis_ui::Window;
 use arctis_ui::intents::IntentSink;
+use arctis_ui::preset_files::{Export, PickedText, PresetFiles};
+use arctis_ui::{EqBandRow, EqEditorPage, Services, Window};
 use gtk::glib;
 use gtk::glib::translate::{IntoGlib, ToGlibPtr};
 
@@ -158,3 +162,155 @@ pub fn ruled(entries: &[(&str, &str)]) -> Snapshot {
 }
 
 pub use arctis_core::testkit::snapshots::seen_app;
+#[derive(Default)]
+pub struct FakeFiles {
+    pub picked: RefCell<Option<PickedText>>,
+    pub save_as: RefCell<String>,
+    pub saved: RefCell<Vec<String>>,
+    pub refuse_writes: Cell<bool>,
+}
+
+impl PresetFiles for FakeFiles {
+    fn open(&self, _parent: &gtk::Widget, done: Box<dyn FnOnce(PickedText)>) {
+        if let Some(picked) = self.picked.take() {
+            done(picked);
+        }
+    }
+
+    fn save(&self, _parent: &gtk::Widget, export: Export) {
+        let written = match (export.render)(&self.save_as.borrow()) {
+            Some(text) => {
+                self.saved.borrow_mut().push(text);
+                !self.refuse_writes.get()
+            }
+            None => false,
+        };
+        (export.done)(written);
+    }
+}
+
+pub struct Mounted<P> {
+    pub page: P,
+    pub log: Log,
+    pub files: Rc<FakeFiles>,
+    pub toasts: adw::ToastOverlay,
+}
+
+pub fn fake_services() -> (Services, Log, Rc<FakeFiles>) {
+    init();
+    let (sink, log) = recording_sink();
+    let files = Rc::new(FakeFiles::default());
+    let shared: Rc<dyn PresetFiles> = files.clone();
+    let services = Services {
+        sink,
+        toasts: adw::ToastOverlay::new(),
+        files: shared,
+    };
+    (services, log, files)
+}
+
+pub fn mount<P: Default>(attach: impl FnOnce(&P, Services)) -> Mounted<P> {
+    let (services, log, files) = fake_services();
+    let page = P::default();
+    let toasts = services.toasts.clone();
+    attach(&page, services);
+    Mounted {
+        page,
+        log,
+        files,
+        toasts,
+    }
+}
+
+pub fn standalone_editor(s: Snapshot, preset: &str) -> Mounted<EqEditorPage> {
+    let mounted = mount(|page: &EqEditorPage, services| {
+        page.set_services(services);
+    });
+    mounted.page.open(&Rc::new(s), &id(preset));
+    mounted
+}
+
+pub fn one_peak() -> Preset {
+    custom_preset(&[filter(FilterKind::Peaking, 250, 4, 1_000)])
+}
+
+pub fn shows_text(root: &impl IsA<gtk::Widget>, text: &str) -> bool {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
+        .any(|label| label.label() == text)
+}
+
+pub fn click(root: &impl IsA<gtk::Widget>, label: &str) {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Button>().ok())
+        .find(|button| button.label().as_deref() == Some(label))
+        .unwrap_or_else(|| panic!("no button labelled {label}"))
+        .emit_clicked();
+}
+
+pub fn has_button(root: &impl IsA<gtk::Widget>, label: &str) -> bool {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Button>().ok())
+        .any(|button| button.label().as_deref() == Some(label))
+}
+
+pub fn saved(log: &Log) -> Preset {
+    match log.borrow().last() {
+        Some(Intent::SavePreset(preset)) => preset.clone(),
+        other => panic!("expected SavePreset, got {other:?}"),
+    }
+}
+
+pub fn band_rows(page: &EqEditorPage) -> Vec<EqBandRow> {
+    descendants(page)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<EqBandRow>().ok())
+        .collect()
+}
+
+pub fn step_up(row: &adw::SpinRow) {
+    first::<gtk::SpinButton>(row).emit_by_name::<()>("change-value", &[&gtk::ScrollType::StepUp]);
+}
+
+pub fn drain() {
+    while glib::MainContext::default().iteration(false) {}
+}
+
+pub fn dismiss_toast(root: &impl IsA<gtk::Widget>) {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Button>().ok())
+        .find(|button| button.icon_name().as_deref() == Some("window-close-symbolic"))
+        .expect("a toast with a close button")
+        .emit_clicked();
+    drain();
+}
+
+pub fn open_editor(window: &Window, preset: &str) -> EqEditorPage {
+    WidgetExt::activate_action(window, "win.show-preset", Some(&preset.to_variant()))
+        .expect("the action exists");
+    first::<EqEditorPage>(window)
+}
+
+pub fn open_presets(window: &Window) {
+    WidgetExt::activate_action(window, "win.show-page", Some(&"presets".to_variant()))
+        .expect("the action exists");
+}
+
+pub fn visible_tag(window: &Window) -> Option<String> {
+    named::<adw::NavigationView>(window, "navigation")
+        .visible_page()
+        .and_then(|page| page.tag())
+        .map(String::from)
+}
+
+pub fn count_text(root: &impl IsA<gtk::Widget>, text: &str) -> usize {
+    descendants(root)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
+        .filter(|label| label.label() == text)
+        .count()
+}
