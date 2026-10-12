@@ -45,3 +45,17 @@ fn a_default_the_user_changed_while_inserted_is_left_alone() {
     });
     assert_eq!(tools::configured_default().as_deref(), Some(USB));
 }
+
+#[test]
+#[ignore = "needs the private PipeWire of crates/audio/tests/headless/run.sh"]
+fn dropping_the_handle_restores_bluez() {
+    let lab = Lab::open();
+    lab.insert(flat());
+    drop(lab);
+    eventually("the configured bluez default", || {
+        tools::configured_default().as_deref() == Some(BLUEZ)
+    });
+    eventually("the equalizer sink gone", || {
+        tools::node_id(EQ_SINK).is_none()
+    });
+}

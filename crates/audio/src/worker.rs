@@ -14,11 +14,13 @@ use pw::properties::properties;
 use pw::spa::utils::result::AsyncSeq;
 
 use crate::changes::Published;
+use crate::outputs::EQ_SINK_NAME;
 use crate::registry::Registry;
 use crate::system_engine::{Inserted, SystemEngine};
 
 pub const RECONNECT_AFTER: Duration = Duration::from_secs(2);
 pub const MANAGER_CONFIRM_AFTER: Duration = Duration::from_secs(1);
+pub const SHUTDOWN_GRACE: Duration = Duration::from_secs(1);
 const MANAGER_CATEGORY: &str = "Manager";
 
 pub enum Message {
@@ -118,7 +120,11 @@ struct Dispatcher {
 impl Dispatcher {
     fn dispatch(&self, message: Message) {
         match (message, &self.worker) {
-            (Message::Quit, _) => {
+            (Message::Quit, Some(worker)) => {
+                self.outcome.set(Outcome::Quit);
+                worker.shut_down();
+            }
+            (Message::Quit, None) => {
                 self.outcome.set(Outcome::Quit);
                 self.quit();
             }
@@ -199,6 +205,7 @@ fn listen_core(core: &CoreRc, worker: &Rc<Worker>) -> pw::core::Listener {
 struct WorkerState {
     initial: Cell<Option<AsyncSeq>>,
     settling: Cell<Option<AsyncSeq>>,
+    closing: Cell<bool>,
     ready: Cell<bool>,
     published: RefCell<Published>,
 }
@@ -229,6 +236,7 @@ impl Worker {
     }
 
     fn publish(&self) {
+        self.finish_closing();
         if !self.state.ready.get() {
             return;
         }
@@ -260,6 +268,23 @@ impl Worker {
     fn confirm_manager(&self) {
         if self.engine.manager_denied() {
             self.link.send(AudioEvent::ManagerDenied);
+        }
+    }
+
+    fn shut_down(&self) {
+        if self.state.closing.replace(true) {
+            self.quit_loop();
+            return;
+        }
+        self.engine.remove();
+        self.link.send_later(SHUTDOWN_GRACE, Message::Quit);
+        self.finish_closing();
+    }
+
+    fn finish_closing(&self) {
+        let restored = self.registry.graph().defaults().configured() != Some(EQ_SINK_NAME);
+        if self.state.closing.get() && restored {
+            self.quit_loop();
         }
     }
 
