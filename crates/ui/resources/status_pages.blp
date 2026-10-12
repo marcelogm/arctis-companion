@@ -1,0 +1,19 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisStatusView: Adw.Bin {
+  child: Adw.StatusPage page {
+    vexpand: true;
+
+    child: Button button {
+      name: "status-button";
+      halign: center;
+      visible: false;
+
+      styles [
+        "pill",
+        "suggested-action",
+      ]
+    };
+  };
+}
