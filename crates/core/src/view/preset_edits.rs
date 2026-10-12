@@ -1,8 +1,9 @@
-use super::text::{Text, preset_arg};
+use super::text::{Arg, Text, preset_arg, saturating_count};
 use crate::companion::snapshot::Snapshot;
 use crate::eq::curve::{Curve, MAX_FILTERS};
 use crate::eq::decimal::thousandths_of;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
+use crate::eq::library;
 use crate::eq::preset::{Preset, PresetKind};
 use crate::l10n::msgid;
 
@@ -125,6 +126,32 @@ pub fn duplicate(snapshot: &Snapshot, source: &Preset, name: &str) -> Preset {
         snapshot.fresh_preset_id(name),
         name.to_owned(),
         source.curve().clone(),
+    )
+}
+
+#[must_use]
+pub fn new_preset_name(number: u32) -> Text {
+    if number <= 1 {
+        return Text::plain(msgid("Custom Preset"));
+    }
+    Text::format(
+        msgid("Custom Preset {number}"),
+        vec![("number", Arg::Number(number))],
+    )
+}
+
+#[must_use]
+pub fn new_preset(snapshot: &Snapshot, name_of: impl Fn(&Text) -> String) -> Preset {
+    let presets = &snapshot.presets.all;
+    let is_free = |name: &String| presets.iter().all(|preset| preset.name() != name);
+    let name = (1..=saturating_count(presets.len() + 1))
+        .map(|number| name_of(&new_preset_name(number)))
+        .find(is_free)
+        .unwrap_or_else(|| name_of(&new_preset_name(1)));
+    Preset::custom(
+        snapshot.fresh_preset_id(&name),
+        name,
+        library::flat().curve().clone(),
     )
 }
 

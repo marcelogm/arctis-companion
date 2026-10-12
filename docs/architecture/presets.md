@@ -11,6 +11,7 @@ flowchart TD
     H["HeadsetPage: Presets row"] -- "win.show-page presets" --> P["PresetsPage"]
     P -- "row: win.show-preset id" --> E["EqEditorPage"]
     P -- "Import…" --> F["PresetFiles::open"]
+    P -- "New Preset, Ctrl+N: win.new-preset" --> E
     E --> G["ResponseGraph"]
     E --> B["EqBandRow × up to 10"]
     E -- "Duplicate · Rename · Export · Delete · Preview" --> A["header actions"]
@@ -62,6 +63,7 @@ drops that row itself and focuses the next band, so no other band inherits its e
 | One widget change to an edited preset | `crates/core/src/view/preset_edits.rs::BandEdit`, `crates/core/src/view/preset_edits.rs::apply_edit`, `crates/core/src/view/preset_edits.rs::add_band`, `crates/core/src/view/preset_edits.rs::remove_band`, `crates/core/src/view/preset_edits.rs::renamed` |
 | Rounding to the device grid | `crates/core/src/eq/filter.rs::Hertz`, `crates/core/src/eq/filter.rs::Gain`, `crates/core/src/eq/filter.rs::Q` |
 | Duplicate of a built-in | `crates/core/src/view/preset_edits.rs::copy_name`, `crates/core/src/view/preset_edits.rs::duplicate` |
+| New preset from the Flat curve, first free name | `crates/core/src/view/preset_edits.rs::new_preset`, `crates/core/src/view/preset_edits.rs::new_preset_name`, `crates/ui/src/window.rs::Window` (`new_preset`), `crates/ui/src/eq_editor_page.rs::EqEditorPage::open_new` |
 | Undo texts | `crates/core/src/view/preset_edits.rs::saved_toast`, `crates/core/src/view/presets.rs::deleted_toast` |
 | Gain off for pass filters | `crates/core/src/eq/filter.rs::FilterKind`, `crates/ui/src/eq_band_row.rs::EqBandRow` |
 | Combo positions | `crates/core/src/view/eq_editor.rs::kind_at`, `crates/core/src/view/eq_editor.rs::kind_position` |
@@ -110,5 +112,6 @@ Pure: `crates/core/tests/view/eq_editor.rs`, `crates/core/tests/view/preset_edit
 `crates/core/tests/view/preset_files.rs`. Widgets (`crates/ui/tests/widgets/main.rs`):
 `crates/ui/tests/widgets/presets_page.rs`, `crates/ui/tests/widgets/eq_editor_page.rs` (keyboard-only editing,
 undo toast), `crates/ui/tests/widgets/preset_actions.rs` (Duplicate, Rename, Export, Delete, Preview),
+`crates/ui/tests/widgets/new_preset.rs` (New Preset button and Ctrl+N),
 `crates/ui/tests/widgets/eq_band_row.rs`, `crates/ui/tests/widgets/response_graph.rs`, with the fake file chooser
 `crates/ui/tests/widgets/support.rs::FakeFiles`.

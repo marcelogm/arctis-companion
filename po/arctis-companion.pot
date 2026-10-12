@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 14:35-0300\n"
+"POT-Creation-Date: 2026-10-12 18:14-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -438,6 +438,15 @@ msgid "Allow it in Settings → Apps → Arctis Companion"
 msgstr ""
 
 #: crates/core/src/view/preset_edits.rs
+msgid "Custom Preset"
+msgstr ""
+
+#: crates/core/src/view/preset_edits.rs
+#, rust-format
+msgid "Custom Preset {number}"
+msgstr ""
+
+#: crates/core/src/view/preset_edits.rs
 #, rust-format
 msgid "Saved “{preset}”"
 msgstr ""
@@ -509,6 +518,10 @@ msgid "“{file}” is not a preset file"
 msgstr ""
 
 #: crates/core/src/view/presets.rs
+msgid "Create, duplicate or import a preset to customize it"
+msgstr ""
+
+#: crates/core/src/view/presets.rs
 #, rust-format
 msgid "Deleted “{preset}”"
 msgstr ""
@@ -560,10 +573,6 @@ msgid "Deleted “{preset}”. Used by {n} app rule"
 msgid_plural "Deleted “{preset}”. Used by {n} app rules"
 msgstr[0] ""
 msgstr[1] ""
-
-#: crates/core/src/view/presets.rs
-msgid "Duplicate or import a preset to customize it"
-msgstr ""
 
 #: crates/ui/resources/add_rule_dialog.blp
 #: crates/ui/resources/eq_editor_page.blp
@@ -754,6 +763,11 @@ msgstr ""
 
 #: crates/ui/resources/presets_page.blp
 msgid "Import an Equalizer APO or preset file"
+msgstr ""
+
+#: crates/ui/resources/presets_page.blp
+#: crates/ui/resources/shortcuts_dialog.blp
+msgid "New Preset"
 msgstr ""
 
 #: crates/ui/resources/presets_page.blp

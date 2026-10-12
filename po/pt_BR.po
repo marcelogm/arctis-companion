@@ -443,6 +443,15 @@ msgid "Allow it in Settings → Apps → Arctis Companion"
 msgstr "Permita em Configurações → Aplicativos → Arctis Companion"
 
 #: crates/core/src/view/preset_edits.rs
+msgid "Custom Preset"
+msgstr "Predefinição personalizada"
+
+#: crates/core/src/view/preset_edits.rs
+#, rust-format
+msgid "Custom Preset {number}"
+msgstr "Predefinição personalizada {number}"
+
+#: crates/core/src/view/preset_edits.rs
 #, rust-format
 msgid "Saved “{preset}”"
 msgstr "Predefinição “{preset}” salva"
@@ -588,8 +597,8 @@ msgstr[0] "Predefinição “{preset}” excluída. Era usada por {n} regra de a
 msgstr[1] "Predefinição “{preset}” excluída. Era usada por {n} regras de apps"
 
 #: crates/core/src/view/presets.rs
-msgid "Duplicate or import a preset to customize it"
-msgstr "Duplique ou importe uma predefinição para personalizá-la"
+msgid "Create, duplicate or import a preset to customize it"
+msgstr "Crie, duplique ou importe uma predefinição para personalizá-la"
 
 #: crates/ui/resources/add_rule_dialog.blp
 #: crates/ui/resources/eq_editor_page.blp
@@ -781,6 +790,11 @@ msgstr "Personalizadas"
 #: crates/ui/resources/presets_page.blp
 msgid "Import an Equalizer APO or preset file"
 msgstr "Importar um arquivo do Equalizer APO ou de predefinição"
+
+#: crates/ui/resources/presets_page.blp
+#: crates/ui/resources/shortcuts_dialog.blp
+msgid "New Preset"
+msgstr "Nova predefinição"
 
 #: crates/ui/resources/presets_page.blp
 msgid "_Import…"

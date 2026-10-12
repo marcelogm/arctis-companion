@@ -37,9 +37,11 @@ pub fn presets_page(snapshot: &Snapshot) -> PresetsPageModel {
         .iter()
         .partition(|preset| preset.kind() == PresetKind::BuiltIn);
     PresetsPageModel {
-        custom_description: custom
-            .is_empty()
-            .then(|| Text::plain(msgid("Duplicate or import a preset to customize it"))),
+        custom_description: custom.is_empty().then(|| {
+            Text::plain(msgid(
+                "Create, duplicate or import a preset to customize it",
+            ))
+        }),
         built_in: built_in.into_iter().map(item).collect(),
         custom: custom.into_iter().map(item).collect(),
     }

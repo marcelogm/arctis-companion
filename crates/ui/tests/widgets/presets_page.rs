@@ -67,7 +67,7 @@ fn an_empty_custom_group_explains_itself() {
     let custom = named::<adw::PreferencesGroup>(&shown.page, "custom-presets");
     assert_eq!(
         custom.description().as_deref(),
-        Some("Duplicate or import a preset to customize it")
+        Some("Create, duplicate or import a preset to customize it")
     );
     assert!(titles(&shown.page, "custom-presets").is_empty());
 }
