@@ -3,6 +3,7 @@ mod echo;
 mod effect;
 mod exchange;
 mod frames;
+mod grace;
 mod input;
 mod phase;
 mod rebind;

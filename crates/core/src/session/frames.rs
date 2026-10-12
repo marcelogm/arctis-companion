@@ -131,7 +131,9 @@ impl Session {
                 self.enter(Stage::Syncing(Readings::default()));
             }
             (Stage::Probing, false) => self.headset_off(),
-            (Stage::Syncing(_) | Stage::Ready, false) if !self.reconciler.is_writing() => {
+            (Stage::Syncing(_) | Stage::Ready, false)
+                if !self.reconciler.waits_for_link(self.now) =>
+            {
                 self.headset_off();
             }
             _ => {}

@@ -35,7 +35,7 @@ impl Session {
             Some(Expiry::GaveUp(unanswered)) => self.unanswered(unanswered),
             None => {}
         }
-        if self.reconciler.lost_link_for_good(self.now) {
+        if self.link_lost_at().is_some_and(|at| self.now >= at) {
             self.headset_off();
         }
         self.expire_stage();
@@ -75,15 +75,23 @@ impl Session {
             RebindStep::Wait => {}
             RebindStep::Notice => self.publish_phase(Phase::Rebinding),
             RebindStep::GiveUp => self.lost(),
-            RebindStep::Resume(resume) if resume.needs_link() && !self.link_up() => {
+            RebindStep::Resume(resume) if resume.needs_link() && !self.link_up_or_awaited() => {
                 self.headset_off();
             }
             RebindStep::Resume(resume) => self.enter(resume.restart(self.now)),
         }
     }
 
-    fn link_up(&self) -> bool {
+    fn link_up_or_awaited(&self) -> bool {
         self.status.is_none_or(|status| status.link.is_connected())
+            || self.reconciler.waits_for_link(self.now)
+    }
+
+    fn link_lost_at(&self) -> Option<Millis> {
+        match self.stage {
+            Stage::Syncing(_) | Stage::Ready => self.reconciler.link_lost_at(),
+            _ => None,
+        }
     }
 
     pub(super) fn drive(&mut self) {
@@ -184,7 +192,7 @@ impl Session {
             command,
             self.exchange.deadline(),
             self.stage_deadline(),
-            self.reconciler.link_lost_at(),
+            self.link_lost_at(),
         ]
         .into_iter()
         .flatten()

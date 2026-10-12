@@ -19,6 +19,7 @@ flowchart LR
     exchange["exchange.rs<br/>pacing, one query in flight"] --> drive
     verify["verify.rs<br/>Transaction"] --> reconcile["reconcile.rs<br/>Reconciler: desired, observed, drift"]
     echo["echo.rs<br/>EchoFilter"] --> reconcile
+    grace["grace.rs<br/>Grace"] --> reconcile
     reconcile --> drive
     reconcile --> frames
     timing["timing.rs<br/>constants"] --> drive
@@ -34,7 +35,7 @@ flowchart LR
 | Phases and resume points | `crates/core/src/session/phase.rs::Stage`, `crates/core/src/session/phase.rs::Resume`, `crates/core/src/session/phase.rs::restart` |
 | Syncing reads | `crates/core/src/session/syncing.rs::Readings` |
 | Pacing, reply matching, resend | `crates/core/src/session/exchange.rs::Exchange`, `crates/core/src/session/exchange.rs::answer`, `crates/core/src/session/exchange.rs::expire` |
-| Desired, observed, failures, the open transaction and echoes | `crates/core/src/session/reconcile.rs::Reconciler`, `crates/core/src/session/reconcile.rs::drift` |
+| Desired, observed, failures, unknown settings, the open transaction, echoes and the wireless-mode grace | `crates/core/src/session/reconcile.rs::Reconciler`, `crates/core/src/session/reconcile.rs::drift` |
 | Readbacks and curve comparison | `crates/core/src/session/verify.rs::readbacks`, `crates/core/src/session/verify.rs::same` |
 | Write then verify | `crates/core/src/session/verify.rs::Transaction`, `crates/core/src/session/verify.rs::check`, `crates/core/src/session/verify.rs::Progress` |
 | Echoes | `crates/core/src/session/echo.rs::EchoFilter`, `crates/core/src/session/echo.rs::is_echo` |
@@ -83,7 +84,7 @@ stateDiagram-v2
     Rebinding --> Probing: CommandPortBack + REBIND_SETTLE
     Rebinding --> Syncing: CommandPortBack + REBIND_SETTLE
     Rebinding --> Ready: CommandPortBack + REBIND_SETTLE
-    Rebinding --> HeadsetOff: CommandPortBack + REBIND_SETTLE, or link down
+    Rebinding --> HeadsetOff: CommandPortBack + REBIND_SETTLE, or link down outside a wireless-mode grace
     Rebinding --> Absent: REBIND_GIVE_UP
 ```
 
@@ -93,7 +94,7 @@ stateDiagram-v2
 | `Identity` is published on `Found` with unread firmware and again after each Syncing read of `10` | `crates/core/src/session/reducer.rs::publish_identity`, `crates/core/src/session/frames.rs::after_read` |
 | `Lost` from any phase forgets the dongle, desired settings included | `crates/core/src/session/reducer.rs::lost` |
 | Frames on iface 3 are drained while Settling and Rebinding | `crates/core/src/session/phase.rs::drains_command_frames`, `crates/core/src/session/frames.rs::command_frame` |
-| A query unanswered twice means HeadsetOff, unless asked inside a wireless-mode grace | `crates/core/src/session/drive.rs::unanswered`, `crates/core/src/session/verify.rs::tolerates` |
+| A query unanswered twice means HeadsetOff, unless asked inside a wireless-mode grace | `crates/core/src/session/drive.rs::unanswered`, `crates/core/src/session/grace.rs::covers` |
 | A reply with the awaited id that fails to decode is answered, never resent. An unreadable `B0` means HeadsetOff; an unreadable Syncing read is assumed to hold the desired values and its settings stay unknown, so drift overwrites them (without desired settings Syncing waits); an unreadable readback is a mismatch | `crates/core/src/session/exchange.rs::answer`, `crates/core/src/session/frames.rs::on_unreadable`, `crates/core/src/session/reconcile.rs::assume`, `crates/core/src/session/reconcile.rs::on_unreadable` |
 | Link events; `B9` link 3 while HeadsetOff, or while Rebinding from HeadsetOff, polls `B0` at once | `crates/core/src/session/frames.rs::on_link_event`, `crates/core/src/session/frames.rs::poll_status_now`, `crates/core/src/session/rebind.rs::link_up`, `crates/core/src/session/frames.rs::on_link` |
 | Rebinding sends nothing, publishes `Phase::Rebinding` only after `REBIND_NOTICE`, resumes the interrupted phase | `crates/core/src/session/rebind.rs::step`, `crates/core/src/session/drive.rs::rebinding_step`, `crates/core/src/session/reducer.rs::command_port_lost` |
@@ -123,7 +124,7 @@ sequenceDiagram
 | Only drifted fields are written, wireless mode last, failed fields skipped until the next `Change::Desired` or the next Syncing | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/reconcile.rs::next`, `crates/core/src/session/reducer.rs::enter`, `crates/core/src/session/reconcile.rs::start_syncing` |
 | One readback per query kind, backoff steps, one retry | `crates/core/src/session/verify.rs::next`, `crates/core/src/session/verify.rs::check` |
 | Curves compare with `equivalent` | `crates/core/src/session/verify.rs::same`, `crates/core/src/eq/curve.rs::equivalent` |
-| A wireless-mode write opens a grace: link drops and silence wait for it | `crates/core/src/session/verify.rs::link_lost_at`, `crates/core/src/session/frames.rs::on_link` |
+| A wireless-mode write opens a grace: link drops and silence wait for it. The grace outlives the transaction that opened it, the readback that confirms the mode and a Rebinding; it ends with HeadsetOff | `crates/core/src/session/grace.rs::Grace`, `crates/core/src/session/reconcile.rs::waits_for_link`, `crates/core/src/session/reconcile.rs::link_lost_at`, `crates/core/src/session/frames.rs::on_link`, `crates/core/src/session/drive.rs::link_up_or_awaited` |
 | An echo of a value written in the transaction or within `ECHO_WINDOW` is consumed; any other setting event is intent | `crates/core/src/session/reconcile.rs::on_setting_event`, `crates/core/src/session/echo.rs::close` |
 | A press on a setting in flight wins over the write | `crates/core/src/session/reconcile.rs::on_setting_event`, `crates/core/src/session/verify.rs::keep_wanted` |
 | The safety poll waits for the transaction and is postponed by battery events | `crates/core/src/session/drive.rs::due`, `crates/core/src/session/frames.rs::on_event` |
