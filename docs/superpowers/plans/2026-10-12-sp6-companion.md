@@ -7021,7 +7021,7 @@ git push
 - Modify: `crates/core/src/companion/reducer.rs`, `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/quit_flow.rs`, `crates/core/tests/companion/settings_flow.rs`, `crates/core/tests/companion/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod quit_flow;` and `mod settings_flow;` to `crates/core/tests/companion/main.rs`.
 
@@ -7174,12 +7174,12 @@ fn clearing_the_adopted_identity_adopts_again() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion -- quit_flow settings_flow`
 Expected: FAIL (`Quitting` and `SettingsChanged` are ignored).
 
-- [ ] **Step 3: Put quitting in its own file**
+- [x] **Step 3: Put quitting in its own file**
 
 `crates/core/src/companion/quitting.rs`:
 
@@ -7237,7 +7237,7 @@ impl Companion {
 
 Add `mod quitting;` to `crates/core/src/companion/mod.rs` (after `mod intents;`).
 
-- [ ] **Step 4: Wire settings changes and quitting into `reducer.rs`**
+- [x] **Step 4: Wire settings changes and quitting into `reducer.rs`**
 
 Add `use super::quitting::Quit;` to the imports. Add the field `pub(super) quit: Quit,` to `Companion` (after
 `battery`) and `quit: Quit::Running,` to `Companion::new`. Make `remove_equalizer` and `on_headset` `pub(super)`.
@@ -7317,12 +7317,12 @@ Replace `dispatch`, `advance`, `target`, `place_equalizer` and `finish`, and add
     }
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS (all companion tests).
 
-- [ ] **Step 6: Check the file sizes and commit**
+- [x] **Step 6: Check the file sizes and commit**
 
 Run: `wc -l crates/core/src/companion/*.rs`
 Expected: every file under about 400 lines (`reducer.rs` near 390 after `cargo fmt`). If it passes 400, move the
