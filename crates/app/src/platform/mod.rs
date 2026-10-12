@@ -1,3 +1,4 @@
+pub mod background;
 pub mod battery_store;
 pub mod files;
 pub mod notifications;
