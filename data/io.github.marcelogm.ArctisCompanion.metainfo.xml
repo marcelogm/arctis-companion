@@ -1,0 +1,29 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<component type="desktop-application">
+  <id>io.github.marcelogm.ArctisCompanion</id>
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-or-later</project_license>
+  <name>Arctis Companion</name>
+  <summary>Control your SteelSeries Arctis Nova 5 headset</summary>
+  <description>
+    <p>Change headset settings and equalizer presets, switch presets per app and follow the battery.</p>
+  </description>
+  <developer id="io.github.marcelogm">
+    <name>marcelogm</name>
+  </developer>
+  <launchable type="desktop-id">io.github.marcelogm.ArctisCompanion.desktop</launchable>
+  <url type="homepage">https://github.com/marcelogm/arctis-companion</url>
+  <url type="bugtracker">https://github.com/marcelogm/arctis-companion/issues</url>
+  <content_rating type="oars-1.1"/>
+  <requires>
+    <display_length compare="ge">360</display_length>
+  </requires>
+  <supports>
+    <control>pointing</control>
+    <control>keyboard</control>
+    <control>touch</control>
+  </supports>
+  <releases>
+    <release version="0.1.0" date="2026-10-12"/>
+  </releases>
+</component>

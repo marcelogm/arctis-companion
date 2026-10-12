@@ -1,0 +1,11 @@
+[Desktop Entry]
+Name=Arctis Companion
+Comment=Control your SteelSeries Arctis headset
+Exec=arctis-companion
+Icon=io.github.marcelogm.ArctisCompanion
+Terminal=false
+Type=Application
+Categories=Settings;HardwareSettings;
+Keywords=headset;equalizer;battery;sidetone;
+DBusActivatable=true
+StartupNotify=true
