@@ -1,4 +1,5 @@
 use std::collections::VecDeque;
+use std::ops::ControlFlow;
 use std::os::fd::{AsFd, BorrowedFd};
 
 use arctis_core::messages::device::{DeviceUpdate, Phase};
@@ -73,10 +74,10 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
     }
 
     pub fn turn(&mut self) -> Flow {
-        for source in self.wait() {
-            if self.serve(source) == Flow::Quit {
-                return Flow::Quit;
-            }
+        let ready = self.wait();
+        let served = ready.into_iter().try_for_each(|source| self.serve(source));
+        if served.is_break() {
+            return Flow::Quit;
         }
         self.run_timers();
         Flow::Continue
@@ -100,39 +101,41 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
             .collect()
     }
 
-    fn serve(&mut self, source: Source) -> Flow {
+    fn serve(&mut self, source: Source) -> ControlFlow<()> {
         match source {
             Source::Mailbox => self.read_mail(),
             Source::Port(kind) => {
                 self.drain(kind);
-                Flow::Continue
+                ControlFlow::Continue(())
             }
         }
     }
 
-    fn read_mail(&mut self) -> Flow {
+    fn read_mail(&mut self) -> ControlFlow<()> {
         let mail = self.mailbox.take();
         for change in mail.changes {
             self.feed(Input::from(change));
         }
         if mail.quit {
-            Flow::Quit
+            ControlFlow::Break(())
         } else {
-            Flow::Continue
+            ControlFlow::Continue(())
         }
     }
 
     fn drain(&mut self, kind: PortKind) {
-        while let Some(received) = self.port(kind).map(Port::read) {
-            match received {
-                Ok(Received::Report(bytes)) => self.feed(report_input(kind, bytes)),
-                Ok(Received::Empty) => break,
-                Err(PortGone) => {
-                    self.port_gone(kind);
-                    break;
-                }
-            }
+        let mut read = self.read(kind);
+        while let Some(Ok(Received::Report(bytes))) = read {
+            self.feed(report_input(kind, bytes));
+            read = self.read(kind);
         }
+        if let Some(Err(PortGone)) = read {
+            self.port_gone(kind);
+        }
+    }
+
+    fn read(&self, kind: PortKind) -> Option<Result<Received, PortGone>> {
+        self.port(kind).map(Port::read)
     }
 
     fn port(&self, kind: PortKind) -> Option<&Port> {
