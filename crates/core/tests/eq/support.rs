@@ -22,3 +22,10 @@ pub fn assert_close(actual: f64, expected: f64, tolerance: f64, case: &str) {
         "{case}: got {actual}, expected {expected} ± {tolerance}"
     );
 }
+
+pub fn log_grid(points: u16) -> Vec<f32> {
+    let ratio = 1_000f32.powf(1.0 / f32::from(points - 1));
+    std::iter::successors(Some(20.0_f32), |hz| Some(hz * ratio))
+        .take(usize::from(points))
+        .collect()
+}
