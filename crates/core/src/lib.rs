@@ -3,6 +3,7 @@
 mod bounded;
 
 pub mod battery;
+pub mod companion;
 pub mod eq;
 pub mod messages;
 pub mod protocol;
