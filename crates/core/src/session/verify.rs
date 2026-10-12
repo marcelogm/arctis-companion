@@ -2,7 +2,7 @@ use std::collections::VecDeque;
 
 use super::exchange::Outgoing;
 use super::reconcile::{readbacks, same};
-use super::timing::VERIFY_BACKOFF;
+use super::timing::{VERIFY_BACKOFF, WIRELESS_MODE_GRACE};
 use crate::protocol::Query;
 use crate::settings::headset_settings::{Setting, SettingChange};
 use crate::time::Millis;
@@ -22,6 +22,7 @@ pub(crate) struct Transaction {
     written_at: Millis,
     step: usize,
     retried: bool,
+    grace_until: Option<Millis>,
     link_down: bool,
 }
 
@@ -34,13 +35,14 @@ impl Transaction {
             written_at: Millis(0),
             step: 0,
             retried: false,
+            grace_until: None,
             link_down: false,
         }
     }
 
     pub(crate) fn next(&mut self, now: Millis) -> Option<Outgoing> {
         if let Some(change) = self.unwritten.pop_front() {
-            self.wrote(now);
+            self.wrote(&change, now);
             return Some(Outgoing::Write(change));
         }
         if self.due_at().is_none_or(|due| now < due) {
@@ -77,20 +79,32 @@ impl Transaction {
         self.targets.is_empty()
     }
 
+    pub(crate) fn requeue(&mut self, query: Query) {
+        self.unread.push_front(query);
+    }
+
+    pub(crate) fn tolerates(&self, asked_at: Millis) -> bool {
+        self.grace_until.is_some_and(|until| asked_at < until)
+    }
+
     pub(crate) fn link(&mut self, up: bool) {
         self.link_down = !up;
     }
 
     pub(crate) fn link_lost_at(&self) -> Option<Millis> {
-        self.link_down.then_some(self.written_at)
+        self.link_down
+            .then(|| self.grace_until.unwrap_or(self.written_at))
     }
 
     pub(crate) fn lost_link_for_good(&self, now: Millis) -> bool {
         self.link_lost_at().is_some_and(|at| now >= at)
     }
 
-    fn wrote(&mut self, now: Millis) {
+    fn wrote(&mut self, change: &SettingChange, now: Millis) {
         self.written_at = now;
+        if change.setting() == Setting::WirelessMode {
+            self.grace_until = Some(now.after(WIRELESS_MODE_GRACE));
+        }
         if self.unwritten.is_empty() {
             self.step = 0;
             self.unread = readbacks(&self.targets).into();
