@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod text;
 mod window;
 
 pub use window::Window;
