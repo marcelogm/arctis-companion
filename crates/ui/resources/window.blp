@@ -1,0 +1,15 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisWindow: Adw.ApplicationWindow {
+  title: _("Arctis Companion");
+  default-width: 420;
+  default-height: 640;
+  width-request: 360;
+  height-request: 294;
+
+  content: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+  };
+}
