@@ -3729,7 +3729,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 15. **The udev rule is created by SP2** (`data/udev/70-arctis-companion.rules`, `SUBSYSTEM=="hidraw"` +
     `TAG+="uaccess"` per supported PID) because SP2's criterion tests it; SP14 installs it and documents it.
 16. **`0x22` capture** decodes through `eq_wire::decode_curve` only: there is no `Query` for `0x22` (ADR 0004).
-17. **Tests are integration tests** in `crates/core/tests/` against the public API; `Frame::new` and the decoding
+17. **Tests are integration tests** in `crates/core/tests/` (one binary since Deviation 28) against the public API; `Frame::new` and the decoding
     helpers stay crate-private. The golden checks are split in two files (`golden_frames.rs`: the set, curves,
     setter frames; `golden_replies.rs`: replies) sharing one loader in `tests/support/mod.rs`, because one file
     reaches about 410 lines after `cargo fmt`. The "never panics" and stale-tail properties live next to each
@@ -3753,12 +3753,36 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     `Curve::MAX_FILTERS`, `Curve::from_slots` and `TooManyFilters` do not exist; SP2 uses `Hertz`, `Q` (thousandths),
     `Gain` (half-dB steps, wire byte `20 + half_db`), `curve::MAX_FILTERS`, `Curve::from_array`, `Curve::default`
     and `EnvelopeError`. Deviations 1 and 3 are superseded: the codec converts at the boundary. When the second of
-    SP2 and SP3 lands, SP3's `eq` files win as they are; `crates/core/tests/eq_types.rs` can then be deleted.
+    SP2 and SP3 lands, SP3's `eq` files win as they are; `crates/core/tests/protocol/eq_types.rs` can then be deleted.
 22. **Disabled filters** (SP3's `enabled` flag) are left out by `encode_curve`; the enabled ones close up and the
     remaining slots carry the disabled band, as SP3's port note says. `decode_curve` still drops disabled bands.
 23. **A low-pass or high-pass band whose gain byte is not 20** decodes with no gain (SP3 rejects gain on pass
     filters; the gain has no effect there, and a curve set by another app must still decode). The byte must still
     be inside 0..40, or the band is `InvalidValue` at the gain offset.
-24. **`decode_curve` builds the curve with `Curve::new`** (no `from_slots` in SP3's API); its `TooManyFilters`
-    error cannot happen for a 60-byte window and maps to `InvalidValue` on the same line, so line coverage stays
-    at 100 %.
+24. **`decode_curve` builds the curve with `Curve::from_slots`**, a crate-visible infallible constructor added to
+    `eq/curve.rs` that takes `[Option<Filter>; MAX_FILTERS]`, so the at-most-ten bound is in the type and no
+    impossible `TooManyFilters` is mapped to a made-up `InvalidValue`. When SP3's `eq` files win (Deviation 21),
+    `from_slots` must be kept in SP3's `curve.rs`.
+
+### Review outcomes
+
+All thirteen findings of the post-execution review were verified and fixed; none was rejected.
+
+25. **Decoders carry the frame length in the type.** `frame::expect_frame::<N>` returns `&[u8; N]` through
+    `first_chunk`; `byte`, `field` and `flag_field` take `&[u8; N]` and read with `get`, so a decoder that names a
+    wrong offset gets a `DecodeError` instead of a panic. `firmware::decode_firmware` does its own framing, keeps
+    `FIRMWARE_LEN` private and reads `[u8; 12]` slots with `get`; the slot layouts are named data
+    (`THREE_PART_DOTS`, `THREE_PART_PAIRS`, `TWO_PART_PAIRS`) decoded by `three_part` and `two_part`.
+    `Frame::new` takes `&[u8; A]` with a compile-time `A < PAYLOAD_LEN`.
+26. **Reply offsets are named** next to the lengths they derive (`STATUS_LEN = CHARGING_AT + 1`, …), and the audio
+    trailer starts at `FIRST_BAND + BANDS_LEN`. `DISABLED_BAND` is built by the same `band` const fn as
+    `encode_filter`.
+27. **`OutOfRange` lives in `bounded.rs`** and `settings::values` re-exports it, so the public path is unchanged.
+    A `raw_enum!` macro there generates `ALL`, `raw()` and `TryFrom<u8>` for `Link`, `Charging`, `WirelessMode`
+    and `MuteLight`; `MuteLight::from_raw` is `try_from` with the lenient `Medium` fallback (no longer `const`).
+    `FilterKind` keeps its hand-written code table in `eq_wire.rs` because SP3 owns the enum.
+28. **One test binary.** The SP2 integration tests are modules of `crates/core/tests/protocol/main.rs` sharing
+    `support.rs` and `strategies.rs`; the local helper copies are gone. `crates/core/tests/udev_rule.rs` stays a
+    separate file because the device and quality specs name that path. The duplicate curve round-trip golden test
+    is deleted, the frozen-message tests are exhaustive matches with payload type checks instead of string echoes,
+    and the allow-list proptest classifies arguments by variant instead of through `readback()`.
