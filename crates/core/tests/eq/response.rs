@@ -104,9 +104,9 @@ fn the_preamp_cancels_a_resonant_pass_filter() {
 fn swept_peak_db(curve: &Curve, rate: u32) -> f64 {
     let biquads: Vec<_> = shaping_biquads(curve, rate).collect();
     let nyquist = f64::from(rate) / 2.0;
-    let step = (nyquist - 20.0) / f64::from(SWEEP_POINTS);
+    let step = nyquist / f64::from(SWEEP_POINTS);
     (0..=SWEEP_POINTS)
-        .map(|index| 20.0 + step * f64::from(index))
+        .map(|index| step * f64::from(index))
         .map(|hz| {
             let rate = f64::from(rate);
             biquads
@@ -141,6 +141,32 @@ fn the_preamp_cancels_boosts_up_to_nyquist() {
                 &case,
             );
         }
+    }
+}
+
+#[test]
+fn the_preamp_cancels_boosts_down_to_dc() {
+    let curves = [
+        Curve::from_array([filter(FilterKind::LowShelf, 20, 20, 707)]),
+        Curve::from_array([filter(FilterKind::LowShelf, 20, 20, 10_000)]),
+        Curve::from_array([filter(FilterKind::Peaking, 20, 20, 200)]),
+    ];
+    for curve in &curves {
+        assert_close(
+            preamp_db(curve),
+            -swept_peak_db(curve, 48_000),
+            0.05,
+            &format!("{curve:?}"),
+        );
+    }
+}
+
+#[test]
+fn no_built_in_clips_after_its_preamp() {
+    for preset in library::library() {
+        let curve = preset.curve();
+        let loudest = preamp_db(curve) + swept_peak_db(curve, 48_000);
+        assert!(loudest <= 1e-6, "{}: {loudest} dB", preset.name());
     }
 }
 

@@ -1,9 +1,9 @@
 use super::biquad::{Biquad, narrow, shaping_biquads};
 use super::curve::Curve;
-use super::filter::Hertz;
 
 pub const RESPONSE_RATE: u32 = 48_000;
-const PREAMP_PROBES: u16 = 512;
+const PREAMP_PROBES: u16 = 768;
+const PROBE_FLOOR_HZ: f64 = 1.0;
 const REFINEMENTS: usize = 48;
 const GOLDEN_RATIO: f64 = 0.618_033_988_749_894_9;
 
@@ -26,7 +26,8 @@ pub fn preamp_db_at(curve: &Curve, rate: u32) -> f64 {
     let biquads: Vec<Biquad> = shaping_biquads(curve, rate).collect();
     let gain_at = |hz: f64| total_db(&biquads, hz, rate);
     let nyquist = f64::from(rate) / 2.0;
-    let grid: Vec<(f64, f64)> = log_grid(f64::from(Hertz::MIN), nyquist)
+    let grid: Vec<(f64, f64)> = std::iter::once(0.0)
+        .chain(log_grid(PROBE_FLOOR_HZ, nyquist))
         .map(|hz| (hz, gain_at(hz)))
         .collect();
     let refined = grid

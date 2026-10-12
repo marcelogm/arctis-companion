@@ -79,8 +79,8 @@ sequenceDiagram
 (`crates/core/src/eq/filter.rs::shapes_sound`) and filters at or above the rate's Nyquist frequency
 (`crates/core/src/eq/biquad.rs::below_nyquist`), so Flat runs no section and a preamp of exactly 1: a bit-exact
 identity. The preamp cancels the loudest point of the response at the design rate, so overlapping peaks, resonant
-pass filters and shelves that overshoot above 20 kHz cannot clip (`crates/core/src/eq/response.rs::preamp_db_at`).
-It probes a log grid from 20 Hz to Nyquist plus every filter's own frequency, then narrows each local peak of the
+pass filters and shelves that overshoot below 20 Hz or above 20 kHz cannot clip (`crates/core/src/eq/response.rs::preamp_db_at`).
+It probes DC, a log grid from 1 Hz to Nyquist plus every filter's own frequency, then narrows each local peak of the
 grid with a golden-section search (`crates/core/src/eq/response.rs::refined_peak`). APO export writes the preamp at
 the graph's 48 kHz (`crates/core/src/eq/response.rs::preamp_db`). Each section is RBJ, designed in `f64` and run in `f32` transposed direct form II
 (`crates/core/src/eq/biquad.rs::Section`); state below 1e-20 is flushed to zero, so silence never turns subnormal.
