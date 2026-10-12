@@ -1,6 +1,7 @@
 mod comments;
 mod generated;
 mod line_limit;
+mod lints;
 mod unsafe_api;
 
 use std::fs;
@@ -22,10 +23,10 @@ pub fn run(root: &Path, staged: bool) -> Report {
 }
 
 fn check_tree(root: &Path, files: &[String]) -> Report {
-    files
-        .iter()
-        .map(|file| check_file(root, file))
+    let per_file = files.iter().map(|file| check_file(root, file));
+    per_file
         .fold(Report::default(), Report::merged)
+        .merged(lints::check(root, files))
 }
 
 fn check_file(root: &Path, file: &str) -> Report {
