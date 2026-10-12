@@ -2217,3 +2217,10 @@ CRITICAL line. The extension zip was installed with `gnome-extensions install --
 | `resolve(&Text::plain(msgid(..)))` repeated | Fixed: `crates/ui/src/text.rs::translated`, 7 call sites |
 
 No finding was rejected.
+
+2026-10-12, after the review: rebuilt with `"separate-locales": false` and installed commit `3351cd8f6458`.
+`flatpak build-bundle` of that build, imported into an empty ostree repo, holds
+`/files/share/locale/pt_BR/LC_MESSAGES/arctis-companion.mo`. The earlier Flatpak instance was stopped with
+`flatpak kill`, no preview instance was running, and `flatpak run` started the new build: `State` returned
+`headset-off`, `Route` returned `dongle`, no CRITICAL line. The extension zip was reinstalled with
+`gnome-extensions install --force`; GNOME Shell lists it after the next login, and it is not enabled.
