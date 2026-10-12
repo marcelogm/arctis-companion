@@ -137,3 +137,16 @@ fn an_unplugged_dongle_forgets_the_desired_settings() {
     simulation.run_until(Phase::Ready, SETTLED);
     assert_eq!(setter_writes(&simulation), 0);
 }
+
+#[test]
+fn a_setting_changed_back_before_its_readback_is_written_back() {
+    let mut simulation = ready();
+    let headset = simulation.headset().settings().clone();
+    simulation.desire(with_sidetone(&headset, 6), SyncPolicy::Enforce);
+    simulation.run_until_sent(setter(Setting::Sidetone), 1_000);
+    simulation.desire(headset.clone(), SyncPolicy::Enforce);
+    simulation.run_for(1_000);
+    assert_eq!(simulation.headset().settings(), &headset);
+    assert_eq!(observed(&simulation), Some(headset));
+    assert_eq!(simulation.phase(), Phase::Ready);
+}

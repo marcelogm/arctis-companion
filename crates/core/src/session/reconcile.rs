@@ -22,6 +22,7 @@ pub(crate) struct Reconciler {
     desired: Option<HeadsetSettings>,
     observed: Option<HeadsetSettings>,
     failed: Vec<Setting>,
+    unknown: Vec<Setting>,
     transaction: Option<Transaction>,
     echoes: EchoFilter,
 }
@@ -42,6 +43,7 @@ impl Reconciler {
 
     pub(crate) fn observe(&mut self, settings: HeadsetSettings) -> Vec<DeviceUpdate> {
         self.observed = Some(settings);
+        self.unknown.clear();
         self.observed_update()
     }
 
@@ -80,6 +82,8 @@ impl Reconciler {
 
     pub(crate) fn on_readback(&mut self, reply: &Reply, now: Millis) -> Vec<DeviceUpdate> {
         let readings = settings_in(reply);
+        self.unknown
+            .retain(|setting| !readings.iter().any(|reading| reading.setting() == *setting));
         if let Some(observed) = &mut self.observed {
             readings
                 .iter()
@@ -111,6 +115,7 @@ impl Reconciler {
             settings.apply(change.clone());
         }
         let mut updates = self.drop_unwanted_targets(now);
+        self.unknown.retain(|setting| *setting != change.setting());
         updates.push(DeviceUpdate::HeadsetChanged(change));
         updates
     }
@@ -174,9 +179,13 @@ impl Reconciler {
         let (Some(transaction), Some(desired)) = (&mut self.transaction, &self.desired) else {
             return Vec::new();
         };
-        match transaction.keep_wanted(desired) {
-            Progress::Done => self.finish(Vec::new(), now),
-            Progress::Pending | Progress::Failed(_) => Vec::new(),
+        let overwritten = transaction.keep_wanted(desired);
+        let done = transaction.is_done();
+        self.unknown.extend(overwritten);
+        if done {
+            self.finish(Vec::new(), now)
+        } else {
+            Vec::new()
         }
     }
 
@@ -192,24 +201,16 @@ impl Reconciler {
     }
 
     fn drift(&self) -> Vec<SettingChange> {
-        match (&self.desired, &self.observed) {
-            (Some(desired), Some(observed)) => drift(desired, observed, &self.failed),
-            _ => Vec::new(),
-        }
+        let (Some(desired), Some(observed)) = (&self.desired, &self.observed) else {
+            return Vec::new();
+        };
+        WRITE_ORDER
+            .into_iter()
+            .filter(|setting| !self.failed.contains(setting))
+            .map(|setting| desired.value_of(setting))
+            .filter(|wanted| self.unknown.contains(&wanted.setting()) || !holds(observed, wanted))
+            .collect()
     }
-}
-
-fn drift(
-    desired: &HeadsetSettings,
-    observed: &HeadsetSettings,
-    skipped: &[Setting],
-) -> Vec<SettingChange> {
-    WRITE_ORDER
-        .into_iter()
-        .filter(|setting| !skipped.contains(setting))
-        .map(|setting| desired.value_of(setting))
-        .filter(|wanted| !holds(observed, wanted))
-        .collect()
 }
 
 fn holds(settings: &HeadsetSettings, wanted: &SettingChange) -> bool {

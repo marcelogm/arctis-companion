@@ -25,6 +25,7 @@ pub(crate) struct Transaction {
     retried: bool,
     grace_until: Option<Millis>,
     link_down: bool,
+    sent: Vec<Setting>,
 }
 
 impl Transaction {
@@ -38,6 +39,7 @@ impl Transaction {
             retried: false,
             grace_until: None,
             link_down: false,
+            sent: Vec::new(),
         }
     }
 
@@ -72,15 +74,20 @@ impl Transaction {
         self.next_step()
     }
 
-    pub(crate) fn keep_wanted(&mut self, desired: &HeadsetSettings) -> Progress {
+    pub(crate) fn keep_wanted(&mut self, desired: &HeadsetSettings) -> Vec<Setting> {
         let wanted = |change: &SettingChange| same(change, &desired.value_of(change.setting()));
-        self.targets.retain(wanted);
         self.unwritten.retain(wanted);
-        if self.targets.is_empty() {
-            Progress::Done
-        } else {
-            Progress::Pending
-        }
+        let (kept, dropped): (Vec<_>, Vec<_>) = self.targets.drain(..).partition(wanted);
+        self.targets = kept;
+        dropped
+            .iter()
+            .map(SettingChange::setting)
+            .filter(|setting| self.sent.contains(setting))
+            .collect()
+    }
+
+    pub(crate) const fn is_done(&self) -> bool {
+        self.targets.is_empty()
     }
 
     pub(crate) fn requeue(&mut self, query: Query) {
@@ -113,6 +120,7 @@ impl Transaction {
 
     fn wrote(&mut self, change: &SettingChange, now: Millis) {
         self.written_at = now;
+        self.sent.push(change.setting());
         if change.setting() == Setting::WirelessMode {
             self.grace_until = Some(now.after(WIRELESS_MODE_GRACE));
         }
