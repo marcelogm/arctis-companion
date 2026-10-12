@@ -1,5 +1,60 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <schemalist gettext-domain="arctis-companion">
+  <enum id="io.github.marcelogm.ArctisCompanion.MuteLight">
+    <value nick="off" value="0"/>
+    <value nick="low" value="1"/>
+    <value nick="medium" value="4"/>
+    <value nick="high" value="10"/>
+  </enum>
   <schema id="io.github.marcelogm.ArctisCompanion" path="/io/github/marcelogm/ArctisCompanion/">
+    <key name="mic-volume" type="i">
+      <range min="0" max="15"/>
+      <default>10</default>
+    </key>
+    <key name="sidetone" type="i">
+      <range min="0" max="10"/>
+      <default>0</default>
+    </key>
+    <key name="mute-light" enum="io.github.marcelogm.ArctisCompanion.MuteLight">
+      <default>'medium'</default>
+    </key>
+    <key name="volume-limiter" type="b">
+      <default>true</default>
+    </key>
+    <key name="extended-range" type="b">
+      <default>false</default>
+    </key>
+    <key name="auto-power-off" type="i">
+      <range min="0" max="90"/>
+      <default>30</default>
+    </key>
+    <key name="preset-dongle" type="s">
+      <default>'flat'</default>
+    </key>
+    <key name="preset-bluetooth" type="s">
+      <default>'flat'</default>
+    </key>
+    <key name="app-rules" type="a{ss}">
+      <default>{}</default>
+    </key>
+    <key name="automatic-presets" type="b">
+      <default>true</default>
+    </key>
+    <key name="adopted-identity" type="s">
+      <default>''</default>
+    </key>
+    <key name="bluetooth-sink-seen" type="b">
+      <default>false</default>
+    </key>
+    <key name="low-battery-threshold" type="i">
+      <range min="5" max="50"/>
+      <default>15</default>
+    </key>
+    <key name="run-in-background" type="b">
+      <default>true</default>
+    </key>
+    <key name="background-requested" type="b">
+      <default>false</default>
+    </key>
   </schema>
 </schemalist>
