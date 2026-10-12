@@ -5,6 +5,7 @@ use std::sync::Once;
 
 use adw::prelude::*;
 use arctis_core::companion::Snapshot;
+use arctis_core::companion::seen_apps::SeenApp;
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::intent::Intent;
 use arctis_core::testkit::snapshots::{id, snapshot};
@@ -149,4 +150,27 @@ pub fn has_value_text(row: &arctis_ui::ScaleRow, text: &str) -> bool {
 #[track_caller]
 pub fn assert_close(actual: f64, expected: f64) {
     assert!((actual - expected).abs() < 1e-9, "{actual} != {expected}");
+}
+
+pub fn ruled(entries: &[(&str, &str)]) -> Snapshot {
+    let mut s = snapshot();
+    s.presets.rules = entries
+        .iter()
+        .map(|(app, preset)| ((*app).to_owned(), id(preset)))
+        .collect();
+    s
+}
+
+pub fn seen_app(name: &str, identifiers: &[&str]) -> SeenApp {
+    SeenApp {
+        key: identifiers
+            .first()
+            .map(|key| (*key).to_owned())
+            .unwrap_or_default(),
+        name: name.to_owned(),
+        identifiers: identifiers
+            .iter()
+            .map(|identifier| (*identifier).to_owned())
+            .collect(),
+    }
 }
