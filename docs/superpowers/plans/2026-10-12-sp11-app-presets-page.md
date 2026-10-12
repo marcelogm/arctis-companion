@@ -46,7 +46,10 @@ row); ADR 0010; SP9 plan Deviation 8 (`win.show-page` tags); code on `origin/mai
 - No comments in any file of any language, doc comments and Blueprint included. Names and small functions carry
   the meaning. Blueprint strings shown to people are `_("…")`; widget `name:` values and icon names are not.
 - Clippy policy applies to tests too: cognitive complexity 8, 40 lines per function, at most 4 arguments
-  (`self` included), no `unwrap()` (tests use `expect`), `pedantic` under `-D warnings`: no `as` casts (use
+  (`self` included), block nesting at most 3 (`excessive_nesting`: an inline `mod imp`, an `impl` and a `fn` body
+  already count 3, so a closure or `if` block inside an `imp` method trips it; put the logic in a method of the
+  outer `impl` and call it, as SP9's `copy_on_click` does; `#[glib::object_subclass]` impls are exempt because the
+  macro re-emits them), no `unwrap()` (tests use `expect`), `pedantic` under `-D warnings`: no `as` casts (use
   `u32::try_from`, `widget_values::position`), `#[must_use]` on public functions that return a value. When clippy
   objects, extract a function or rename; never add an `allow` or `expect` attribute.
 - Every row whose title or subtitle comes from a model has `use-markup: false` (app names and identifiers are
@@ -81,15 +84,17 @@ row); ADR 0010; SP9 plan Deviation 8 (`win.show-page` tags); code on `origin/mai
 | View-model checks: rules list with identifiers and "Preset missing" | 1 |
 | `#[gtk::test]`: rules list with app name, identifiers and "Preset missing" | 3, 5 |
 | App icon if resolvable | 2, 3, 4 |
-| Preset chooser per rule shows the rule's preset; none for a missing preset | 3 |
+| Preset chooser per rule shows the rule's preset; a missing preset shows as its own first choice, and picking a library preset repairs the rule | 3 |
 | View-model checks: Add Rule offers seen apps (without a rule) and "Other App…" | 1 |
 | `#[gtk::test]`: Add Rule offers seen apps and "Other App…" with the identifier hint | 4 |
 | Empty states: page "No App Presets" with suggested "Add Rule"; dialog hides "Seen Playing" and focuses "Other App…" | 1, 4, 5 |
 | Page description ("On the 2.4 GHz connection the headset keeps …") | 5 |
 | Warning row while Automatic App Presets is off | 5 |
-| Each control emits its `Intent`: preset chooser → `SetAppRule`, remove → `RemoveAppRule`, seen app → `SetAppRule`, Other App apply → `SetAppRule`; header and empty-state buttons open the dialog | 3, 4, 5, 6 |
+| Each control emits its `Intent`: preset chooser → `SetAppRule`, remove → `RemoveAppRule`, seen app → `SetAppRule`, Other App apply → `SetAppRule` (trimmed; empty adds nothing); header and empty-state buttons open the dialog; the dialog closes after adding | 3, 4, 5, 6 |
+| The dialog's preset choice survives renders and falls back to the first preset when it disappears | 4 |
 | Rendering never emits an `Intent` | 3, 4, 5, 6 |
-| Page reachable from the headset page's App Presets row (`win.show-page` `app-presets`) | 6 |
+| Page reachable from the headset page's App Presets row (`win.show-page` `app-presets`), in full and Bluetooth-only mode (ui §1), with rules editable in both | 6 |
+| A presented dialog follows new snapshots (seen apps appear while it is open) | 5, 6 |
 | Accessibility walk (names on every control) and 360 px width (quality §1 `crates/ui`, ui §4 adaptive) | 7 |
 | `docs/architecture/app-presets.md` (sub-project rule, design §5) | 8 |
 
@@ -132,10 +137,10 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 1 | No production code in `crates/core`: `core::view::app_presets::{app_presets, add_rule_dialog}` and their models (`AppPresetsModel`, `RuleRowModel`, `AddRuleModel`, `SeenRowModel`) were delivered by SP6. SP11 appends characterization tests to `crates/core/tests/view/app_presets.rs` for the cases SP6 left implicit (order, case-insensitive name lookup, seen row key, preset list) | the view-model half of the acceptance criteria is already on `main`; SP10 and SP12 also touch `core::view`, so not editing it avoids conflicts |
 | 2 | The rules list is an `AdwPreferencesGroup` of `AppRuleRow`s instead of a `GtkListView` | a `GtkListView` creates rows only after size allocation, so headless `#[gtk::test]`s cannot see them, and it would need a `gio::ListStore` plus a factory for a list of a few dozen rules at most. Rows are kept while the identifiers are unchanged and rebuilt otherwise, so a publish never steals focus from an open chooser |
 | 3 | Each rule's preset chooser is the row itself: `AppRuleRow` subclasses `AdwComboRow` (title = app name, subtitle = identifier or "Preset missing", prefix = app icon, suffix = remove button) instead of an `AdwActionRow` holding a `GtkDropDown` | `AdwComboRow` is libadwaita's row form of `GtkDropDown`; it reuses `widget_values::show_choices`, the `support::combo_text` helper and the accessibility handling SP9 already proved |
-| 4 | A rule whose preset is missing shows no selection (`gtk::INVALID_LIST_POSITION`); choosing a preset repairs the rule through `Intent::SetAppRule` | `RuleRowModel.preset` is `None` for that case; there is nothing truthful to select |
+| 4 | A rule whose preset is missing gets one extra first choice in its chooser, titled with the row's subtitle ("Preset missing"), selected; picking it emits nothing; picking a library preset repairs the rule through `Intent::SetAppRule`. Rows with a known preset list the library only | `RuleRowModel.preset` is `None` for that case and there is nothing truthful to select, but neither `AdwComboRow` nor `GtkDropDown` can show "no selection": probed on libadwaita 1.9.4 / GTK 4.22 in the toolbox, `set_selected(gtk::INVALID_LIST_POSITION)` is ignored and the previous item stays selected |
 | 5 | App icon: the stored identifier (rule) or the app key (seen app) is looked up in the display's `gtk::IconTheme`; when the theme lacks it, `application-x-executable-symbolic`. Lookup lives in `crates/ui/src/app_icons.rs`; the core models are unchanged | "app icon if resolvable" (ui §4); the app key is the portal app id first (audio §4), which is the icon name of Flatpak and most desktop apps; no desktop-file lookup from inside the sandbox |
 | 6 | The Add Rule dialog has a "Preset" combo row on top (library order, first preset selected at first, the user's choice kept by id across renders); activating a seen app, or applying the "Other App…" entry, emits `SetAppRule { identifier, preset }` with that preset and closes the dialog | the spec says what the dialog offers but not how the preset is chosen; `Intent::SetAppRule` needs one. The rule can be changed afterwards on its row |
-| 7 | "Other App…" is an `AdwEntryRow` with an apply button; the identifier hint is the description of its group; input is trimmed and an empty identifier adds nothing; an identifier that already has a rule is replaced (the `AppRules::set` behaviour) | ui §4 "an entry for an identifier (Flatpak app id, application id or binary name)"; the hint text is `AddRuleModel.other_hint` |
+| 7 | "Other App…" is an `AdwEntryRow` with an apply button; the identifier hint is the description of its group; input is trimmed and an empty identifier adds nothing; the identifier is sent as typed: one equal to a stored identifier replaces that rule, one differing only in case becomes a second rule (`AppRules::set` stores identifiers verbatim; both match the same streams, case-insensitively) | ui §4 "an entry for an identifier (Flatpak app id, application id or binary name)"; the hint text is `AddRuleModel.other_hint`; folding case would need a `core::companion` change, outside SP11 (Deviation 1) |
 | 8 | With no seen apps the dialog hides "Seen Playing" and `AddRuleDialog::open` sets the dialog focus to the "Other App…" entry after presenting | ui §4 empty state "focus on Other App…"; `adw::Dialog::set_focus` |
 | 9 | The page description is the `AdwPreferencesPage` description of the rules state; the empty state is the status page alone. The header "Add Rule" button (`list-add-symbolic`) shows only in the rules state; both it and the status page's suggested button activate the page action `app-presets.add-rule` | ui §4 lists the description under the content and the empty state separately; one action, two entry points |
 | 10 | The "Automatic App Presets is off" warning is a read-only `AdwActionRow` with a `dialog-warning-symbolic` prefix in its own group above the rules, without a switch | ui §4 "a warning row says so"; the switch lives on the headset page and in the Shell |
@@ -145,6 +150,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 14 | The architecture page is a new `docs/architecture/app-presets.md` instead of a section of `ui.md` | SP10 and SP12 extend `ui.md` in parallel; a separate page keeps the merge to one README row |
 | 15 | No pt_BR entries are added | `po/` does not exist yet; SP14 creates the catalogue from the `_()` marks |
 | 16 | Accessible labels of icon-only buttons ("Add Rule", "Remove Rule") are static Blueprint strings | the row title already names the app; the static label keeps the models unchanged (Deviation 1) |
+| 17 | The dialog closes itself after emitting a rule. Every test that makes it emit presents it first in an `adw::Window` (or through the window's `app-presets.add-rule`) | `adw::Dialog::close` on a dialog that was never presented logs `Adwaita-CRITICAL: Trying to close … that's not presented` (probed in the toolbox); a presented dialog leaves `visible_dialog()` synchronously, which gives the tests a close assertion |
 
 ---
 
@@ -308,10 +314,8 @@ pub fn display_icon_name(widget: &impl IsA<gtk::Widget>, identifier: &str) -> St
 
 In `crates/ui/src/lib.rs` add `pub mod app_icons;` after `pub mod app_dialogs;`.
 
-If `set_search_path` in gtk4-rs 0.11 takes another slice type, adapt the call (`&[&dir]`); if `has_icon` ignores
-unthemed icons in a search directory, write the file to `dir/hicolor/scalable/apps/` with a minimal
-`dir/hicolor/index.theme` (`[Icon Theme]\nName=hicolor\nDirectories=scalable/apps\n\n[scalable/apps]\nSize=16\nType=Scalable\n`)
-and call `theme.set_theme_name(Some("hicolor"))`.
+Checked against the toolbox: gtk4-rs 0.11.5 declares `IconTheme::set_search_path(&self, path: &[&Path])`, and GTK
+4.22's `has_icon` finds an unthemed `.svg` placed directly in a search directory, so no `index.theme` is needed.
 
 - [ ] **Step 4: Run it to see it pass**
 
@@ -419,13 +423,46 @@ fn the_row_names_the_app_and_shows_its_preset() {
     assert_eq!(combo_text(row.upcast_ref()), english(&presets[index].title));
 }
 
+fn choice_count(row: &AppRuleRow) -> usize {
+    let count = row.model().map(|model| model.n_items()).unwrap_or_default();
+    usize::try_from(count).expect("a count")
+}
+
 #[gtk::test]
-fn a_missing_preset_says_so_and_selects_nothing() {
+fn a_missing_preset_is_the_first_choice_and_says_so() {
     let s = ruled(&[("mpv", "gone")]);
     let (row, _, log) = rendered(&s);
-    let model = &rule_models(&s)[0];
-    assert_eq!(row.subtitle().as_deref(), Some(english(&model.subtitle).as_str()));
-    assert_eq!(row.selected(), gtk::INVALID_LIST_POSITION);
+    let missing = english(&rule_models(&s)[0].subtitle);
+    assert_eq!(row.subtitle().as_deref(), Some(missing.as_str()));
+    assert_eq!(row.selected(), 0);
+    assert_eq!(combo_text(row.upcast_ref()), missing);
+    assert_eq!(choice_count(&row), preset_items(&s).len() + 1);
+    assert!(log.borrow().is_empty());
+}
+
+#[gtk::test]
+fn picking_a_preset_repairs_a_missing_one() {
+    let s = ruled(&[("mpv", "gone")]);
+    let (row, _, log) = rendered(&s);
+    row.set_selected(position_of(&preset_items(&s), "podcast") + 1);
+    row.set_selected(0);
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::SetAppRule {
+            identifier: "mpv".to_owned(),
+            preset: id("podcast"),
+        }]
+    );
+}
+
+#[gtk::test]
+fn a_repaired_rule_drops_the_missing_choice() {
+    let (row, sink, log) = rendered(&ruled(&[("mpv", "gone")]));
+    let repaired = ruled(&[("mpv", "podcast")]);
+    let presets = preset_items(&repaired);
+    sink.rendering(|| row.render(&rule_models(&repaired)[0], &presets));
+    assert_eq!(choice_count(&row), presets.len());
+    assert_eq!(row.selected(), position_of(&presets, "podcast"));
     assert!(log.borrow().is_empty());
 }
 
@@ -551,7 +588,7 @@ mod imp {
         #[template_child]
         pub remove: TemplateChild<gtk::Button>,
         pub identifier: RefCell<String>,
-        pub choices: RefCell<Vec<PresetId>>,
+        pub choices: RefCell<Vec<Option<PresetId>>>,
     }
 
     #[glib::object_subclass]
@@ -599,22 +636,24 @@ impl AppRuleRow {
     pub fn render(&self, model: &RuleRowModel, presets: &[PresetItem]) {
         let imp = self.imp();
         imp.identifier.replace(model.identifier.clone());
-        imp.choices
-            .replace(presets.iter().map(|item| item.id.clone()).collect());
         self.set_title(&resolve(&model.title));
         self.set_subtitle(&resolve(&model.subtitle));
         imp.icon
             .set_icon_name(Some(&display_icon_name(self, &model.identifier)));
-        self.show_presets(presets, model.preset.as_ref());
+        self.show_presets(model, presets);
     }
 
-    fn show_presets(&self, presets: &[PresetItem], chosen: Option<&PresetId>) {
-        let titles: Vec<String> = presets.iter().map(|item| resolve(&item.title)).collect();
-        let selected = chosen.and_then(|id| presets.iter().position(|item| item.id == *id));
-        show_choices(self.upcast_ref(), &titles, selected.unwrap_or_default());
-        if selected.is_none() {
-            self.set_selected(gtk::INVALID_LIST_POSITION);
-        }
+    fn show_presets(&self, model: &RuleRowModel, presets: &[PresetItem]) {
+        let choices = rule_choices(model, presets);
+        let selected = choices
+            .iter()
+            .position(|(id, _)| *id == model.preset)
+            .unwrap_or_default();
+        let titles: Vec<String> = choices.iter().map(|(_, title)| title.clone()).collect();
+        self.imp()
+            .choices
+            .replace(choices.into_iter().map(|(id, _)| id).collect());
+        show_choices(self.upcast_ref(), &titles, selected);
     }
 
     fn connect_intents(&self, sink: &IntentSink) {
@@ -638,12 +677,23 @@ impl AppRuleRow {
             .choices
             .borrow()
             .get(index(self.selected())?)?
-            .clone();
+            .clone()?;
         Some(Intent::SetAppRule {
             identifier: self.identifier(),
             preset,
         })
     }
+}
+
+fn rule_choices(model: &RuleRowModel, presets: &[PresetItem]) -> Vec<(Option<PresetId>, String)> {
+    let missing = model
+        .preset
+        .is_none()
+        .then(|| (None, resolve(&model.subtitle)));
+    let library = presets
+        .iter()
+        .map(|item| (Some(item.id.clone()), resolve(&item.title)));
+    missing.into_iter().chain(library).collect()
 }
 ```
 
@@ -653,7 +703,7 @@ In `crates/ui/src/lib.rs` add `mod app_rule_row;` (alphabetical, after `pub mod 
 - [ ] **Step 6: Run them to see them pass**
 
 Run (ui): `cargo test -p arctis-ui --test widgets app_rule_row`
-Expected: PASS, 6 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 7: Gates and commit**
 
@@ -719,6 +769,13 @@ fn apply(entry: &adw::EntryRow, text: &str) {
     entry.emit_by_name::<()>("apply", &[]);
 }
 
+fn presented(dialog: &AddRuleDialog) -> adw::Window {
+    let window = adw::Window::new();
+    window.present();
+    dialog.open(&window);
+    window
+}
+
 #[gtk::test]
 fn seen_apps_are_offered_by_name_and_key() {
     let s = spotify_seen();
@@ -745,9 +802,7 @@ fn without_seen_apps_only_another_app_is_offered() {
 #[gtk::test]
 fn without_seen_apps_the_entry_takes_the_focus() {
     let (dialog, _, _) = rendered_dialog(&snapshot());
-    let window = adw::Window::new();
-    window.present();
-    dialog.open(&window);
+    let _window = presented(&dialog);
     let entry = named::<adw::EntryRow>(&dialog, "other-app");
     let focus = dialog.focus().expect("a focused widget");
     assert!(focus == entry.clone().upcast::<gtk::Widget>() || focus.is_ancestor(&entry));
@@ -767,6 +822,7 @@ fn the_preset_row_offers_the_library() {
 fn picking_a_seen_app_adds_its_rule_with_the_chosen_preset() {
     let s = spotify_seen();
     let (dialog, _, log) = rendered_dialog(&s);
+    let window = presented(&dialog);
     named::<adw::ComboRow>(&dialog, "rule-preset").set_selected(2);
     seen_rows(&dialog)[0].emit_by_name::<()>("activated", &[]);
     assert_eq!(
@@ -776,12 +832,14 @@ fn picking_a_seen_app_adds_its_rule_with_the_chosen_preset() {
             preset: preset_items(&s)[2].id.clone(),
         }]
     );
+    assert!(window.visible_dialog().is_none());
 }
 
 #[gtk::test]
 fn another_app_is_added_by_its_trimmed_identifier() {
     let s = snapshot();
     let (dialog, _, log) = rendered_dialog(&s);
+    let window = presented(&dialog);
     let entry = named::<adw::EntryRow>(&dialog, "other-app");
     apply(&entry, "  mpv ");
     assert_eq!(
@@ -792,12 +850,28 @@ fn another_app_is_added_by_its_trimmed_identifier() {
         }]
     );
     assert_eq!(entry.text().as_str(), "");
+    assert!(window.visible_dialog().is_none());
 }
 
 #[gtk::test]
-fn an_empty_identifier_adds_nothing() {
+fn an_empty_identifier_adds_nothing_and_keeps_the_dialog_open() {
     let (dialog, _, log) = rendered_dialog(&snapshot());
+    let window = presented(&dialog);
     apply(&named::<adw::EntryRow>(&dialog, "other-app"), "   ");
+    assert!(log.borrow().is_empty());
+    assert!(window.visible_dialog().is_some());
+}
+
+#[gtk::test]
+fn a_chosen_preset_that_disappears_falls_back_to_the_first() {
+    let s = snapshot();
+    let (dialog, sink, log) = rendered_dialog(&s);
+    let combo = named::<adw::ComboRow>(&dialog, "rule-preset");
+    combo.set_selected(u32::try_from(preset_items(&s).len() - 1).expect("a short list"));
+    let mut fewer = snapshot();
+    fewer.presets.all.pop();
+    sink.rendering(|| dialog.render(&add_rule_dialog(&fewer), &preset_items(&fewer)));
+    assert_eq!(combo.selected(), 0);
     assert!(log.borrow().is_empty());
 }
 
@@ -890,7 +964,6 @@ use crate::widget_values::{index, show_choices};
 mod imp {
     use std::cell::RefCell;
 
-    use adw::prelude::*;
     use adw::subclass::prelude::*;
     use arctis_core::eq::preset::PresetId;
     use arctis_core::view::app_presets::SeenRowModel;
@@ -933,12 +1006,7 @@ mod imp {
     impl ObjectImpl for AddRuleDialog {
         fn constructed(&self) {
             self.parent_constructed();
-            let dialog = self.obj().downgrade();
-            self.other_app.connect_apply(move |entry| {
-                if let Some(dialog) = dialog.upgrade() {
-                    dialog.add_rule(&entry.text());
-                }
-            });
+            self.obj().connect_other_app();
         }
     }
 
@@ -975,10 +1043,18 @@ impl AddRuleDialog {
         }
     }
 
+    fn connect_other_app(&self) {
+        self.imp().other_app.connect_apply(glib::clone!(
+            #[weak(rename_to = dialog)]
+            self,
+            move |entry| dialog.add_rule(&entry.text())
+        ));
+    }
+
     pub fn open(&self, parent: &impl IsA<gtk::Widget>) {
         let imp = self.imp();
         self.present(Some(parent));
-        if !imp.seen_group.is_visible() {
+        if !imp.seen_group.get_visible() {
             self.set_focus(Some(&*imp.other_app));
         }
     }
@@ -1070,14 +1146,13 @@ fn app_icon(dialog: &AddRuleDialog, identifier: &str) -> gtk::Image {
 In `crates/ui/src/lib.rs` add `mod add_rule_dialog;` (alphabetical, before `pub mod app_dialogs;`) and
 `pub use add_rule_dialog::AddRuleDialog;` (first among the `pub use` lines).
 
-If `dialog.focus()` is `None` in the focus test because the dialog is not mapped yet, call
-`glib::MainContext::default().iteration(false)` in a loop until `dialog.is_mapped()` (at most 100 iterations)
-inside the test before reading the focus; do not change `open`.
+Checked in the toolbox (libadwaita 1.9.4): `adw::Dialog::set_focus` right after `present` takes effect without a
+main-loop iteration, and closing a presented dialog clears the window's `visible_dialog()` synchronously.
 
 - [ ] **Step 5: Run them to see them pass**
 
 Run (ui): `cargo test -p arctis-ui --test widgets add_rule_dialog`
-Expected: PASS, 8 tests.
+Expected: PASS, 9 tests.
 
 - [ ] **Step 6: Gates and commit**
 
@@ -1163,7 +1238,15 @@ fn rules_list_one_row_per_app() {
     assert_eq!(state(&page).as_deref(), Some("rules"));
     let identifiers: Vec<String> = rule_rows(&page).iter().map(AppRuleRow::identifier).collect();
     assert_eq!(identifiers, ["firefox", "mpv"]);
-    assert_eq!(rule_rows(&page)[1].subtitle().as_deref(), Some("Preset missing"));
+    let AppPresetsContent::Rules(models) = app_presets(&s).content else {
+        panic!("expected rule rows");
+    };
+    let subtitles: Vec<Option<String>> = rule_rows(&page)
+        .iter()
+        .map(|row| row.subtitle().map(String::from))
+        .collect();
+    let expected: Vec<Option<String>> = models.iter().map(|row| Some(english(&row.subtitle))).collect();
+    assert_eq!(subtitles, expected);
     let add_rule = named::<gtk::Button>(&page, "add-rule");
     assert!(add_rule.get_visible());
     assert_eq!(add_rule.action_name().as_deref(), Some("app-presets.add-rule"));
@@ -1243,22 +1326,6 @@ fn the_dialog_follows_the_latest_snapshot() {
     render(&page, &sink, &s);
     assert!(named::<adw::PreferencesGroup>(&dialog, "seen-group").get_visible());
     assert_eq!(page.add_rule_dialog(), dialog);
-}
-
-#[gtk::test]
-fn the_dialog_reaches_the_intent_handler() {
-    let s = snapshot();
-    let (page, _, log) = rendered_page(&s);
-    let entry = named::<adw::EntryRow>(&page.add_rule_dialog(), "other-app");
-    entry.set_text("mpv");
-    entry.emit_by_name::<()>("apply", &[]);
-    assert_eq!(
-        *log.borrow(),
-        vec![Intent::SetAppRule {
-            identifier: "mpv".to_owned(),
-            preset: preset_items(&s)[0].id.clone(),
-        }]
-    );
 }
 ```
 
@@ -1541,7 +1608,7 @@ In `crates/ui/src/lib.rs` add `mod app_presets_page;` (alphabetical, after `pub 
 - [ ] **Step 5: Run them to see them pass**
 
 Run (ui): `cargo test -p arctis-ui --test widgets app_presets_page`
-Expected: PASS, 9 tests.
+Expected: PASS, 8 tests.
 
 - [ ] **Step 6: Gates and commit**
 
@@ -1568,17 +1635,29 @@ If SP10 or SP12 merged first, `window.blp` and `window.rs` already hold their pa
 
 - [ ] **Step 2: Write the failing tests**
 
-Append to `crates/ui/tests/widgets/app_presets_page.rs`, adding `use arctis_ui::{AddRuleDialog, Window};` and
-`rendered_window` to the `crate::support` import:
+Append to `crates/ui/tests/widgets/app_presets_page.rs`, adding `use arctis_ui::{AddRuleDialog, Window};`,
+`use arctis_core::companion::routing::Route;`, `use arctis_core::messages::device::Phase;`, `with` to the
+`arctis_core::testkit::snapshots` import and `rendered_window` to the `crate::support` import. The page is opened
+through the headset page's own App Presets row (its action name and target), so a wrong target fails here:
 
 ```rust
 fn open_app_presets(window: &Window) -> AppPresetsPage {
-    WidgetExt::activate_action(window, "win.show-page", Some(&"app-presets".to_variant()))
+    let row = named::<adw::ActionRow>(window, "app-presets-row");
+    let action = row.action_name().expect("the row has an action");
+    WidgetExt::activate_action(&row, &action, row.action_target_value().as_ref())
         .expect("the action exists");
     named::<adw::NavigationView>(window, "navigation")
         .visible_page()
         .and_downcast::<AppPresetsPage>()
         .expect("the app presets page is shown")
+}
+
+fn add_rule_through(window: &Window, page: &AppPresetsPage) -> AddRuleDialog {
+    named::<gtk::Button>(page, "status-button").emit_clicked();
+    window
+        .visible_dialog()
+        .and_downcast::<AddRuleDialog>()
+        .expect("the add-rule dialog is presented")
 }
 
 #[gtk::test]
@@ -1597,19 +1676,51 @@ fn the_window_renders_the_rules_and_forwards_their_intents() {
 }
 
 #[gtk::test]
-fn add_rule_presents_the_dialog() {
-    let (window, _) = rendered_window(snapshot());
+fn rules_stay_editable_in_bluetooth_only_mode() {
+    let mut s = with(Phase::Absent, Route::Bluetooth);
+    s.presets.rules = ruled(&[("firefox", "footsteps")]).presets.rules;
+    let (window, log) = rendered_window(s);
+    let page = open_app_presets(&window);
+    let row = named::<AppRuleRow>(&page, "app-rule");
+    assert!(row.is_sensitive());
+    named::<gtk::Button>(&row, "remove-rule").emit_clicked();
+    assert_eq!(*log.borrow(), vec![Intent::RemoveAppRule("firefox".to_owned())]);
+}
+
+#[gtk::test]
+fn a_rule_added_in_the_dialog_reaches_the_window_handler() {
+    let (window, log) = rendered_window(snapshot());
     window.present();
     let page = open_app_presets(&window);
-    WidgetExt::activate_action(&page, "app-presets.add-rule", None).expect("the action exists");
-    assert!(window.visible_dialog().is_some_and(|dialog| dialog.is::<AddRuleDialog>()));
+    let entry = named::<adw::EntryRow>(&add_rule_through(&window, &page), "other-app");
+    entry.set_text("mpv");
+    entry.emit_by_name::<()>("apply", &[]);
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::SetAppRule {
+            identifier: "mpv".to_owned(),
+            preset: preset_items(&snapshot())[0].id.clone(),
+        }]
+    );
+    assert!(window.visible_dialog().is_none());
+}
+
+#[gtk::test]
+fn the_presented_dialog_follows_new_snapshots() {
+    let (window, _) = rendered_window(snapshot());
+    window.present();
+    let dialog = add_rule_through(&window, &open_app_presets(&window));
+    let mut s = snapshot();
+    s.presets.seen_apps = vec![seen_app("Spotify", &["com.spotify.Client"])];
+    window.render(&std::rc::Rc::new(s));
+    assert!(named::<adw::PreferencesGroup>(&dialog, "seen-group").get_visible());
 }
 ```
 
 - [ ] **Step 3: Run them to see them fail**
 
 Run (ui): `cargo test -p arctis-ui --test widgets app_presets_page`
-Expected: the three new tests FAIL with "the app presets page is shown" (no page tagged `app-presets` yet).
+Expected: the five new tests FAIL with "the app presets page is shown" (no page tagged `app-presets` yet).
 
 - [ ] **Step 4: Add the page to the window**
 
@@ -1647,8 +1758,11 @@ In `crates/ui/src/window.rs`:
 - [ ] **Step 5: Run the whole widget binary**
 
 Run (ui): `cargo test -p arctis-ui`
-Expected: PASS, every test, including SP9's `window` and `accessibility` modules (the pushed page is not
-shown until navigated to, so SP9's walks and `named` lookups are unchanged).
+Expected: PASS, every test, including SP9's `window`, `accessibility` and `layout` modules. The added page is not
+shown until pushed, so `shown`-filtered walks skip it; SP9's `named`/`first` lookups still find the main page's
+widgets first because the main page is the navigation view's first child. If an SP9 lookup by a shared name
+(`status-button`) now reaches the app presets page, scope that lookup to `named::<adw::NavigationView>(&window,
+"navigation").visible_page()` in the SP9 test instead of renaming SP11's widget.
 
 - [ ] **Step 6: Gates and commit**
 
@@ -1675,6 +1789,7 @@ Append to `crates/ui/tests/widgets/accessibility.rs`, adding
 fn every_control_of_the_app_presets_page_has_a_name() {
     for s in [snapshot(), ruled(&[("firefox", "footsteps"), ("mpv", "gone")])] {
         let (page, _, _) = rendered_page(&s);
+        assert!(descendants(&page).iter().any(needs_name), "the walk sees the controls");
         assert_eq!(unnamed(&page), Vec::<String>::new());
     }
 }
@@ -1683,6 +1798,7 @@ fn every_control_of_the_app_presets_page_has_a_name() {
 fn every_control_of_the_add_rule_dialog_has_a_name() {
     for s in [snapshot(), spotify_seen()] {
         let (dialog, _, _) = rendered_dialog(&s);
+        assert!(descendants(&dialog).iter().any(needs_name), "the walk sees the controls");
         assert_eq!(unnamed(&dialog), Vec::<String>::new());
     }
 }
@@ -1706,7 +1822,8 @@ fn the_app_presets_page_and_dialog_fit_the_narrowest_window() {
 - [ ] **Step 2: Run them**
 
 Run (ui): `cargo test -p arctis-ui --test widgets accessibility layout`
-Expected: PASS. These check widgets written in Tasks 3–5. If a walk lists a control, give it a name in its
+Expected: PASS. These check widgets written in Tasks 3–5, so they are written after them on purpose; the
+`any(needs_name)` assertion keeps a walk from passing on an empty tree. If a walk lists a control, give it a name in its
 Blueprint (`accessibility { label: _("…"); }`); if the width exceeds 360, set `title-lines: 2` and
 `subtitle-lines: 2` on `AppRuleRow` and the seen-app rows instead of letting labels widen the row. Re-run until
 PASS.
@@ -1766,6 +1883,7 @@ sequenceDiagram
     C-->>W: render(Snapshot)
     W->>P: render(app_presets, add_rule_dialog) inside IntentSink::rendering
     P->>R: render(RuleRowModel, presets), rows kept while identifiers match
+    Note over R: a missing preset is an extra first choice that emits nothing
     P->>D: render(AddRuleModel, presets) once created
     R-->>W: SetAppRule / RemoveAppRule
     D-->>W: SetAppRule, then close
@@ -1774,7 +1892,7 @@ sequenceDiagram
 | Piece | Code | Template |
 |---|---|---|
 | Page | `crates/ui/src/app_presets_page.rs::AppPresetsPage`, `crates/ui/src/app_presets_page.rs::AppPresetsPage::render`, `crates/ui/src/app_presets_page.rs::AppPresetsPage::sync_rows`, `crates/ui/src/app_presets_page.rs::AppPresetsPage::add_rule_dialog` | `crates/ui/resources/app_presets_page.blp` |
-| Rule row | `crates/ui/src/app_rule_row.rs::AppRuleRow`, `crates/ui/src/app_rule_row.rs::AppRuleRow::chosen_intent` | `crates/ui/resources/app_rule_row.blp` |
+| Rule row | `crates/ui/src/app_rule_row.rs::AppRuleRow`, `crates/ui/src/app_rule_row.rs::rule_choices`, `crates/ui/src/app_rule_row.rs::AppRuleRow::chosen_intent` | `crates/ui/resources/app_rule_row.blp` |
 | Add Rule dialog | `crates/ui/src/add_rule_dialog.rs::AddRuleDialog`, `crates/ui/src/add_rule_dialog.rs::AddRuleDialog::open`, `crates/ui/src/add_rule_dialog.rs::rule_intent` | `crates/ui/resources/add_rule_dialog.blp` |
 | App icons | `crates/ui/src/app_icons.rs::icon_name`, `crates/ui/src/app_icons.rs::FALLBACK_ICON` | – |
 | View models | `crates/core/src/view/app_presets.rs::app_presets`, `crates/core/src/view/app_presets.rs::add_rule_dialog`, `crates/core/src/view/app_presets.rs::RuleRowModel` | – |
