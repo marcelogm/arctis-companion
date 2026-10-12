@@ -3,7 +3,7 @@
 Status: SP0 result, 2026-10-12 00:36–01:00 (-03), run by an agent with nobody at the desk. It answers each SP0 item
 of [the design](../superpowers/specs/2026-10-11-arctis-companion-design.md) §5 with captures, or names it **needs a
 person** with the designed fallback and the procedure for SP14's hardware checklist (§7). Protocol facts are in
-[hid-protocol.md](hid-protocol.md); frames captured here are in [`captures/`](captures) (§8).
+[hid-protocol.md](hid-protocol.md); frames captured here are in [`crates/core/tests/golden/`](../../crates/core/tests/golden) (§8).
 
 ## 0. Conditions and safety record
 
@@ -161,7 +161,7 @@ Cause, confirmed without root:
    ```
 3. **A fwupd-shaped stale tail.** The first `36` after each rebind returns `36 01 02 20 03 00 00 …`: bytes `[2..6]`
    are the tail of a `B0` reply (`b0 02 02 20 03 00 00`) that no hidraw reader asked for
-   ([`reply_36_tail_from_fwupd_b0.hex`](captures/reply_36_tail_from_fwupd_b0.hex)).
+   ([`reply_36_tail_from_fwupd_b0.hex`](../../crates/core/tests/golden/reply_36_tail_from_fwupd_b0.hex)).
 4. `udevadm monitor --kernel` shows `remove hidraw6`, `unbind` hid and usb interface `1-5.2.1:1.3`, then `add` and
    `bind` 2 ms later, with no USB device event.
 
@@ -197,7 +197,7 @@ The same rebind was observed and recovered from inside a Flatpak sandbox (§6.1)
 ## 5. Bluetooth
 
 `22` was sent once, right after a `10` whose ASCII filled bytes 1–36. The reply was
-`22` + 10 × `{32..16000 Hz, peaking, 0 dB, Q 1410}` ([`reply_22_flat_headset_off.hex`](captures/reply_22_flat_headset_off.hex)):
+`22` + 10 × `{32..16000 Hz, peaking, 0 dB, Q 1410}` ([`reply_22_flat_headset_off.hex`](../../crates/core/tests/golden/reply_22_flat_headset_off.hex)):
 the dongle keeps a separate Bluetooth band layout, flat at the factory values. Per ADR 0013 the next step is `34`
 with phone audio and a `22` readback; it needs a phone paired to the headset and a person listening, and `34` stays
 forbidden until then (§7 item 10). `B0[1]` and `B9` with QuickSwitch need a person (§7 item 11).
@@ -288,9 +288,9 @@ Each item keeps its designed default until a person runs it; scripts must use th
 
 ## 8. Captures
 
-[`captures/*.hex`](captures): one 64-byte frame per file, lowercase hex bytes separated by spaces on one line,
+[`crates/core/tests/golden/*.hex`](../../crates/core/tests/golden): one 64-byte frame per file, lowercase hex bytes separated by spaces on one line,
 exactly as read from or written to hidraw without the leading report-id `00`. Replies keep their stale tails, which
-is what the golden tests need. SP2 moves them to `crates/core/tests/golden/`.
+is what the golden tests need. SP2 moved them to `crates/core/tests/golden/`.
 
 | Files | Content |
 |---|---|
