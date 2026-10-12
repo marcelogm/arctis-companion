@@ -1,0 +1,24 @@
+[package]
+name = "arctis-app"
+version.workspace = true
+edition.workspace = true
+license.workspace = true
+publish.workspace = true
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+name = "arctis-companion"
+path = "src/main.rs"
+
+[dependencies]
+arctis-core.workspace = true
+arctis-hid.workspace = true
+arctis-audio.workspace = true
+arctis-ui.workspace = true
+gtk.workspace = true
+adw.workspace = true
+
+[lints]
+workspace = true
