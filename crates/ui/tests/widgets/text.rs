@@ -1,5 +1,5 @@
 use arctis_core::battery::sample::UnixSeconds;
-use arctis_core::eq::{Gain, Hertz};
+use arctis_core::eq::{Gain, Hertz, Q};
 use arctis_core::testkit::snapshots::percent;
 use arctis_core::view::text::{Arg, Text};
 use arctis_ui::text::{NumberStyle, Resolver, optional, translated};
@@ -20,6 +20,14 @@ fn decibels(half_db: i8) -> Text {
 #[test]
 fn pt_br_renders_decibels_with_a_decimal_comma() {
     assert_eq!(brazilian().resolve(&decibels(4)), "+2,0 dB");
+}
+
+#[test]
+fn q_renders_with_two_decimals_in_the_locale_style() {
+    let q = Q::from_milli(1_414).expect("q in the envelope");
+    let text = Text::format("Q {q}", vec![("q", Arg::Quality(q))]);
+    assert_eq!(brazilian().resolve(&text), "Q 1,41");
+    assert_eq!(american().resolve(&text), "Q 1.41");
 }
 
 #[test]

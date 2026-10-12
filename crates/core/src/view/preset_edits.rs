@@ -19,6 +19,7 @@ pub enum BandEdit {
     Gain(f64),
     Q(f64),
     Enabled(bool),
+    Point { hz: f64, db: f64 },
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -93,6 +94,13 @@ pub fn add_band(preset: &Preset) -> Option<Preset> {
     }
     filters.push(NEW_BAND);
     with_filters(preset, filters)
+}
+
+#[must_use]
+pub fn add_band_at(preset: &Preset, hz: f64, db: f64) -> Option<Preset> {
+    let added = add_band(preset)?;
+    let index = added.curve().filters().len() - 1;
+    apply_edit(&added, index, BandEdit::Point { hz, db }).or(Some(added))
 }
 
 #[must_use]
@@ -180,8 +188,17 @@ fn edited_band(band: Filter, edit: BandEdit) -> Option<Filter> {
         BandEdit::Frequency(value) => (band.kind(), hertz_of(value)?, band.gain(), band.q()),
         BandEdit::Gain(db) => (band.kind(), band.hz(), gain_of(db)?, band.q()),
         BandEdit::Q(value) => (band.kind(), band.hz(), band.gain(), q_of(value)?),
+        BandEdit::Point { hz, db } => (band.kind(), hertz_of(hz)?, gain_at(band, db)?, band.q()),
     };
     Some(Filter::dropping_pass_gain(kind, hz, gain, q).with_enabled(band.is_enabled()))
+}
+
+fn gain_at(band: Filter, db: f64) -> Option<Gain> {
+    if band.kind().has_gain() {
+        gain_of(db)
+    } else {
+        Some(band.gain())
+    }
 }
 
 fn hertz_of(value: f64) -> Option<Hertz> {

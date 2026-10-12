@@ -40,6 +40,7 @@ fn argument(arg: &Arg) -> String {
         Arg::Percent(percent) => format!("{} %", percent.get()),
         Arg::Decibels(gain) => format!("{:+.1} dB", gain.db()),
         Arg::Hertz(hertz) => format!("{} Hz", hertz.get()),
+        Arg::Quality(q) => format!("{:.2}", q.value()),
         Arg::Number(number) => number.to_string(),
         Arg::Time(at) => format!("@{}", at.0),
         Arg::Msgid(text) | Arg::Str(text) => text.clone(),

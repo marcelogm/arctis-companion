@@ -9,7 +9,7 @@ use arctis_core::testkit::english::english;
 use arctis_core::testkit::snapshots::{id, snapshot};
 use arctis_core::view::eq_editor::{eq_editor_for, kind_position};
 use arctis_core::view::preset_edits::NEW_BAND;
-use arctis_ui::{EqBandRow, ResponseGraph};
+use arctis_ui::{EqBandRow, EqGraph};
 use gtk::AccessibleProperty;
 
 use crate::support::{
@@ -76,7 +76,7 @@ fn the_graph_describes_the_shown_preset() {
     let editor = standalone_editor(s.clone(), "mine");
     let description = eq_editor_for(&s, &one_peak()).graph.description;
     assert!(has_accessible_text(
-        &first::<ResponseGraph>(&editor.page),
+        &first::<EqGraph>(&editor.page),
         AccessibleProperty::Description,
         &english(&description)
     ));
