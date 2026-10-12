@@ -53,6 +53,9 @@ quality part §1 (`crates/app` row, end-to-end scenario) and §2; ADRs 0001, 000
   casts, `#[must_use]` on public functions that return a value, no deprecated gio calls (`subscribe_to_signal`, not
   `signal_subscribe`). When clippy objects, extract a function, add a parameter struct or rename; never add an
   `allow` or `expect` attribute. Every `pub` helper in a test binary must be used by that binary.
+- `gtk::gio::prelude::*` and `adw::prelude::*` re-export glib's prelude: a file that has either never also imports
+  `gtk::glib::prelude::*` (the second glob is an unused import, an error under `-D warnings`; checked during the plan
+  review against gtk4-rs 0.11). Import `gtk::glib::prelude::*` only where neither of the others is present.
 - `std::env::set_var` is `unsafe` in Rust 2024 and `crates/app` forbids `unsafe`: tests never mutate the process
   environment. Environment for D-Bus tests comes from the `session_bus` binary re-executing itself (Task 16).
 - Code blocks below are not rustfmt-formatted; `cargo fmt --all` reflows them and that is expected. Where a gtk-rs
@@ -72,22 +75,22 @@ quality part §1 (`crates/app` row, end-to-end scenario) and §2; ADRs 0001, 000
 
 | SP8 acceptance criterion or scope item (design §5, quality §1 `crates/app` row) | Task |
 |---|---|
-| `crates/core/tests/end_to_end.rs` passes: connect → settle → probe → adopt → set preset → app rule switch → low battery notify → flap → reconnect, asserting actions and the wire log | 1 |
+| `crates/core/tests/end_to_end.rs` passes: connect → settle → probe → adopt → set preset → app rule switch → low battery notify → flap → reconnect, asserting actions, published phases and the wire log (command ids, plus the full `SetEqualizer` frames) | 1 |
 | GSettings schema with every key of device §5, audio §1/§4/§5, ui §4 | 2 |
 | GSettings store: load `AppSettings`, persist every `PersistedChange`, external changes become `SettingsChanged` | 3, 4, 5 |
 | preset, seen-apps and battery stores pass the `core::ports` contract suite (tempdirs, `fresh` and `reopen`) | 6, 7, 8 |
 | battery rows older than 8 days dropped at start-up; failed loads start empty | 9 |
-| `crates/app/tests/bridge` covers every `Action` (Persist, StorePreset, RecordBattery, RecordSeenApp, SendDevice, SendAudio, Publish, Notify, Withdraw, WakeAt, ReadyToQuit) | 10, 11 |
+| `crates/app/tests/bridge` covers every `Action` (Persist, StorePreset, RecordBattery, RecordSeenApp, SendDevice, SendAudio, Publish, Notify, Withdraw, WakeAt, ReadyToQuit) | 10, 11, 13 |
 | `WakeAt` schedules one timeout and delivers `Woke` | 11 |
 | channels pumped into `Companion` with `glib::spawn_future_local`; re-entrant inputs queued; a failing store stops nothing | 12 |
 | quit sends the route preset and waits at most `QUIT_GRACE` | 13, 22 |
 | `Headset1` values (`State`, `BatteryLevel`, `Charging`, `BatteryWarning`, `Route`, `Presets`, `ActivePreset`, `ActivePresetReason`, `AppRuleCount`, `AutomaticPresets`, `Model`) | 14, 15 |
 | `gio::TestDBus` contract test: runtime introspection equals `data/dbus/…Headset1.xml` | 16 |
 | properties follow the snapshot through `PropertiesChanged`; `ActivatePreset` with `NoRoute` / `NotReady`; `AutomaticPresets` writable | 17 |
-| scripted run fires and withdraws the low-battery notification (`app.show-battery` default action) | 18 |
+| scripted run fires and withdraws the low-battery notification (`app.show-battery` default action), then the critical one replaces it and charging withdraws it | 18 |
 | Background portal: asked at first run and when turned on, denial turns the switch off with the hint, hold guard, status line | 19, 20 |
 | window wiring (`WindowPort`): one window, latest snapshot, background state, close behaviour | 21 |
-| runs windowless with `--gapplication-service`; `Activate` opens the window; `app.quit` ends the process | 22 |
+| runs windowless with `--gapplication-service` (the Run in Background hold is what keeps it alive); `Activate` opens the window; `app.quit` ends the process | 22 |
 | CI runs the app tests (display, dbus-daemon) | 23 |
 | `docs/architecture/app.md` (sub-project rule, design §5) | 24 |
 
@@ -160,7 +163,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 14 | The contract test compares canonical member lists (each `property`, `method`, `arg`, `signal` tag with its attributes sorted) of the live `Introspect` reply and of the XML file | GDBus regenerates the XML with its own attribute order, and gio-rs exposes no accessors for interface members |
 | 15 | D-Bus, notification, portal, window and service tests live in one `harness = false` binary, `crates/app/tests/session_bus/`, which re-executes itself with `GSETTINGS_SCHEMA_DIR`, `GSETTINGS_BACKEND=memory`, `XDG_DATA_HOME` and then brings up one `gio::TestDBus` | `std::env::set_var` is `unsafe` in Rust 2024; GLib's session-bus singleton cannot be torn down between libtest threads |
 | 16 | The fake portal and the fake notification server are Rust gio services on the test bus instead of python-dbusmock; the notification fake is `org.gtk.Notifications`, which `GNotification` uses outside Flatpak (inside Flatpak GLib picks the portal by itself) | no Python files or pip dependency; the test still exercises `ashpd` and `send_notification` end to end |
-| 17 | Background: "first run" is `background-requested` = false; a portal error or a non-zero response counts as a denial; turning Run in Background off only releases the hold (no portal call, the autostart entry stays; an autostarted service with the switch off exits on GApplication's service timeout). Status line: "Headset connected, {percent}" while the dongle is present with a connected reading, else "No headset", sent only when the text changes | design §2 and ui §4 describe only the grant and denial paths |
+| 17 | Background: "first run" is `background-requested` = false; a portal error or a non-zero response counts as a denial; turning Run in Background off only releases the hold (no portal call, the autostart entry stays; an autostarted service with the switch off holds nothing, so GApplication leaves `run` right after start-up: a service has no grace period of its own once its use count is zero). Status line: "Headset connected, {percent}" while the dongle is present with a connected reading, else "No headset", sent only when the text changes | design §2 and ui §4 describe only the grant and denial paths |
 | 18 | Quit: `app.quit` (Ctrl+Q, and GNOME's background-apps "Quit", which activates the `quit` action over D-Bus) submits `Input::Quitting`; `ReadyToQuit` calls `gio::Application::quit`, which also ends the hold. Closing the window while Run in Background is off hides it and quits through the same path; with it on, the window closes and the hold keeps the process | design §3.2 says `ReadyToQuit` "drops the hold guard"; quitting has to work whether or not the switch is on, and the route preset must be restored on every orderly exit |
 | 19 | `app.show-battery` presents the window and activates `win.show-page` with target `battery` (SP9 Deviation 8, SP12 Deviation 13) | the battery page is SP12's; until it is on `main` the action only presents the window |
 | 20 | The runtime (persisted state, bridge, views, threads) is created lazily by `dbus_register` or `startup`, whichever runs first | `dbus_register` runs before `startup` and must export `Headset1` with a real snapshot; without a session bus only `startup` runs |
@@ -170,6 +173,8 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 24 | The end-to-end test steps the virtual clock by 10 ms and asserts, per stage, the published phases, the exact wire ids, the exact content of the key actions, and that no other action kind appears | the full action list depends on how many snapshots differ, which is not part of the contract |
 | 25 | `main` no longer calls `arctis_audio::init()` | `AudioHandle::spawn` already calls it |
 | 26 | `ashpd` with `default-features = false, features = ["async-io", "background"]` | design §2 "no tokio" |
+| 27 | `Intent::SetRunInBackground` is routed by the pure `runtime::destination` to `BackgroundController`; every other intent goes to `Companion` | `Companion` ignores that intent (SP6), so the routing is the only thing making the preferences switch work; a pure function gets a table test instead of a GTK walk |
+| 28 | `shutdown` unexports `Headset1` before dropping the runtime | GApplication runs `dbus_unregister` after `shutdown`, when the runtime is already gone |
 
 ---
 
@@ -203,7 +208,7 @@ use arctis_core::messages::audio::{
     AppIdentifiers, AudioEvent, DefaultSink, SinkKind, SoundPath, StreamInfo,
 };
 use arctis_core::messages::device::{Change, DeviceUpdate, Phase, SyncPolicy};
-use arctis_core::protocol::{Command, Query, encode};
+use arctis_core::protocol::{Command, Frame, Query, encode};
 use arctis_core::session::timing::ENUMERATION_SETTLE;
 use arctis_core::testkit::snapshots::{percent, values};
 use arctis_core::testkit::{FakeHeadset, Flap, Simulation};
@@ -217,6 +222,7 @@ const CONNECTED: u64 = ENUMERATION_SETTLE + 2_000;
 struct Stage {
     actions: Vec<Action>,
     wire: Vec<u8>,
+    frames: Vec<Frame>,
     phases: Vec<Phase>,
 }
 
@@ -293,6 +299,7 @@ impl EndToEnd {
         let stage = Stage {
             actions: mem::take(&mut self.actions),
             wire: self.simulation.sent_ids(),
+            frames: self.simulation.writes().iter().map(|(_, frame)| frame.clone()).collect(),
             phases: self.simulation.published_phases(),
         };
         self.simulation.clear_logs();
@@ -348,6 +355,10 @@ fn dongle_sink() -> DefaultSink {
 
 fn equalizer_id() -> u8 {
     encode(&Command::SetEqualizer(curve("flat"))).payload()[0]
+}
+
+fn equalizer_frame(preset: &str) -> Frame {
+    encode(&Command::SetEqualizer(curve(preset)))
 }
 
 fn connect_reads() -> Vec<u8> {
@@ -440,16 +451,20 @@ fn connect(run: &mut EndToEnd) -> HeadsetValues {
         [Phase::Settling, Phase::Probing, Phase::Syncing, Phase::Ready]
     );
     assert_eq!(connect.wire, connect_reads());
-    let sent = policies(&connect.actions);
+    assert_adopted(&connect.actions, factory);
+    assert_eq!(run.companion.snapshot().dongle.adoption, AdoptionStatus::Adopted);
+    factory
+}
+
+fn assert_adopted(actions: &[Action], factory: HeadsetValues) {
+    let sent = policies(actions);
     assert_eq!(sent.first(), Some(&SyncPolicy::Adopt));
     assert_eq!(sent.last(), Some(&SyncPolicy::Enforce));
     let identity = DongleIdentity::new(NOVA_5, None);
-    assert!(connect.actions.contains(&Action::Persist(PersistedChange::AdoptedIdentity(identity))));
-    assert!(connect.actions.contains(&Action::Persist(PersistedChange::Headset(factory))));
-    assert_eq!(battery_percents(&connect.actions), [37]);
-    assert_only(&connect.actions, &["Persist", "SendDevice", "RecordBattery", "Publish"]);
-    assert_eq!(run.companion.snapshot().dongle.adoption, AdoptionStatus::Adopted);
-    factory
+    assert!(actions.contains(&Action::Persist(PersistedChange::AdoptedIdentity(identity))));
+    assert!(actions.contains(&Action::Persist(PersistedChange::Headset(factory))));
+    assert_eq!(battery_percents(actions), [37]);
+    assert_only(actions, &["Persist", "SendDevice", "RecordBattery", "Publish"]);
 }
 
 fn set_route_preset(run: &mut EndToEnd) {
@@ -458,6 +473,7 @@ fn set_route_preset(run: &mut EndToEnd) {
         run.run_for(1_000);
     });
     assert_eq!(set.wire, [equalizer_id(), Query::Audio.id()]);
+    assert_eq!(set.frames.first(), Some(&equalizer_frame("bass-boost")));
     assert_eq!(curves(&set.actions), [curve("bass-boost")]);
     let persisted = PersistedChange::RoutePreset(SoundPath::Dongle, id("bass-boost"));
     assert!(set.actions.contains(&Action::Persist(persisted)));
@@ -472,6 +488,7 @@ fn switch_for_a_ruled_app(run: &mut EndToEnd) {
         run.run_for(1_500);
     });
     assert_eq!(switch.wire, [equalizer_id(), Query::Audio.id()]);
+    assert_eq!(switch.frames.first(), Some(&equalizer_frame("footsteps")));
     assert_eq!(curves(&switch.actions), [curve("footsteps")]);
     assert!(kinds(&switch.actions).is_superset(&BTreeSet::from(["WakeAt", "RecordSeenApp"])));
     assert_only(&switch.actions, &["WakeAt", "RecordSeenApp", "SendDevice", "Publish"]);
@@ -548,8 +565,9 @@ fn connect_adopt_set_switch_warn_flap_and_reconnect() {
 
 - [ ] **Step 2: Run it**
 
-Run: `cargo test -p arctis-core --test end_to_end`
-Expected: PASS, 1 test. The reducers already exist, so this test is the acceptance check of their contract. If an
+Run: `cargo test -p arctis-core --test end_to_end && cargo clippy -p arctis-core --all-targets -- -D warnings`
+Expected: PASS, 1 test, clippy clean (checked by the plan review on top of `99f8274`; `connect` is split into
+`connect` and `assert_adopted` because one function held cognitive complexity 9). The reducers already exist, so this test is the acceptance check of their contract. If an
 assertion fails, compare the actual value with the spec (device §2 for phases and wire, audio §4 for the switch,
 audio §5 for alerts) before touching anything: a difference that contradicts the spec is a bug in SP4 or SP6 to
 report with this test, not an expectation to edit. Only a value the spec leaves open (for example a published
@@ -875,7 +893,7 @@ fn an_unreadable_identity_means_never_adopted() {
 }
 ```
 
-`ToVariant` comes from `gtk::glib::prelude::*`; add `use gtk::glib::prelude::*;` if the gio prelude does not bring it.
+`ToVariant` comes through `gtk::gio::prelude::*`, which re-exports glib's prelude.
 
 - [ ] **Step 2: Run them to see them fail**
 
@@ -918,7 +936,6 @@ use arctis_core::settings::values::{AutoPowerOff, MuteLight, WirelessMode};
 use gtk::gio;
 use gtk::gio::prelude::*;
 use gtk::glib;
-use gtk::glib::prelude::*;
 
 pub const MIC_VOLUME: &str = "mic-volume";
 pub const SIDETONE: &str = "sidetone";
@@ -1135,40 +1152,44 @@ fn headset_values() -> HeadsetValues {
     }
 }
 
+fn assert_round_trip(change: &PersistedChange, apply: impl FnOnce(&mut AppSettings)) {
+    let mut expected = defaults();
+    apply(&mut expected);
+    assert_eq!(persisted_then_loaded(change), expected, "{change:?}");
+}
+
 #[test]
-fn every_persisted_change_round_trips() {
+fn headset_and_route_changes_round_trip() {
+    assert_round_trip(&PersistedChange::Headset(headset_values()), |s| {
+        s.headset = headset_values();
+    });
+    let bass = PresetId::new("bass-boost");
+    assert_round_trip(&PersistedChange::RoutePreset(SoundPath::Dongle, bass.clone()), |s| {
+        s.route_presets.dongle = bass;
+    });
+    let podcast = PresetId::new("podcast");
+    assert_round_trip(&PersistedChange::RoutePreset(SoundPath::Bluetooth, podcast.clone()), |s| {
+        s.route_presets.bluetooth = podcast;
+    });
+}
+
+#[test]
+fn app_and_dongle_changes_round_trip() {
+    let rule = PersistedChange::AppRule {
+        identifier: "firefox".to_owned(),
+        preset: Some(PresetId::new("footsteps")),
+    };
+    assert_round_trip(&rule, |s| s.app_rules.set("firefox".to_owned(), PresetId::new("footsteps")));
+    assert_round_trip(&PersistedChange::AutomaticPresets(false), |s| s.automatic_presets = false);
     let identity = DongleIdentity::new(0x2232, Some("ABC"));
+    assert_round_trip(&PersistedChange::AdoptedIdentity(identity.clone()), |s| {
+        s.adopted_identity = Some(identity);
+    });
+    assert_round_trip(&PersistedChange::BluetoothSinkSeen, |s| s.bluetooth_sink_seen = true);
     let threshold = Percent::try_from(20).expect("percent");
-    let cases: Vec<(PersistedChange, Box<dyn Fn(&mut AppSettings)>)> = vec![
-        (PersistedChange::Headset(headset_values()), Box::new(|s| s.headset = headset_values())),
-        (
-            PersistedChange::RoutePreset(SoundPath::Dongle, PresetId::new("bass-boost")),
-            Box::new(|s| s.route_presets.dongle = PresetId::new("bass-boost")),
-        ),
-        (
-            PersistedChange::RoutePreset(SoundPath::Bluetooth, PresetId::new("podcast")),
-            Box::new(|s| s.route_presets.bluetooth = PresetId::new("podcast")),
-        ),
-        (
-            PersistedChange::AppRule { identifier: "firefox".to_owned(), preset: Some(PresetId::new("footsteps")) },
-            Box::new(|s| s.app_rules.set("firefox".to_owned(), PresetId::new("footsteps"))),
-        ),
-        (PersistedChange::AutomaticPresets(false), Box::new(|s| s.automatic_presets = false)),
-        (
-            PersistedChange::AdoptedIdentity(identity.clone()),
-            Box::new(move |s| s.adopted_identity = Some(identity.clone())),
-        ),
-        (PersistedChange::BluetoothSinkSeen, Box::new(|s| s.bluetooth_sink_seen = true)),
-        (
-            PersistedChange::LowBatteryThreshold(threshold),
-            Box::new(move |s| s.low_battery_threshold = threshold),
-        ),
-    ];
-    for (change, apply) in cases {
-        let mut expected = defaults();
-        apply(&mut expected);
-        assert_eq!(persisted_then_loaded(&change), expected, "{change:?}");
-    }
+    assert_round_trip(&PersistedChange::LowBatteryThreshold(threshold), |s| {
+        s.low_battery_threshold = threshold;
+    });
 }
 
 #[test]
@@ -1254,7 +1275,7 @@ impl SettingsStore for GSettingsStore {
 
 - [ ] **Step 5: Run the tests**
 
-Run (display): `cargo test -p arctis-app --test settings_store` → PASS, 7 tests.
+Run (display): `cargo test -p arctis-app --test settings_store` → PASS, 8 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -1371,6 +1392,7 @@ impl Drop for SettingsWatch {
 }
 
 impl GSettingsStore {
+    #[must_use]
     pub fn watch(&self, on_change: impl Fn(AppSettings) + 'static) -> SettingsWatch {
         let pending = Rc::new(Cell::new(false));
         let store = self.clone();
@@ -1399,7 +1421,7 @@ the watch before any change, and the runtime keeps its watch for its whole life.
 
 - [ ] **Step 4: Run the tests**
 
-Run (display): `cargo test -p arctis-app --test settings_store` → PASS, 10 tests.
+Run (display): `cargo test -p arctis-app --test settings_store` → PASS, 11 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -3011,10 +3033,12 @@ use arctis_core::messages::device::DeviceUpdate;
 use gtk::glib;
 
 impl Bridge {
+    #[must_use]
     pub fn pump_device(&self, updates: async_channel::Receiver<DeviceUpdate>) -> glib::JoinHandle<()> {
         self.pump(updates, Input::Device)
     }
 
+    #[must_use]
     pub fn pump_audio(&self, events: async_channel::Receiver<AudioEvent>) -> glib::JoinHandle<()> {
         self.pump(events, Input::Audio)
     }
@@ -3880,10 +3904,10 @@ impl HeadsetObject {
     }
 
     pub fn unregister(&self) {
-        if let Some(id) = self.registration.take() {
-            if let Err(error) = self.connection.unregister_object(id) {
-                warn(&format!("Headset1 was not unregistered: {error}"));
-            }
+        if let Some(id) = self.registration.take()
+            && let Err(error) = self.connection.unregister_object(id)
+        {
+            warn(&format!("Headset1 was not unregistered: {error}"));
         }
     }
 
@@ -4041,7 +4065,7 @@ pub fn property(connection: &gio::DBusConnection, name: &str, property: &str) ->
 }
 ```
 
-(`ToVariant` needs `use gtk::glib::prelude::*;` in `bus.rs`.)
+(`ToVariant` already comes through `bus.rs`'s `gtk::gio::prelude::*`, which re-exports glib's prelude.)
 
 Append to `crates/app/tests/session_bus/fixtures.rs`:
 
@@ -4077,7 +4101,6 @@ use arctis_core::messages::device::Phase;
 use arctis_core::testkit::snapshots::{id, percent, with};
 use gtk::gio;
 use gtk::glib;
-use gtk::glib::prelude::*;
 
 use crate::bus::{property, settle, wait_until};
 use crate::fixtures::{Intents, recorder};
@@ -4443,30 +4466,53 @@ use crate::notification_service::{NotificationService, Shown};
 
 const TEST_APP_ID: &str = "io.github.marcelogm.ArctisCompanion.NotificationTest";
 
-pub fn low_battery_is_notified_then_withdrawn(bus: &Bus) {
-    let service = NotificationService::start(bus);
+fn registered_application() -> gio::Application {
     let application = gio::Application::new(Some(TEST_APP_ID), gio::ApplicationFlags::empty());
     application.register(None::<&gio::Cancellable>).expect("registered");
-    let bridge = quiet_bridge(Box::new(GioNotifier::new(application.clone())));
+    application
+}
+
+fn added(id: &str, title: &str) -> Shown {
+    Shown::Added {
+        id: id.to_owned(),
+        title: title.to_owned(),
+        default_action: "app.show-battery".to_owned(),
+    }
+}
+
+fn removed(id: &str) -> Shown {
+    Shown::Removed(id.to_owned())
+}
+
+fn shown_after(service: &NotificationService, what: &str, count: usize) -> Vec<Shown> {
+    wait_until(what, || service.shown().len() == count);
+    service.shown()
+}
+
+pub fn battery_alerts_are_notified_then_withdrawn(bus: &Bus) {
+    let service = NotificationService::start(bus);
+    let bridge = quiet_bridge(Box::new(GioNotifier::new(registered_application())));
     bridge.submit(status(14, Charging::Discharging));
-    wait_until("the low-battery notification", || service.shown().len() == 1);
+    let shown = shown_after(&service, "the low-battery notification", 1);
+    assert_eq!(shown, [added("low-battery", "Headset Battery Low")]);
+    bridge.submit(status(4, Charging::Discharging));
+    let shown = shown_after(&service, "the critical notification", 3);
     assert_eq!(
-        service.shown()[0],
-        Shown::Added {
-            id: "low-battery".to_owned(),
-            title: "Headset Battery Low".to_owned(),
-            default_action: "app.show-battery".to_owned(),
-        }
+        shown[1..],
+        [removed("low-battery"), added("critical-battery", "Headset Battery Critical")]
     );
-    bridge.submit(status(14, Charging::Charging));
-    wait_until("the withdrawal", || service.shown().len() == 2);
-    assert_eq!(service.shown()[1], Shown::Removed("low-battery".to_owned()));
+    bridge.submit(status(4, Charging::Charging));
+    let shown = shown_after(&service, "the withdrawal", 4);
+    assert_eq!(shown[3], removed("critical-battery"));
     service.stop();
 }
 ```
 
 Add `mod notification_service;` and `mod notifications;` to `main.rs` and the scenario
-`("low battery is notified then withdrawn", notifications::low_battery_is_notified_then_withdrawn)` to `SCENARIOS`.
+`("battery alerts are notified then withdrawn", notifications::battery_alerts_are_notified_then_withdrawn)` to
+`SCENARIOS`. The script follows `core::companion::alerts`: 14 % fires `low-battery`; 4 % (at or below
+`CRITICAL_BATTERY`) withdraws it and fires `critical-battery`; charging withdraws `critical-battery`. Both
+notification ids and the default action are therefore checked on the wire.
 
 - [ ] **Step 4: Run it to see it fail**
 
@@ -4903,7 +4949,6 @@ use std::rc::Rc;
 use gtk::gio;
 use gtk::gio::prelude::*;
 use gtk::glib;
-use gtk::glib::prelude::*;
 
 use crate::bus::{Bus, wait_until};
 
@@ -5180,6 +5225,7 @@ use arctis_app::ports::SnapshotView;
 use arctis_app::window_slot::WindowSlot;
 use arctis_core::testkit::snapshots::snapshot;
 use arctis_core::view::preferences::Background;
+use arctis_ui::Window;
 use gtk::gio;
 use gtk::glib;
 
@@ -5196,36 +5242,57 @@ fn application() -> adw::Application {
     application
 }
 
+fn closing_decision(keep_running: &Rc<Cell<bool>>) -> Rc<dyn Fn() -> glib::Propagation> {
+    let decision = Rc::clone(keep_running);
+    Rc::new(move || {
+        if decision.get() {
+            glib::Propagation::Proceed
+        } else {
+            glib::Propagation::Stop
+        }
+    })
+}
+
+fn close_and_settle(window: &Window) {
+    window.close();
+    settle();
+}
+
 pub fn presents_one_window_with_the_latest_state(_bus: &Bus) {
     let application = application();
     let intents = Intents::default();
-    let keep_running = Rc::new(Cell::new(true));
-    let decision = Rc::clone(&keep_running);
-    let slot = WindowSlot::new(
-        Rc::new(recorder(&intents)),
-        Rc::new(move || if decision.get() { glib::Propagation::Proceed } else { glib::Propagation::Stop }),
-    );
+    let keep_running = Rc::new(Cell::new(false));
+    let slot = WindowSlot::new(Rc::new(recorder(&intents)), closing_decision(&keep_running));
     slot.publish(&Rc::new(snapshot()));
     slot.show_background(Background::Denied);
     slot.present(&application);
     slot.present(&application);
     assert_eq!(application.windows().len(), 1, "one window");
     let window = slot.window().expect("a window");
-    keep_running.set(false);
-    window.close();
-    settle();
-    assert!(!window.is_visible(), "quitting hides the window");
-    assert!(slot.window().is_some(), "and keeps it until the quit ends");
+    hides_then_reuses(&slot, &application, &window);
     keep_running.set(true);
-    window.close();
-    settle();
+    close_and_settle(&window);
     assert!(slot.window().is_none(), "closing with Run in Background on forgets the window");
     assert!(intents.borrow().is_empty(), "rendering emits no intent");
+}
+
+fn hides_then_reuses(slot: &Rc<WindowSlot>, application: &adw::Application, window: &Window) {
+    close_and_settle(window);
+    assert!(!window.is_visible(), "quitting hides the window");
+    assert!(slot.window().is_some(), "and keeps it until the quit ends");
+    slot.present(application);
+    assert!(window.is_visible(), "presenting again shows the kept window");
+    assert_eq!(application.windows().len(), 1, "still one window");
 }
 ```
 
 Add `mod window;` to `main.rs` and the scenario
 `("the window slot presents one window", window::presents_one_window_with_the_latest_state)` to `SCENARIOS`.
+
+`register` emits `startup` on the primary instance, so the `GtkApplication` has its platform integration before
+`Window::new` adds a window to it. The window is presented again before the second `close`: that pins the reuse of a
+hidden window and keeps the second `close` from depending on whether GTK keeps a hidden toplevel realized
+(`gtk_window_close` does nothing on an unrealized window).
 
 - [ ] **Step 2: Run it to see it fail**
 
@@ -5489,10 +5556,32 @@ git push
 **Files:**
 - Create: `crates/app/src/runtime.rs`
 - Rewrite: `crates/app/src/application.rs`, `crates/app/src/main.rs`; modify `crates/app/src/lib.rs`
-- Modify: `crates/app/tests/application.rs`
+- Modify: `crates/app/tests/application.rs`, `crates/app/tests/background.rs`
 - Create: `crates/app/tests/session_bus/service.rs`; modify `crates/app/tests/session_bus/{main,fixtures}.rs`
 
-- [ ] **Step 1: Write the failing scenario**
+- [ ] **Step 1: Write the failing tests**
+
+The window's Run in Background switch emits `Intent::SetRunInBackground`, which `Companion` ignores; only the
+runtime can route it to `BackgroundController`. That routing is a pure function so it gets a table test. Append to
+`crates/app/tests/background.rs` (merge the imports):
+
+```rust
+use arctis_app::runtime::{Destination, destination};
+use arctis_core::companion::Input;
+use arctis_core::intent::Intent;
+
+#[test]
+fn the_run_in_background_switch_goes_to_the_controller() {
+    assert_eq!(
+        destination(Intent::SetRunInBackground(false)),
+        Destination::Background(false)
+    );
+    assert_eq!(
+        destination(Intent::SetAutomaticPresets(false)),
+        Destination::Companion(Input::Intent(Intent::SetAutomaticPresets(false)))
+    );
+}
+```
 
 Append to `crates/app/tests/session_bus/fixtures.rs` (merge the imports):
 
@@ -5577,7 +5666,14 @@ async fn probe(application: application::CompanionApplication, client: gio::DBus
     client.call(Some(APP_ID), PATH, "org.freedesktop.Application", "ActivateAction", Some(&quit), None, gio::DBusCallFlags::NONE, CALL_TIMEOUT_MS, None::<&gio::Cancellable>, |_| {});
 }
 
+fn asked_for_background_before() {
+    let settings = gio::Settings::new(APP_ID);
+    settings.set_boolean("background-requested", true).expect("background-requested");
+    gio::Settings::sync();
+}
+
 pub fn runs_windowless_as_a_service(bus: &Bus) {
+    asked_for_background_before();
     let application = application::build(silent_threads);
     let probed = Rc::new(Cell::new(false));
     glib::spawn_future_local(probe(application.clone(), bus.client(), Rc::clone(&probed)));
@@ -5590,13 +5686,24 @@ pub fn runs_windowless_as_a_service(bus: &Bus) {
 A panic inside `probe` aborts the child process, which the parent reports as a failed run; the message is
 printed before the abort.
 
+`asked_for_background_before` is required, not cosmetic. A `--gapplication-service` GApplication has no grace
+period of its own: it leaves `run` as soon as its use count drops to zero (checked during the plan review with a
+`Gio.Application` under `dbus-run-session`: release at 0.1 s, exit at 0.1 s). The only thing keeping this windowless
+service alive is the `AppHold` taken by `BackgroundController::start` (`run-in-background` defaults to on). With
+`background-requested` still false, `start` would ask the Background portal, which no longer has an owner on the
+test bus after the portal scenario stopped it; the denial would release the hold within milliseconds and the
+service would exit before `probe` runs, leaving `probed` false. With the flag set, the scenario also proves that the
+hold keeps a windowless service running. `GSETTINGS_BACKEND=memory` makes every `gio::Settings` of the child share
+one in-memory store, so the runtime's own `gio::Settings` sees the value.
+
 Add `mod service;` to `main.rs` and append the scenario last (it owns `APP_ID` on the bus and quits the process's
 only `adw::Application`): `("runs windowless as a service", service::runs_windowless_as_a_service)`.
 
 - [ ] **Step 2: Run it to see it fail**
 
-Run (display): `cargo test -p arctis-app --test session_bus`
-Expected: FAIL to compile, `application::build` takes no argument and `CompanionApplication` does not exist.
+Run (display): `cargo test -p arctis-app --test session_bus --test background`
+Expected: FAIL to compile, `application::build` takes no argument, `CompanionApplication` and `arctis_app::runtime`
+do not exist.
 
 - [ ] **Step 3: Write the runtime**
 
@@ -5627,6 +5734,20 @@ use crate::threads::Threads;
 use crate::window_slot::WindowSlot;
 
 const BATTERY_PAGE: &str = "battery";
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum Destination {
+    Background(bool),
+    Companion(Input),
+}
+
+#[must_use]
+pub fn destination(intent: Intent) -> Destination {
+    match intent {
+        Intent::SetRunInBackground(on) => Destination::Background(on),
+        other => Destination::Companion(Input::Intent(other)),
+    }
+}
 
 pub struct Runtime {
     bridge: Rc<Bridge>,
@@ -5695,9 +5816,9 @@ impl Runtime {
     }
 
     fn deliver(&self, intent: Intent) {
-        match intent {
-            Intent::SetRunInBackground(on) => self.background.set_enabled(on),
-            other => self.bridge.submit(Input::Intent(other)),
+        match destination(intent) {
+            Destination::Background(on) => self.background.set_enabled(on),
+            Destination::Companion(input) => self.bridge.submit(input),
         }
     }
 
@@ -5852,7 +5973,9 @@ mod imp {
         }
 
         fn shutdown(&self) {
-            self.runtime.replace(None);
+            if let Some(runtime) = self.runtime.take() {
+                runtime.unexport();
+            }
             self.parent_shutdown();
         }
     }
@@ -5938,6 +6061,11 @@ pub fn run() -> glib::ExitCode {
 `runtime()` borrows `imp.runtime` only briefly: `Runtime::start` never calls back into the application, so no
 borrow is held across it.
 
+GApplication calls `dbus_unregister` after `shutdown`, so `shutdown` unexports `Headset1` itself before it drops the
+runtime; otherwise the registration would outlive its object until the connection closes. Dropping the runtime drops
+the bridge's ports, and the `DeviceHandle` and `AudioHandle` drops join their threads (the audio thread restores the
+default sink before it exits, audio §2 "Removal ... on quit").
+
 `crates/app/src/main.rs`:
 
 ```rust
@@ -5987,7 +6115,8 @@ Building never calls the factory, so no thread starts.
 
 - [ ] **Step 6: Run everything**
 
-Run (display): `cargo test -p arctis-app` → every binary passes; `session_bus` prints "9 scenarios passed".
+Run (display): `cargo test -p arctis-app` → every binary passes; `background` runs 8 tests; `session_bus` prints
+"9 scenarios passed".
 Run: `cargo clippy --workspace --all-targets -- -D warnings` → clean.
 
 - [ ] **Step 7: Commit**
@@ -6076,7 +6205,7 @@ flowchart LR
 | Concern | Code |
 |---|---|
 | Application and its actions | `crates/app/src/application.rs::CompanionApplication`, `crates/app/src/application.rs::build`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::install_actions` |
-| Wiring | `crates/app/src/runtime.rs::Runtime`, `crates/app/src/runtime.rs::assemble`, `crates/app/src/runtime.rs::deliver`, `crates/app/src/runtime.rs::closing` |
+| Wiring | `crates/app/src/runtime.rs::Runtime`, `crates/app/src/runtime.rs::assemble`, `crates/app/src/runtime.rs::deliver`, `crates/app/src/runtime.rs::destination`, `crates/app/src/runtime.rs::closing` |
 | One input at a time, one port per action | `crates/app/src/bridge.rs::Bridge`, `crates/app/src/bridge.rs::submit`, `crates/app/src/bridge.rs::perform`, `crates/app/src/bridge.rs::attach` |
 | Ports | `crates/app/src/ports.rs::Ports`, `crates/app/src/ports.rs::Stores`, `crates/app/src/ports.rs::SnapshotView`, `crates/app/src/ports.rs::SettingsStore`, `crates/app/src/ports.rs::DevicePort`, `crates/app/src/ports.rs::AudioPort`, `crates/app/src/ports.rs::Notifier`, `crates/app/src/ports.rs::Alarm`, `crates/app/src/ports.rs::Clock`, `crates/app/src/ports.rs::Lifetime` |
 | Channels from the threads | `crates/app/src/threads.rs::Threads`, `crates/app/src/bridge.rs::pump_device`, `crates/app/src/bridge.rs::pump_audio` |
@@ -6214,7 +6343,7 @@ sequenceDiagram
 | `crates/app/tests/settings_store.rs` | schema keys; load, persist and watch over a memory backend |
 | `crates/app/tests/stores.rs` | the `core::ports` contract suite on tempdirs; file specifics; start-up loading |
 | `crates/app/tests/dbus_properties.rs` | `Headset1` names and values |
-| `crates/app/tests/background.rs` | Run in Background with fakes; the status line |
+| `crates/app/tests/background.rs` | Run in Background with fakes; the status line; the switch intent routed to the controller |
 | `crates/app/tests/session_bus/main.rs` | on a private `gio::TestDBus`: the contract, `PropertiesChanged`, `ActivatePreset`, notifications, the portal, the window slot, and the windowless service |
 ````
 
