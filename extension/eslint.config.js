@@ -16,6 +16,8 @@ const noComments = {
 
 const gjsGlobals = {
     ARGV: 'readonly',
+    TextDecoder: 'readonly',
+    console: 'readonly',
     imports: 'readonly',
     log: 'readonly',
     logError: 'readonly',
