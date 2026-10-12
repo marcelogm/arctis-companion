@@ -2,6 +2,8 @@ mod bus;
 mod fixtures;
 mod headset;
 mod introspection;
+mod notification_service;
+mod notifications;
 
 use std::env;
 use std::path::Path;
@@ -29,6 +31,10 @@ const SCENARIOS: &[Scenario] = &[
     (
         "AutomaticPresets is writable",
         headset::automatic_presets_is_writable,
+    ),
+    (
+        "battery alerts are notified then withdrawn",
+        notifications::battery_alerts_are_notified_then_withdrawn,
     ),
 ];
 
