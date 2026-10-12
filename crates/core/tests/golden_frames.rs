@@ -3,8 +3,10 @@ mod support;
 use std::fs;
 
 use arctis_core::eq::FilterKind;
+use arctis_core::protocol::command::{Command, encode};
 use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
-use support::{factory_flat, filter, golden, golden_dir};
+use arctis_core::settings::values::{MuteLight, WirelessMode};
+use support::{auto_off, factory_flat, filter, golden, golden_dir, mic, sidetone};
 
 const GOLDEN_NAMES: [&str; 39] = [
     "cmd_27_00.hex",
@@ -117,4 +119,50 @@ fn the_bluetooth_band_layout_is_the_factory_flat_curve() {
         decode_curve(&golden("reply_22_flat_headset_off.hex")),
         Ok(factory_flat())
     );
+}
+
+fn captured_setters() -> [(&'static str, Command); 11] {
+    [
+        ("cmd_27_00.hex", Command::SetVolumeLimiter(false)),
+        (
+            "cmd_35_00.hex",
+            Command::SetWirelessMode(WirelessMode::ExtendedRange),
+        ),
+        (
+            "cmd_35_01.hex",
+            Command::SetWirelessMode(WirelessMode::Standard),
+        ),
+        ("cmd_37_0e.hex", Command::SetMicVolume(mic(14))),
+        ("cmd_39_03.hex", Command::SetSidetone(sidetone(3))),
+        ("cmd_39_06.hex", Command::SetSidetone(sidetone(6))),
+        ("cmd_39_0a.hex", Command::SetSidetone(sidetone(10))),
+        ("cmd_a3_0f.hex", Command::SetAutoPowerOff(auto_off(15))),
+        ("cmd_ae_00.hex", Command::SetMuteLight(MuteLight::Off)),
+        ("cmd_ae_01.hex", Command::SetMuteLight(MuteLight::Low)),
+        ("cmd_ae_04.hex", Command::SetMuteLight(MuteLight::Medium)),
+    ]
+}
+
+#[test]
+fn every_captured_setter_encodes_to_its_golden_bytes() {
+    for (name, command) in captured_setters() {
+        assert_eq!(
+            encode(&command).payload(),
+            golden(name).as_slice(),
+            "{name}"
+        );
+    }
+}
+
+#[test]
+fn every_captured_curve_write_encodes_through_set_equalizer() {
+    for name in ["cmd_33_kinds.hex", "cmd_33_odd.hex"] {
+        let bytes = golden(name);
+        let curve = decode_curve(&bytes).expect("captured curve decodes");
+        assert_eq!(
+            encode(&Command::SetEqualizer(curve)).payload(),
+            bytes.as_slice(),
+            "{name}"
+        );
+    }
 }

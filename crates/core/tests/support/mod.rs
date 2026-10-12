@@ -2,6 +2,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use arctis_core::eq::{Curve, Filter, FilterKind};
+use arctis_core::settings::values::{AutoPowerOff, MicVolume, Sidetone};
 
 pub fn golden_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden")
@@ -26,4 +27,16 @@ pub fn factory_flat() -> Curve {
         .map(|&hz| filter(FilterKind::Peaking, hz, 0, 1410))
         .collect();
     Curve::new(filters).expect("ten filters")
+}
+
+pub fn mic(level: u8) -> MicVolume {
+    MicVolume::try_from(level).expect("mic volume")
+}
+
+pub fn sidetone(level: u8) -> Sidetone {
+    Sidetone::try_from(level).expect("sidetone")
+}
+
+pub fn auto_off(minutes: u8) -> AutoPowerOff {
+    AutoPowerOff::try_from(minutes).expect("auto power off choice")
 }
