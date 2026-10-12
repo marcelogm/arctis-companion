@@ -1,5 +1,6 @@
 use arctis_core::battery::sample::Reading;
 use arctis_core::companion::adoption::DongleIdentity;
+use arctis_core::companion::app_settings::PersistedChange;
 use arctis_core::companion::app_settings::{
     AppRules, AppSettings, HeadsetValues, Persisted, RoutePresets,
 };
@@ -9,6 +10,7 @@ use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
+use arctis_core::messages::device::{Change, SyncPolicy};
 use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::protocol::firmware::{Firmware, Version};
 use arctis_core::protocol::model::{Model, ModelLookup};
@@ -222,6 +224,28 @@ pub fn wakes(actions: &[Action]) -> Vec<Millis> {
         .iter()
         .filter_map(|action| match action {
             Action::WakeAt(at) => Some(*at),
+            _ => None,
+        })
+        .collect()
+}
+
+pub fn device_changes(actions: &[Action]) -> Vec<(HeadsetSettings, SyncPolicy)> {
+    actions
+        .iter()
+        .filter_map(|action| match action {
+            Action::SendDevice(Change::Desired { settings, policy }) => {
+                Some((settings.clone(), *policy))
+            }
+            _ => None,
+        })
+        .collect()
+}
+
+pub fn persisted_changes(actions: &[Action]) -> Vec<PersistedChange> {
+    actions
+        .iter()
+        .filter_map(|action| match action {
+            Action::Persist(change) => Some(change.clone()),
             _ => None,
         })
         .collect()

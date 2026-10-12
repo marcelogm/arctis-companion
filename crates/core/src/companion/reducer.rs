@@ -1,7 +1,10 @@
 use std::rc::Rc;
 
 use super::action::Action;
+use super::action::PresetChange;
 use super::adoption::AdoptionStatus;
+use super::adoption::adopt;
+use super::app_settings::PersistedChange;
 use super::app_settings::{AppSettings, Persisted};
 use super::battery_watch::BatteryWatch;
 use super::catalog::Catalog;
@@ -17,8 +20,10 @@ use crate::battery::sample::Reading;
 use crate::eq::curve::Curve;
 use crate::eq::preset::PresetId;
 use crate::messages::audio::SoundPath;
+use crate::messages::device::{Change, SyncPolicy};
 use crate::messages::device::{DeviceUpdate, Phase};
 use crate::settings::headset_settings::HeadsetSettings;
+use crate::settings::headset_settings::SettingChange;
 use crate::time::Millis;
 
 #[derive(Debug)]
@@ -55,6 +60,7 @@ impl Companion {
     pub fn handle(&mut self, input: Input, now: Millis) -> Vec<Action> {
         let mut out = Vec::new();
         self.dispatch(input, now, &mut out);
+        self.advance(&mut out);
         self.finish(&mut out);
         out
     }
@@ -76,6 +82,7 @@ impl Companion {
                 firmware,
             } => {
                 self.dongle.identify(model, uniq.as_deref(), firmware);
+                out.push(self.sync_policy());
             }
             DeviceUpdate::Observed(observed) => {
                 let desired = self.desired();
@@ -93,7 +100,7 @@ impl Companion {
                 };
                 self.battery_status(reading, now, out);
             }
-            DeviceUpdate::HeadsetChanged(change) => self.dongle.headset_changed(&change),
+            DeviceUpdate::HeadsetChanged(change) => self.headset_changed(&change, out),
             DeviceUpdate::WriteFailed(setting) => self.dongle.write_failed(setting),
         }
     }
@@ -155,5 +162,64 @@ impl Companion {
             self.published = Some(Rc::clone(&snapshot));
             out.push(Action::Publish(snapshot));
         }
+    }
+
+    fn advance(&mut self, out: &mut Vec<Action>) {
+        self.try_adopt(out);
+    }
+
+    pub(super) fn sync_policy(&self) -> Action {
+        let policy = if self.adoption() == AdoptionStatus::Adopted {
+            SyncPolicy::Enforce
+        } else {
+            SyncPolicy::Adopt
+        };
+        Action::SendDevice(Change::Desired {
+            settings: self.desired(),
+            policy,
+        })
+    }
+
+    fn headset_changed(&mut self, change: &SettingChange, out: &mut Vec<Action>) {
+        self.dongle.headset_changed(change);
+        if self.adoption() != AdoptionStatus::Adopted {
+            return;
+        }
+        self.settings.headset.apply(change);
+        out.push(Action::Persist(PersistedChange::Headset(
+            self.settings.headset,
+        )));
+    }
+
+    fn try_adopt(&mut self, out: &mut Vec<Action>) {
+        if self.adoption() != AdoptionStatus::NeverAdopted || !self.dongle.is_ready() {
+            return;
+        }
+        let (Some(identity), Some(observed)) =
+            (self.dongle.identity.clone(), self.dongle.observed.clone())
+        else {
+            return;
+        };
+        let adoption = adopt(&observed, &self.catalog);
+        self.settings.headset = adoption.values;
+        out.push(Action::Persist(PersistedChange::Headset(adoption.values)));
+        if let Some(preset) = adoption.new_preset {
+            self.catalog.save(preset.clone());
+            out.push(Action::StorePreset(PresetChange::Save(preset)));
+        }
+        self.adopt_route_preset(adoption.preset, out);
+        self.settings.adopted_identity = Some(identity.clone());
+        out.push(Action::Persist(PersistedChange::AdoptedIdentity(identity)));
+        out.push(self.sync_policy());
+    }
+
+    fn adopt_route_preset(&mut self, preset: PresetId, out: &mut Vec<Action>) {
+        self.settings.route_presets.dongle = preset.clone();
+        out.push(Action::Persist(PersistedChange::RoutePreset(
+            SoundPath::Dongle,
+            preset.clone(),
+        )));
+        self.engines
+            .record(SoundPath::Dongle, ActivePreset::route(preset), None);
     }
 }
