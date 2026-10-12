@@ -1,3 +1,5 @@
+use std::cell::Cell;
+use std::rc::Rc;
 use std::thread;
 use std::time::{Duration, Instant};
 
@@ -56,6 +58,20 @@ pub fn wait_until(what: &str, done: impl Fn() -> bool) {
         context.iteration(false);
         thread::sleep(Duration::from_millis(2));
     }
+}
+
+pub fn own_name(connection: &gio::DBusConnection, name: &str) -> gio::OwnerId {
+    let acquired = Rc::new(Cell::new(false));
+    let flag = Rc::clone(&acquired);
+    let owner = gio::bus_own_name_on_connection(
+        connection,
+        name,
+        gio::BusNameOwnerFlags::NONE,
+        move |_, _| flag.set(true),
+        |_, _| {},
+    );
+    wait_until(&format!("{name} to be owned"), || acquired.get());
+    owner
 }
 
 pub fn settle() {

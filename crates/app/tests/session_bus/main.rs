@@ -4,6 +4,8 @@ mod headset;
 mod introspection;
 mod notification_service;
 mod notifications;
+mod portal;
+mod portal_service;
 
 use std::env;
 use std::path::Path;
@@ -35,6 +37,14 @@ const SCENARIOS: &[Scenario] = &[
     (
         "battery alerts are notified then withdrawn",
         notifications::battery_alerts_are_notified_then_withdrawn,
+    ),
+    (
+        "the portal is absent",
+        portal::an_absent_portal_counts_as_denied,
+    ),
+    (
+        "the portal grants and denies",
+        portal::asks_for_background_with_autostart,
     ),
 ];
 
