@@ -1,9 +1,12 @@
+use arctis_core::battery::sample::Reading;
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
+use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::settings::values::Percent;
 use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
 
 pub fn sink(terminal: SinkKind, via_equalizer: bool, via_easy_effects: bool) -> DefaultSink {
@@ -57,4 +60,20 @@ pub fn observed_with(equalizer: Curve) -> HeadsetSettings {
 
 pub fn observed() -> HeadsetSettings {
     observed_with(curve_of("flat"))
+}
+
+pub fn percent(value: u8) -> Percent {
+    Percent::try_from(value).expect("percent")
+}
+
+pub fn reading(value: u8, charging: Charging, link: Link) -> Reading {
+    Reading {
+        percent: percent(value),
+        charging,
+        link,
+    }
+}
+
+pub fn discharging(value: u8) -> Reading {
+    reading(value, Charging::Discharging, Link::Connected)
 }
