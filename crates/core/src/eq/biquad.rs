@@ -182,6 +182,13 @@ impl Section {
         state.s2 = self.b2 * input - self.a2 * output;
         output
     }
+
+    #[must_use]
+    pub fn poles_inside_unit_circle(self) -> bool {
+        let a1 = f64::from(self.a1);
+        let a2 = f64::from(self.a2);
+        a2.abs() < 1.0 && a1.abs() < 1.0 + a2
+    }
 }
 
 impl From<Biquad> for Section {
