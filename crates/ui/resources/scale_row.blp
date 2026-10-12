@@ -1,0 +1,58 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisScaleRow: Adw.PreferencesRow {
+  activatable: false;
+
+  child: Box {
+    orientation: vertical;
+    spacing: 2;
+    margin-top: 8;
+    margin-bottom: 8;
+    margin-start: 12;
+    margin-end: 12;
+
+    Label title_label {
+      xalign: 0;
+      wrap: true;
+    }
+
+    Label subtitle_label {
+      name: "subtitle";
+      xalign: 0;
+      wrap: true;
+      visible: false;
+
+      styles [
+        "dim-label",
+        "caption",
+      ]
+    }
+
+    Box {
+      spacing: 6;
+
+      Image start_icon {
+        visible: false;
+      }
+
+      Scale scale {
+        hexpand: true;
+        digits: 0;
+        round-digits: 0;
+        draw-value: false;
+
+        adjustment: Adjustment {
+          lower: 0;
+          upper: 1;
+          step-increment: 1;
+          page-increment: 1;
+        };
+      }
+
+      Image end_icon {
+        visible: false;
+      }
+    }
+  };
+}
