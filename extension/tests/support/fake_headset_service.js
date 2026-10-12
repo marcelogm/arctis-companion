@@ -48,6 +48,8 @@ export class FakeHeadsetService {
     }
 
     async stop() {
+        if (this.#connection.is_closed())
+            return;
         Gio.bus_unown_name(this.#ownerId);
         this.#headset.unexport();
         this.#application.unexport();

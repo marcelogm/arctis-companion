@@ -9,6 +9,7 @@ run_headless() {
     gnome-shell --headless --wayland --no-x11 --virtual-monitor 1280x800 --wayland-display=arctis-smoke \
         > "$log" 2>&1 &
     shell=$!
+    trap 'kill "$fake_app" "$shell" 2>/dev/null; cat "$log"' EXIT
     timeout 30 sh -c "until gnome-extensions info $uuid | grep -q 'State: ACTIVE'; do sleep 0.5; done"
     sleep 2
     gnome-extensions disable "$uuid"
@@ -24,7 +25,7 @@ gsettings set org.gnome.shell disable-user-extensions false
 gsettings set org.gnome.shell enabled-extensions "['$uuid']"
 gjs -m tests/fake_app.js "$scenario" &
 fake_app=$!
-trap 'kill "$fake_app"' EXIT
+trap 'kill "$fake_app" 2>/dev/null; cat "$log"' EXIT
 if [ "$mode" = devkit ]; then run_devkit; else run_headless; fi
 if grep -n "JS ERROR\|JS WARNING\|Arctis Companion:" "$log"; then
     exit 1

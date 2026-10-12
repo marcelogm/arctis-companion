@@ -15,6 +15,10 @@ const SCENARIOS = {
 };
 
 const [scenario = 'connected'] = ARGV;
+if (!(scenario in SCENARIOS)) {
+    printerr(`unknown scenario ${scenario}; known: ${Object.keys(SCENARIOS).join(', ')}`);
+    imports.system.exit(2);
+}
 const loop = new GLib.MainLoop(null, false);
 FakeHeadsetService.start(connectedBag(SCENARIOS[scenario]))
     .then(() => print(`fake app serving scenario ${scenario}`))

@@ -3,17 +3,15 @@ import GObject from 'gi://GObject';
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
-import {QuickMenuToggle} from 'resource:///org/gnome/shell/ui/quickSettings.js';
+import {QuickMenuToggle, QuickToggle} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 import {reportFailure} from './failures.js';
-import {HIDDEN, automaticPresetsAfterClick} from './presentation.js';
-
-const HEADSET_ICON = 'audio-headset-symbolic';
+import {HEADSET_ICON, HIDDEN, automaticPresetsAfterClick} from './presentation.js';
 
 export const AppPresetsToggle = GObject.registerClass(
 class AppPresetsToggle extends QuickMenuToggle {
     _init(client) {
-        super._init({title: _('App Presets'), iconName: HEADSET_ICON, toggleMode: false, visible: false});
+        super._init({title: HIDDEN.title, iconName: HEADSET_ICON, toggleMode: false, visible: false});
         this._client = client;
         this._presentation = HIDDEN;
         this._presets = new PopupMenu.PopupMenuSection();
@@ -25,21 +23,36 @@ class AppPresetsToggle extends QuickMenuToggle {
 
     render(presentation) {
         this._presentation = presentation;
-        this.visible = presentation.visible;
         if (presentation.visible)
             this._renderVisible(presentation);
+        else
+            this._hide();
+    }
+
+    _hide() {
+        this.menu.close();
+        this.visible = false;
     }
 
     _renderVisible({title, subtitle, checked, sensitive, header, items}) {
+        this.visible = true;
         this.set({title, subtitle, checked});
-        this._switchButton().reactive = sensitive;
+        this._setPrimaryReactive(sensitive);
         this.menu.setHeader(header.icon, header.title, header.subtitle);
         this._presets.removeAll();
         items.forEach(item => this._presets.addMenuItem(this._presetItem(item)));
     }
 
-    _switchButton() {
-        return this.get_child().get_first_child();
+    _setPrimaryReactive(reactive) {
+        const button = this._primaryButton();
+        if (button === null)
+            reportFailure(new Error('quick toggle button not found'));
+        else
+            button.reactive = reactive;
+    }
+
+    _primaryButton() {
+        return this.get_child().get_children().find(child => child instanceof QuickToggle) ?? null;
     }
 
     _presetItem({id, label, checked, sensitive}) {

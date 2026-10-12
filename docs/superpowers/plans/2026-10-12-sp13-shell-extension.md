@@ -2210,8 +2210,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
    `lib/presentation.js` free of `resource:///` imports while every string still goes through the extension's
    gettext domain. Missing properties take `EMPTY_PROPERTIES`.
 4. **"Insensitive toggle" with no app rules** means the switch part: `QuickMenuToggle` binds its own `reactive`
-   only to the menu arrow (Shell 50.5 source), so the toggle sets `reactive` on its switch button (first child of
-   its box) and also ignores clicks while insensitive. The arrow keeps opening the menu so presets stay
+   only to the menu arrow (Shell 50.5 source), so the toggle sets `reactive` on its `QuickToggle` child (found by type, never by position; a miss is logged through `reportFailure` and the nested-shell `no-rules` run fails on that warning) and also ignores clicks while insensitive. The arrow keeps opening the menu so presets stay
    reachable from the Shell when no rule exists.
 5. **Panel icon names**: low → `battery-caution-symbolic`, critical → `battery-level-0-symbolic`, charging →
    `battery-level-N-charging-symbolic` with N the level in tens capped at 90 (Adwaita has no 100-charging icon),
@@ -2257,3 +2256,9 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     Task 13 compares the host's `org.gnome.shell` extension keys before and after. A probe run during plan review
     that set these variables only inside the private bus wrote `enabled-extensions` into the user's real dconf
     database through the bus-activated `dconf-service`.
+18. **Review round 1**: fixed the missing `diffutils` in the CI `extension` job, the toggle menu left open when hidden,
+    the positional switch-button lookup, the failing-smoke diagnostics (log printed, shell killed, session removed),
+    the silent unknown scenario, the duplicated icon and title, the source-grep and flag tests, the fake service
+    `stop()` idempotency, `reasonTemplate` and `canPick` readability, and the per-enable render guard. Nothing rejected.
+19. **Devkit visual check pending**: no person is at the machine; the Task 13 table is posted on the pull request
+    and SP14 carries it into its end-to-end checklist.

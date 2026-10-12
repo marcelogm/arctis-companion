@@ -15,4 +15,5 @@ fi
 cd "$extension_root"
 npm run --silent pack
 gnome-extensions install --force dist/arctis-companion@marcelogm.github.io.shell-extension.zip
-exec dbus-run-session -- sh tests/shell-session.sh "$mode" "$scenario" "$session/shell.log"
+trap 'rm -rf "$session" 2>/dev/null || true' EXIT
+dbus-run-session -- sh tests/shell-session.sh "$mode" "$scenario" "$session/shell.log"

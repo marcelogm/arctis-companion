@@ -88,7 +88,7 @@ jobs:
       run:
         working-directory: extension
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False nodejs npm gjs dbus-daemon gettext gnome-shell unzip
+      - run: dnf install -y --setopt=install_weak_deps=False nodejs npm gjs dbus-daemon gettext gnome-shell unzip diffutils
         working-directory: /
       - uses: actions/checkout@v4
       - run: npm ci
