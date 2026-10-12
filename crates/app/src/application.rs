@@ -1,18 +1,26 @@
 use adw::prelude::*;
 use arctis_ui::Window;
+use gtk::glib;
 
 pub const APP_ID: &str = "io.github.marcelogm.ArctisCompanion";
+const LOG_DOMAIN: &str = "arctis-companion";
 
 #[must_use]
 pub fn build() -> adw::Application {
     let application = adw::Application::builder().application_id(APP_ID).build();
-    application.connect_startup(|_| register_resources());
     application.connect_activate(present_window);
     application
 }
 
-fn register_resources() {
-    arctis_ui::register_resources().expect("bundled resources are valid");
+#[must_use]
+pub fn run() -> glib::ExitCode {
+    match arctis_ui::register_resources() {
+        Ok(()) => build().run(),
+        Err(error) => {
+            glib::g_critical!(LOG_DOMAIN, "bundled resources failed to register: {error}");
+            glib::ExitCode::FAILURE
+        }
+    }
 }
 
 fn present_window(application: &adw::Application) {
