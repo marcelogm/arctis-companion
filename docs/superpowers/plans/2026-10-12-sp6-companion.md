@@ -2849,7 +2849,7 @@ git push
 - Modify: `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/alerts.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod alerts;` to `crates/core/tests/companion/main.rs`.
 
@@ -2979,12 +2979,12 @@ fn alert_texts_name_the_level_and_the_percent() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion alerts`
 Expected: FAIL to compile (`companion::alerts` missing).
 
-- [ ] **Step 3: Implement `alerts`**
+- [x] **Step 3: Implement `alerts`**
 
 `crates/core/src/companion/alerts.rs`:
 
@@ -3139,12 +3139,12 @@ fn critical_alert(level: Percent) -> Alert {
 
 Add `pub mod alerts;` to `crates/core/src/companion/mod.rs`.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion alerts`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
