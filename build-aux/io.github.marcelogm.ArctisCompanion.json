@@ -1,0 +1,39 @@
+{
+  "id": "io.github.marcelogm.ArctisCompanion",
+  "runtime": "org.gnome.Platform",
+  "runtime-version": "50",
+  "sdk": "org.gnome.Sdk",
+  "sdk-extensions": [
+    "org.freedesktop.Sdk.Extension.rust-stable",
+    "org.freedesktop.Sdk.Extension.llvm22"
+  ],
+  "command": "arctis-companion",
+  "finish-args": [
+    "--share=ipc",
+    "--socket=wayland",
+    "--socket=fallback-x11",
+    "--device=dri"
+  ],
+  "build-options": {
+    "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm22/bin",
+    "prepend-ld-library-path": "/usr/lib/sdk/llvm22/lib",
+    "build-args": ["--share=network"],
+    "env": {
+      "CARGO_HOME": "/run/build/arctis-companion/cargo"
+    }
+  },
+  "modules": [
+    {
+      "name": "arctis-companion",
+      "buildsystem": "meson",
+      "run-tests": true,
+      "sources": [
+        {
+          "type": "dir",
+          "path": "..",
+          "skip": ["target", "_build", "build-dir", "repo", ".flatpak-builder", "extension/node_modules"]
+        }
+      ]
+    }
+  ]
+}
