@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use super::unescape;
+
 pub type Group = (Vec<String>, Vec<String>);
 
 pub struct Catalogue {
@@ -47,49 +49,58 @@ struct Entry {
     fuzzy: bool,
 }
 
+#[derive(Clone, Copy)]
+enum Field {
+    Msgid,
+    Msgstr,
+}
+
 impl Entry {
     fn parse(block: &str) -> Self {
         let mut entry = Self::default();
-        let mut target: Option<bool> = None;
+        let mut target: Option<Field> = None;
         for line in block.lines() {
             target = entry.take(line, target);
         }
         entry
     }
 
-    fn take(&mut self, line: &str, target: Option<bool>) -> Option<bool> {
+    fn take(&mut self, line: &str, target: Option<Field>) -> Option<Field> {
         if line.starts_with("#,") {
             self.fuzzy |= line.contains("fuzzy");
             return target;
         }
         if let Some(rest) = line.strip_prefix('"') {
-            self.append(target, &unquoted(rest));
+            self.append(target, &unescape(rest));
             return target;
         }
         let (keyword, value) = line.split_once(' ')?;
-        if keyword == "msgctxt" {
+        if keyword == "msgctxt" || !keyword.starts_with("msg") {
             return None;
         }
-        let is_msgstr = keyword.starts_with("msgstr");
-        let field = if is_msgstr {
-            &mut self.msgstrs
+        let field = if keyword.starts_with("msgstr") {
+            Field::Msgstr
         } else {
-            &mut self.msgids
+            Field::Msgid
         };
-        keyword.starts_with("msg").then(|| {
-            field.push(unquoted(value.trim_start_matches('"')));
-            is_msgstr
-        })
+        self.field(field)
+            .push(unescape(value.trim_start_matches('"')));
+        Some(field)
     }
 
-    fn append(&mut self, target: Option<bool>, text: &str) {
-        let field = match target {
-            Some(true) => &mut self.msgstrs,
-            Some(false) => &mut self.msgids,
-            None => return,
+    fn append(&mut self, target: Option<Field>, text: &str) {
+        let Some(field) = target else {
+            return;
         };
-        if let Some(last) = field.last_mut() {
+        if let Some(last) = self.field(field).last_mut() {
             last.push_str(text);
+        }
+    }
+
+    fn field(&mut self, field: Field) -> &mut Vec<String> {
+        match field {
+            Field::Msgid => &mut self.msgids,
+            Field::Msgstr => &mut self.msgstrs,
         }
     }
 
@@ -99,11 +110,4 @@ impl Entry {
             .map(|msgid| (msgid, self.msgstrs.clone()))
             .collect()
     }
-}
-
-fn unquoted(quoted: &str) -> String {
-    let body = quoted.strip_suffix('"').unwrap_or(quoted);
-    body.replace("\\n", "\n")
-        .replace("\\\"", "\"")
-        .replace("\\\\", "\\")
 }

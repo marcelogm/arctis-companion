@@ -34,6 +34,7 @@ msgid \"Low\"\nmsgstr \"Baixo\"\n\n\
 #, fuzzy\nmsgid \"High\"\nmsgstr \"Alto\"\n\n\
 msgid \"{n} minute\"\nmsgid_plural \"{n} minutes\"\nmsgstr[0] \"{n} minuto\"\nmsgstr[1] \"{n} minutos\"\n\n\
 msgid \"\"\n\"Long \"\n\"line\"\nmsgstr \"\"\n\"Linha \"\n\"longa\"\n\n\
+msgid \"Back\\\\nslash\"\nmsgstr \"Barra\\\\ninvertida\"\n\n\
 msgid \"Missing\"\nmsgstr \"\"\n";
 
 #[test]
@@ -65,9 +66,32 @@ fn the_po_reader_knows_translated_entries() {
     assert!(catalogue.is_translated("{n} minute"));
     assert!(catalogue.is_translated("{n} minutes"));
     assert!(catalogue.is_translated("Long line"));
+    assert!(catalogue.is_translated("Back\\nslash"));
     assert!(!catalogue.is_translated("High"));
     assert!(!catalogue.is_translated("Missing"));
     assert!(!catalogue.is_translated("Absent"));
+}
+
+fn unescape(quoted: &str) -> String {
+    let mut text = String::new();
+    let mut chars = quoted.chars();
+    while let Some(next) = chars.next() {
+        match next {
+            '"' => break,
+            '\\' => text.push(unescaped(chars.next())),
+            other => text.push(other),
+        }
+    }
+    text
+}
+
+const fn unescaped(escaped: Option<char>) -> char {
+    match escaped {
+        Some('n') => '\n',
+        Some('t') => '\t',
+        Some(other) => other,
+        None => '\\',
+    }
 }
 
 fn dump(value: &impl Debug) -> String {
