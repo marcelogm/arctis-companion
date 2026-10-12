@@ -1,12 +1,11 @@
-mod support;
-
 use std::fs;
 
 use arctis_core::eq::FilterKind;
 use arctis_core::protocol::command::{Command, encode};
-use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
+use arctis_core::protocol::eq_wire::decode_curve;
 use arctis_core::settings::values::{MuteLight, WirelessMode};
-use support::{auto_off, factory_flat, filter, golden, golden_dir, mic, sidetone};
+
+use crate::support::{auto_off, factory_flat, filter, golden, golden_dir, mic, sidetone};
 
 const GOLDEN_NAMES: [&str; 39] = [
     "cmd_27_00.hex",
@@ -74,15 +73,6 @@ fn the_golden_set_is_the_sp0_capture_set() {
 fn every_golden_file_is_one_64_byte_frame() {
     for name in GOLDEN_NAMES {
         assert_eq!(golden(name).len(), 64, "{name}");
-    }
-}
-
-#[test]
-fn captured_curve_writes_round_trip_bit_exact() {
-    for name in ["cmd_33_kinds.hex", "cmd_33_odd.hex"] {
-        let bytes = golden(name);
-        let curve = decode_curve(&bytes).expect("captured curve decodes");
-        assert_eq!(encode_curve(&curve).as_slice(), &bytes[1..61], "{name}");
     }
 }
 

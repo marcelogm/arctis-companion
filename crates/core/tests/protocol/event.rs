@@ -1,18 +1,16 @@
 use arctis_core::protocol::event::{DeviceEvent, decode_event};
 use arctis_core::protocol::status::{Charging, ChatMix, Link};
 use arctis_core::settings::headset_settings::SettingChange;
-use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone};
+use arctis_core::settings::values::MuteLight;
 use proptest::collection::vec;
 use proptest::prelude::*;
+
+use crate::support::{auto_off, mic, percent, sidetone};
 
 fn event(bytes: &[u8]) -> Option<DeviceEvent> {
     let mut frame = bytes.to_vec();
     frame.resize(64, 0);
     decode_event(&frame)
-}
-
-fn percent(value: u8) -> Percent {
-    Percent::try_from(value).expect("percent")
 }
 
 #[test]
@@ -39,22 +37,10 @@ fn setting_events_decode_to_setting_changes() {
     let cases = [
         ([0x27, 0], SettingChange::VolumeLimiter(false)),
         ([0x27, 1], SettingChange::VolumeLimiter(true)),
-        (
-            [0x37, 7],
-            SettingChange::MicVolume(MicVolume::try_from(7).expect("mic")),
-        ),
-        (
-            [0x39, 6],
-            SettingChange::Sidetone(Sidetone::try_from(6).expect("sidetone")),
-        ),
-        (
-            [0xA3, 15],
-            SettingChange::AutoPowerOff(AutoPowerOff::try_from(15).expect("choice")),
-        ),
-        (
-            [0xA3, 20],
-            SettingChange::AutoPowerOff(AutoPowerOff::try_from(15).expect("choice")),
-        ),
+        ([0x37, 7], SettingChange::MicVolume(mic(7))),
+        ([0x39, 6], SettingChange::Sidetone(sidetone(6))),
+        ([0xA3, 15], SettingChange::AutoPowerOff(auto_off(15))),
+        ([0xA3, 20], SettingChange::AutoPowerOff(auto_off(15))),
         ([0xAE, 4], SettingChange::MuteLight(MuteLight::Medium)),
     ];
     for (bytes, change) in cases {

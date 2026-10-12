@@ -1,16 +1,25 @@
 use super::command::Query;
-use super::eq_wire::decode_curve;
-use super::firmware::{FIRMWARE_LEN, Firmware, decode_firmware};
-use super::frame::{DecodeError, expect_frame, field, flag_field};
+use super::eq_wire::{BANDS_LEN, FIRST_BAND, decode_curve};
+use super::firmware::{Firmware, decode_firmware};
+use super::frame::{DecodeError, byte, expect_frame, field, flag_field};
 use super::status::Status;
 use crate::eq::Curve;
 use crate::settings::headset_settings::HeadsetSettings;
 use crate::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
 
-const STATUS_LEN: usize = 5;
-const AUDIO_LEN: usize = 64;
-const UX_LEN: usize = 3;
-const WIRELESS_LEN: usize = 2;
+const LINK_AT: usize = 1;
+const BATTERY_AT: usize = 3;
+const CHARGING_AT: usize = 4;
+const STATUS_LEN: usize = CHARGING_AT + 1;
+const MIC_VOLUME_AT: usize = FIRST_BAND + BANDS_LEN;
+const SIDETONE_AT: usize = MIC_VOLUME_AT + 1;
+const LIMITER_AT: usize = MIC_VOLUME_AT + 2;
+const AUDIO_LEN: usize = LIMITER_AT + 1;
+const AUTO_POWER_OFF_AT: usize = 1;
+const MUTE_LIGHT_AT: usize = 2;
+const UX_LEN: usize = MUTE_LIGHT_AT + 1;
+const WIRELESS_MODE_AT: usize = 1;
+const WIRELESS_LEN: usize = WIRELESS_MODE_AT + 1;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct AudioReadback {
@@ -38,8 +47,7 @@ pub enum Reply {
 pub fn decode_reply(query: Query, bytes: &[u8]) -> Result<Reply, DecodeError> {
     match query {
         Query::Status => decode_status(bytes).map(Reply::Status),
-        Query::Firmware => expect_frame(bytes, query.id(), FIRMWARE_LEN)
-            .map(|frame| Reply::Firmware(decode_firmware(frame))),
+        Query::Firmware => decode_firmware(bytes).map(Reply::Firmware),
         Query::Audio => decode_audio(bytes).map(Reply::Audio),
         Query::Ux => decode_ux(bytes).map(Reply::Ux),
         Query::Wireless => decode_wireless(bytes).map(Reply::Wireless),
@@ -64,33 +72,33 @@ pub fn observed_settings(
 }
 
 fn decode_status(bytes: &[u8]) -> Result<Status, DecodeError> {
-    let frame = expect_frame(bytes, Query::Status.id(), STATUS_LEN)?;
+    let frame = expect_frame::<STATUS_LEN>(bytes, Query::Status.id())?;
     Ok(Status {
-        link: field(frame, 1)?,
-        battery: field(frame, 3)?,
-        charging: field(frame, 4)?,
+        link: field(frame, LINK_AT)?,
+        battery: field(frame, BATTERY_AT)?,
+        charging: field(frame, CHARGING_AT)?,
     })
 }
 
 fn decode_audio(bytes: &[u8]) -> Result<AudioReadback, DecodeError> {
-    let frame = expect_frame(bytes, Query::Audio.id(), AUDIO_LEN)?;
+    let frame = expect_frame::<AUDIO_LEN>(bytes, Query::Audio.id())?;
     Ok(AudioReadback {
         equalizer: decode_curve(frame)?,
-        mic_volume: field(frame, 61)?,
-        sidetone: field(frame, 62)?,
-        volume_limiter: flag_field(frame, 63)?,
+        mic_volume: field(frame, MIC_VOLUME_AT)?,
+        sidetone: field(frame, SIDETONE_AT)?,
+        volume_limiter: flag_field(frame, LIMITER_AT)?,
     })
 }
 
 fn decode_ux(bytes: &[u8]) -> Result<UxReadback, DecodeError> {
-    let frame = expect_frame(bytes, Query::Ux.id(), UX_LEN)?;
+    let frame = expect_frame::<UX_LEN>(bytes, Query::Ux.id())?;
     Ok(UxReadback {
-        auto_power_off: AutoPowerOff::nearest(frame[1]),
-        mute_light: MuteLight::from_raw(frame[2]),
+        auto_power_off: AutoPowerOff::nearest(byte(frame, AUTO_POWER_OFF_AT)?),
+        mute_light: MuteLight::from_raw(byte(frame, MUTE_LIGHT_AT)?),
     })
 }
 
 fn decode_wireless(bytes: &[u8]) -> Result<WirelessMode, DecodeError> {
-    let frame = expect_frame(bytes, Query::Wireless.id(), WIRELESS_LEN)?;
-    field(frame, 1)
+    let frame = expect_frame::<WIRELESS_LEN>(bytes, Query::Wireless.id())?;
+    field(frame, WIRELESS_MODE_AT)
 }

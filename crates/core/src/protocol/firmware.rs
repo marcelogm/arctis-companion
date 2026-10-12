@@ -1,15 +1,22 @@
 use std::fmt;
 
+use super::command::Query;
+use super::frame::{DecodeError, expect_frame};
+
 const SLOT_LEN: usize = 12;
 const RECEIVER_SLOT: usize = 1;
 const HEADSET_SLOT: usize = 25;
-pub(crate) const FIRMWARE_LEN: usize = HEADSET_SLOT + SLOT_LEN;
-const DOT_POSITIONS: [usize; 3] = [1, 4, 8];
+const FIRMWARE_LEN: usize = HEADSET_SLOT + SLOT_LEN;
+const THREE_PART_DOTS: [usize; 3] = [1, 4, 8];
+const THREE_PART_PAIRS: [usize; 3] = [2, 6, 9];
+const TWO_PART_PAIRS: [usize; 2] = [7, 10];
 const UNREACHABLE: Version = Version {
     major: 0,
     minor: 0,
     patch: 0,
 };
+
+type Slot = [u8; SLOT_LEN];
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
 pub struct Version {
@@ -30,48 +37,61 @@ pub struct Firmware {
     pub headset: Option<Version>,
 }
 
-pub(crate) fn decode_firmware(frame: &[u8]) -> Firmware {
-    Firmware {
-        receiver: decode_slot(slot(frame, RECEIVER_SLOT)),
-        headset: decode_slot(slot(frame, HEADSET_SLOT)),
-    }
+pub(crate) fn decode_firmware(bytes: &[u8]) -> Result<Firmware, DecodeError> {
+    let frame = expect_frame::<FIRMWARE_LEN>(bytes, Query::Firmware.id())?;
+    Ok(Firmware {
+        receiver: slot(frame, RECEIVER_SLOT).and_then(decode_slot),
+        headset: slot(frame, HEADSET_SLOT).and_then(decode_slot),
+    })
 }
 
-fn slot(frame: &[u8], start: usize) -> &[u8] {
-    &frame[start..start + SLOT_LEN]
+fn slot(frame: &[u8; FIRMWARE_LEN], start: usize) -> Option<&Slot> {
+    frame.get(start..)?.first_chunk()
 }
 
-fn decode_slot(slot: &[u8]) -> Option<Version> {
-    let version = if is_dotted(slot) {
-        dotted(slot)
+fn decode_slot(slot: &Slot) -> Option<Version> {
+    let version = if is_three_part(slot) {
+        three_part(slot)
     } else {
-        packed(slot)
+        two_part(slot)
     }?;
     (version != UNREACHABLE).then_some(version)
 }
 
-fn is_dotted(slot: &[u8]) -> bool {
-    DOT_POSITIONS.iter().all(|&position| slot[position] == b'.')
+fn is_three_part(slot: &Slot) -> bool {
+    THREE_PART_DOTS
+        .iter()
+        .all(|&position| slot.get(position) == Some(&b'.'))
 }
 
-fn dotted(slot: &[u8]) -> Option<Version> {
+fn three_part(slot: &Slot) -> Option<Version> {
+    let [Some(major), Some(minor), Some(patch)] =
+        THREE_PART_PAIRS.map(|start| digit_pair(slot, start))
+    else {
+        return None;
+    };
     Some(Version {
-        major: digit_pair(slot, 2)?,
-        minor: digit_pair(slot, 6)?,
-        patch: digit_pair(slot, 9)?,
+        major,
+        minor,
+        patch,
     })
 }
 
-fn packed(slot: &[u8]) -> Option<Version> {
+fn two_part(slot: &Slot) -> Option<Version> {
+    let [Some(major), Some(minor)] = TWO_PART_PAIRS.map(|start| digit_pair(slot, start)) else {
+        return None;
+    };
     Some(Version {
-        major: digit_pair(slot, 7)?,
-        minor: digit_pair(slot, 10)?,
+        major,
+        minor,
         patch: 0,
     })
 }
 
-fn digit_pair(slot: &[u8], start: usize) -> Option<u8> {
-    Some(digit(slot[start])? * 16 + digit(slot[start + 1])?)
+fn digit_pair(slot: &Slot, start: usize) -> Option<u8> {
+    let high = digit(*slot.get(start)?)?;
+    let low = digit(*slot.get(start + 1)?)?;
+    Some(high * 16 + low)
 }
 
 fn digit(byte: u8) -> Option<u8> {
