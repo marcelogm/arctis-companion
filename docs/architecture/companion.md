@@ -26,13 +26,15 @@ flowchart LR
 
 | Concept | Code |
 |---|---|
-| Reducer, inputs, actions | `crates/core/src/companion/reducer.rs::Companion`, `crates/core/src/companion/reducer.rs::handle`, `crates/core/src/companion/input.rs::Input`, `crates/core/src/companion/action.rs::Action`, `crates/core/src/companion/action.rs::PresetChange` |
+| Reducer, inputs, actions | `crates/core/src/companion/reducer.rs::Companion`, `crates/core/src/companion/reducer.rs::handle`, `crates/core/src/companion/reducer.rs::causes`, `crates/core/src/companion/input.rs::Input`, `crates/core/src/companion/action.rs::Action`, `crates/core/src/companion/action.rs::PresetChange` |
+| Device and audio inputs | `crates/core/src/companion/device_inputs.rs::device`, `crates/core/src/companion/device_inputs.rs::try_adopt`, `crates/core/src/companion/audio_inputs.rs::audio_event`, `crates/core/src/companion/audio_inputs.rs::retarget_system_curve` |
+| One value per sound path | `crates/core/src/companion/per_path.rs::PerPath` |
 | Intents | `crates/core/src/intent.rs::Intent`, `crates/core/src/companion/intents.rs::intent` |
 | Quitting | `crates/core/src/companion/quitting.rs::Quit`, `crates/core/src/companion/quitting.rs::start_quit`, `crates/core/src/companion/quitting.rs::finish_quit` |
 | App settings and what is persisted | `crates/core/src/companion/app_settings.rs::AppSettings`, `crates/core/src/companion/app_settings.rs::HeadsetValues`, `crates/core/src/companion/app_settings.rs::AppRules`, `crates/core/src/companion/app_settings.rs::PersistedChange`, `crates/core/src/companion/app_settings.rs::Persisted` |
 | Adoption | `crates/core/src/companion/adoption.rs::DongleIdentity`, `crates/core/src/companion/adoption.rs::adopt`, `crates/core/src/companion/adoption.rs::AdoptionStatus` |
 | Dongle state | `crates/core/src/companion/dongle.rs::DongleState`, `crates/core/src/companion/dongle.rs::WriteFailure` |
-| Presets known to the app | `crates/core/src/companion/catalog.rs::Catalog`, `crates/core/src/companion/catalog.rs::fresh_id` |
+| Presets known to the app | `crates/core/src/companion/catalog.rs::Catalog`, `crates/core/src/companion/catalog.rs::resolve_in`, `crates/core/src/companion/catalog.rs::fresh_id` |
 | Route and the system equalizer | `crates/core/src/companion/routing.rs::route`, `crates/core/src/companion/routing.rs::needs_equalizer`, `crates/core/src/companion/routing.rs::AudioState` |
 | Per-app selection | `crates/core/src/companion/selection.rs::candidates`, `crates/core/src/companion/selection.rs::RuledSet`, `crates/core/src/companion/selection.rs::PathSelection`, `crates/core/src/companion/selection.rs::ActivePreset`, `crates/core/src/companion/selection.rs::picked_path` |
 | Budgets and the editor throttle | `crates/core/src/companion/engines.rs::Engines`, `crates/core/src/companion/engines.rs::decide`, `crates/core/src/companion/engines.rs::EditorThrottle`, `crates/core/src/companion/timing.rs::auto_switch_min_interval` |
@@ -53,7 +55,8 @@ sequenceDiagram
     participant C as Companion
     B->>C: handle(Input, now)
     C->>C: dispatch: device, audio, intent, settings, quit
-    C->>C: advance: adopt, ruled sets, settle each path, editor throttle, quit
+    C->>C: adopt, ruled sets; a path is user-caused only when the intent or quit changed its target
+    C->>C: advance: settle each path, editor throttle, quit
     C->>C: finish: earliest deadline, snapshot
     C-->>B: actions; WakeAt only when it changed, Publish only when the snapshot changed
 ```
@@ -71,7 +74,7 @@ flowchart TD
     T -- "newest member" --> Ap["App"]
     T -- "nobody" --> Rp["route preset, Flat when missing"]
     Ma & Ap & Rp --> D{"Engines::decide"}
-    D -- "automatic and inside the budget<br/>30 s on 2.4 GHz, 2 s on Bluetooth" --> Ho["hold until the budget allows"]
+    D -- "not changed by an intent or quit, inside the budget<br/>30 s on 2.4 GHz, 2 s on Bluetooth" --> Ho["hold until the budget allows"]
     D -- "otherwise" --> Wr["write: Change::Desired on 2.4 GHz,<br/>Retarget on the system equalizer;<br/>no budget spent when the headset already holds an equivalent curve"]
 ```
 
@@ -98,7 +101,7 @@ sequenceDiagram
 flowchart LR
     St["DeviceUpdate::Status"] --> W["BatteryWatch"]
     W --> Sa["Sampler: a row only on change"] --> R["Action::RecordBattery"]
-    W --> Al["Alerts: Low at the threshold, Critical at 5 %,<br/>3-point hysteresis, once per discharge"] --> N["Action::Notify and Withdraw"]
+    W --> Al["Alerts: Low at the threshold, Critical at 5 %,<br/>3-point hysteresis, once per discharge;<br/>a cleared warning or a lost dongle withdraws and re-arms"] --> N["Action::Notify and Withdraw"]
     R --> F["battery.csv, written by SP8"]
     F --> Se["series: Day or Week,<br/>gaps, charging spans"] --> Ch["battery_chart: 0..1 geometry"]
 ```
