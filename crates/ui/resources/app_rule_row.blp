@@ -1,0 +1,30 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisAppRuleRow: Adw.ComboRow {
+  name: "app-rule";
+  use-markup: false;
+  use-subtitle: false;
+
+  [prefix]
+  Image icon {
+    name: "app-icon";
+    icon-size: large;
+  }
+
+  [suffix]
+  Button remove {
+    name: "remove-rule";
+    icon-name: "user-trash-symbolic";
+    tooltip-text: _("Remove Rule");
+    valign: center;
+
+    accessibility {
+      label: _("Remove Rule");
+    }
+
+    styles [
+      "flat",
+    ]
+  }
+}

@@ -2,6 +2,7 @@
 
 pub mod app_dialogs;
 pub mod app_icons;
+mod app_rule_row;
 mod equalizer_group;
 mod headset_page;
 mod headset_rows;
@@ -16,6 +17,7 @@ mod toasts;
 pub mod widget_values;
 mod window;
 
+pub use app_rule_row::AppRuleRow;
 pub use equalizer_group::EqualizerGroup;
 pub use headset_page::HeadsetPage;
 pub use headset_status::HeadsetStatus;
