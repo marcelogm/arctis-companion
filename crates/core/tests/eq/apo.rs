@@ -61,6 +61,16 @@ fn values_outside_the_envelope_are_clamped_and_listed() {
 }
 
 #[test]
+fn huge_values_clamp_to_the_envelope() {
+    let text = "Filter 1: ON PK Fc 9223372036854775.807 Hz Gain -9223372036854775.807 dB Q 9223372036854775.807\n";
+    let import = apo::parse(text).expect("valid file");
+    assert_eq!(
+        import.curve,
+        Curve::from_array([peaking(20_000, -20, 10_000)])
+    );
+}
+
+#[test]
 fn off_filters_import_disabled() {
     let import = apo::parse("Filter 1: OFF PK Fc 1000 Hz Gain 3 dB Q 1\n").expect("valid file");
     assert_eq!(

@@ -1,5 +1,6 @@
 const SCALE: i64 = 1_000;
-const DIGITS_READ: usize = 4;
+const FRACTION_DIGITS: usize = 3;
+const WITH_ROUNDING_DIGIT: usize = FRACTION_DIGITS + 1;
 
 #[must_use]
 pub fn parse_thousandths(text: &str) -> Option<i64> {
@@ -29,7 +30,12 @@ pub fn render_thousandths(value: i64) -> String {
 
 #[must_use]
 pub fn rounded_quotient(value: i64, divisor: i64) -> i64 {
-    (value + value.signum() * (divisor / 2)) / divisor
+    let (quotient, remainder) = (value / divisor, (value % divisor).abs());
+    if remainder >= divisor - remainder {
+        quotient + value.signum()
+    } else {
+        quotient
+    }
 }
 
 fn unsigned_thousandths(text: &str) -> Option<i64> {
@@ -51,7 +57,7 @@ fn fraction_thousandths(fraction: &str) -> i64 {
     let padded = fraction
         .bytes()
         .chain(std::iter::repeat(b'0'))
-        .take(DIGITS_READ);
-    let ten_thousandths = padded.fold(0, |total, digit| total * 10 + i64::from(digit - b'0'));
-    (ten_thousandths + 5) / 10
+        .take(WITH_ROUNDING_DIGIT);
+    let with_rounding_digit = padded.fold(0, |total, digit| total * 10 + i64::from(digit - b'0'));
+    rounded_quotient(with_rounding_digit, 10)
 }

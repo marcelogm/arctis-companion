@@ -50,6 +50,9 @@ fn quotients_round_half_away_from_zero() {
         (1_499, 1_000, 1),
         (1_500, 1_000, 2),
         (0, 500, 0),
+        (i64::MAX, 1_000, 9_223_372_036_854_776),
+        (i64::MIN, 1_000, -9_223_372_036_854_776),
+        (i64::MAX, 500, 18_446_744_073_709_552),
     ];
     for (value, divisor, expected) in cases {
         assert_eq!(
