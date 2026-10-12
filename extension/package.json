@@ -4,7 +4,7 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "test": "GIO_USE_VFS=local dbus-run-session -- gjs -m tests/run.js"
+    "test": "GIO_USE_VFS=local dbus-run-session --config-file=tests/support/session-bus.xml -- gjs -m tests/run.js"
   },
   "devDependencies": {
     "eslint": "9.39.5"
