@@ -5,7 +5,7 @@ use arctis_core::view::text::Text;
 use gtk::prelude::*;
 use gtk::{gio, glib};
 
-use crate::text::resolve;
+use crate::text::{resolve, translated};
 
 const PATTERNS: [&str; 2] = ["*.txt", "*.json"];
 
@@ -56,7 +56,7 @@ pub fn portal_files() -> Rc<dyn PresetFiles> {
 
 fn preset_dialog(title: &Text) -> gtk::FileDialog {
     let filter = gtk::FileFilter::new();
-    filter.set_name(Some(&resolve(&Text::plain(msgid("Presets")))));
+    filter.set_name(Some(&translated(msgid("Presets"))));
     for pattern in PATTERNS {
         filter.add_pattern(pattern);
     }

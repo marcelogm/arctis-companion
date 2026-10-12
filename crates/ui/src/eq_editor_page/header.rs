@@ -12,7 +12,7 @@ use gtk::glib;
 use super::EqEditorPage;
 use crate::preset_files::Export;
 use crate::services::Services;
-use crate::text::resolve;
+use crate::text::{resolve, translated};
 
 const CANCEL: &str = "cancel";
 const RENAME: &str = "rename";
@@ -129,16 +129,16 @@ fn rename_dialog(name: &str) -> (adw::AlertDialog, gtk::Entry) {
         .text(name)
         .activates_default(true)
         .build();
-    entry.update_property(&[Property::Label(&resolve(&Text::plain(msgid("Name"))))]);
+    entry.update_property(&[Property::Label(&translated(msgid("Name")))]);
     let dialog = adw::AlertDialog::builder()
-        .heading(resolve(&Text::plain(msgid("Rename Preset"))))
+        .heading(translated(msgid("Rename Preset")))
         .extra_child(&entry)
         .default_response(RENAME)
         .close_response(CANCEL)
         .build();
     dialog.add_responses(&[
-        (CANCEL, &resolve(&Text::plain(msgid("_Cancel")))),
-        (RENAME, &resolve(&Text::plain(msgid("_Rename")))),
+        (CANCEL, &translated(msgid("_Cancel"))),
+        (RENAME, &translated(msgid("_Rename"))),
     ]);
     dialog.set_response_appearance(RENAME, adw::ResponseAppearance::Suggested);
     (dialog, entry)

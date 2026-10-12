@@ -2,7 +2,7 @@ use arctis_core::battery::sample::UnixSeconds;
 use arctis_core::eq::{Gain, Hertz};
 use arctis_core::testkit::snapshots::percent;
 use arctis_core::view::text::{Arg, Text};
-use arctis_ui::text::{NumberStyle, Resolver, optional};
+use arctis_ui::text::{NumberStyle, Resolver, optional, translated};
 
 fn brazilian() -> Resolver {
     Resolver::new(NumberStyle::for_locale("pt_BR.UTF-8"))
@@ -115,4 +115,9 @@ fn times_render_as_a_local_date() {
 fn a_missing_optional_text_is_empty() {
     assert_eq!(optional(None), "");
     assert_eq!(optional(Some(&Text::plain("Not applied"))), "Not applied");
+}
+
+#[test]
+fn a_fixed_label_without_a_catalogue_stays_english() {
+    assert_eq!(translated("_Cancel"), "_Cancel");
 }
