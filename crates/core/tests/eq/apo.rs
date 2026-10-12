@@ -97,6 +97,23 @@ fn other_lines_are_ignored() {
 }
 
 #[test]
+fn filter_lines_match_in_any_case() {
+    let curve = apo::parse(
+        "filter 1: on pk fc 1000 hz gain 3 db q 1\nFILTER: ON PK FC 2000 HZ GAIN 3 DB Q 1\n",
+    )
+    .map(|import| import.curve);
+    let expected = Curve::from_array([peaking(1_000, 6, 1_000), peaking(2_000, 6, 1_000)]);
+    assert_eq!(curve, Ok(expected));
+}
+
+#[test]
+fn lines_that_only_start_like_a_filter_are_ignored() {
+    let text =
+        "Filters: ON PK Fc 1000 Hz Gain 3 dB Q 1\nFilterbank 1: ON PK Fc 1000 Hz Gain 3 dB Q 1\n";
+    assert_eq!(apo::parse(text), Err(ApoError::NoFilters));
+}
+
+#[test]
 fn more_than_ten_filters_are_rejected() {
     let text = "Filter 1: ON PK Fc 1000 Hz Gain 1 dB Q 1\n".repeat(11);
     assert_eq!(apo::parse(&text), Err(ApoError::TooManyFilters(11)));

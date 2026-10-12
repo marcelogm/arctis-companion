@@ -97,8 +97,11 @@ impl fmt::Display for PresetFormatError {
             }
             Self::NotADecimal => formatter.write_str("a gain or Q is not a plain decimal number"),
             Self::OffGrid => formatter.write_str("a gain is not a multiple of 0.5 dB"),
+            Self::Envelope(EnvelopeError::TooManyFilters) => {
+                formatter.write_str("the preset has more than ten filters")
+            }
             Self::Envelope(error) => {
-                write!(formatter, "a filter lies outside the envelope: {error:?}")
+                write!(formatter, "a filter lies outside the envelope: {error}")
             }
         }
     }

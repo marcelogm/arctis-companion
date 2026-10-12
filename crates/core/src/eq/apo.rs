@@ -1,6 +1,6 @@
 use super::curve::Curve;
 use super::decimal::{parse_thousandths, render_thousandths, rounded_quotient, thousandths_of};
-use super::filter::{Filter, FilterKind, Gain, Hertz, Q};
+use super::filter::{Clamped, Filter, FilterKind, Gain, Hertz, Q};
 use super::response::preamp_db;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -37,12 +37,11 @@ pub fn parse(text: &str) -> Result<Import, ApoError> {
     if raw.is_empty() {
         return Err(ApoError::NoFilters);
     }
-    let converted = raw
+    let (filters, clamps): (Vec<Filter>, Vec<Vec<Clamp>>) = raw
         .iter()
         .enumerate()
         .map(|(position, filter)| filter.to_envelope(position))
-        .collect::<Result<Vec<_>, _>>()?;
-    let (filters, clamps): (Vec<Filter>, Vec<Vec<Clamp>>) = converted.into_iter().unzip();
+        .unzip();
     let curve = Curve::new(filters).map_err(|_| ApoError::TooManyFilters(raw.len()))?;
     Ok(Import {
         curve,
@@ -64,7 +63,7 @@ pub fn render(curve: &Curve) -> String {
 }
 
 #[must_use]
-pub const fn kind_name(kind: FilterKind) -> &'static str {
+pub const fn kind_code(kind: FilterKind) -> &'static str {
     match kind {
         FilterKind::Peaking => "PK",
         FilterKind::LowShelf => "LSC",
@@ -76,7 +75,7 @@ pub const fn kind_name(kind: FilterKind) -> &'static str {
 
 fn filter_line(number: usize, filter: Filter) -> String {
     let state = if filter.is_enabled() { "ON" } else { "OFF" };
-    let kind = kind_name(filter.kind());
+    let kind = kind_code(filter.kind());
     let hz = filter.hz().get();
     let gain = if filter.kind().has_gain() {
         format!(" Gain {} dB", decibels(filter.gain()))
@@ -96,15 +95,22 @@ fn preamp_text(curve: &Curve) -> String {
 }
 
 fn filter_lines(text: &str) -> impl Iterator<Item = (usize, &str)> {
-    text.lines().enumerate().filter_map(|(index, line)| {
-        let rest = line.trim_start().strip_prefix("Filter")?;
-        let body = rest.split_once(':').map_or("", |(_, body)| body);
-        Some((index + 1, body))
-    })
+    text.lines()
+        .enumerate()
+        .filter_map(|(index, line)| filter_body(line).map(|body| (index + 1, body)))
+}
+
+fn filter_body(line: &str) -> Option<&str> {
+    let line = line.trim_start();
+    let head_length = line
+        .find(|character: char| character.is_whitespace() || character == ':')
+        .unwrap_or(line.len());
+    let (head, rest) = line.split_at(head_length);
+    head.eq_ignore_ascii_case("Filter")
+        .then(|| rest.split_once(':').map_or("", |(_, body)| body))
 }
 
 struct RawFilter {
-    line: usize,
     enabled: bool,
     kind: FilterKind,
     hz: i64,
@@ -117,12 +123,11 @@ impl RawFilter {
         let tokens: Vec<&str> = body.split_whitespace().collect();
         let malformed = ApoError::Malformed { line };
         let enabled = state(tokens.first().copied()).ok_or(malformed)?;
-        let kind = kind_named(tokens.get(1).copied()).ok_or(ApoError::UnsupportedKind { line })?;
+        let kind = parse_kind(tokens.get(1).copied()).ok_or(ApoError::UnsupportedKind { line })?;
         let hz = number_after(&tokens, "Fc").ok_or(malformed)?;
         let q = number_after(&tokens, "Q").ok_or(malformed)?;
         let gain = gain_of(&tokens, kind).ok_or(malformed)?;
         Ok(Self {
-            line,
             enabled,
             kind,
             hz,
@@ -131,48 +136,31 @@ impl RawFilter {
         })
     }
 
-    fn to_envelope(&self, position: usize) -> Result<(Filter, Vec<Clamp>), ApoError> {
-        let hz = within(
-            rounded_quotient(self.hz, 1_000),
-            Hertz::MIN.into(),
-            Hertz::MAX.into(),
-        );
-        let gain = self.half_db();
-        let q = within(self.q, Q::MIN_MILLI.into(), Q::MAX_MILLI.into());
+    fn to_envelope(&self, position: usize) -> (Filter, Vec<Clamp>) {
+        let hz = Hertz::clamped(rounded_quotient(self.hz, 1_000));
+        let gain = self.bounded_gain();
+        let q = Q::clamped_milli(self.q);
         let clamps = [
-            (hz.1, Field::Frequency),
-            (gain.1, Field::Gain),
-            (q.1, Field::Q),
+            (hz.clamped, Field::Frequency),
+            (gain.clamped, Field::Gain),
+            (q.clamped, Field::Q),
         ]
         .into_iter()
         .filter(|(clamped, _)| *clamped)
         .map(|(_, field)| Clamp { position, field })
         .collect();
-        Ok((self.filter(hz.0, gain.0, q.0)?, clamps))
+        let filter = Filter::dropping_pass_gain(self.kind, hz.value, gain.value, q.value);
+        (filter.with_enabled(self.enabled), clamps)
     }
 
-    fn half_db(&self) -> (i64, bool) {
-        let half_db = rounded_quotient(self.gain, Gain::MILLI_DB_PER_STEP);
-        if self.kind.has_gain() {
-            within(half_db, Gain::MIN_HALF_DB.into(), Gain::MAX_HALF_DB.into())
-        } else {
-            (0, half_db != 0)
+    fn bounded_gain(&self) -> Clamped<Gain> {
+        let gain = Gain::clamped_half_db(rounded_quotient(self.gain, Gain::MILLI_DB_PER_STEP));
+        let dropped = !self.kind.has_gain() && gain.value != Gain::NONE;
+        Clamped {
+            clamped: gain.clamped || dropped,
+            ..gain
         }
     }
-
-    fn filter(&self, hz: i64, half_db: i64, milli_q: i64) -> Result<Filter, ApoError> {
-        let malformed = ApoError::Malformed { line: self.line };
-        let hz = u16::try_from(hz).map_err(|_| malformed)?;
-        let half_db = i8::try_from(half_db).map_err(|_| malformed)?;
-        let milli_q = u16::try_from(milli_q).map_err(|_| malformed)?;
-        let filter = Filter::from_parts(self.kind, hz, half_db, milli_q).map_err(|_| malformed)?;
-        Ok(filter.with_enabled(self.enabled))
-    }
-}
-
-fn within(value: i64, min: i64, max: i64) -> (i64, bool) {
-    let bounded = value.clamp(min, max);
-    (bounded, bounded != value)
 }
 
 fn state(token: Option<&str>) -> Option<bool> {
@@ -186,11 +174,11 @@ fn state(token: Option<&str>) -> Option<bool> {
     }
 }
 
-fn kind_named(token: Option<&str>) -> Option<FilterKind> {
+fn parse_kind(token: Option<&str>) -> Option<FilterKind> {
     let token = token?;
     FilterKind::ALL
         .into_iter()
-        .find(|kind| kind_name(*kind).eq_ignore_ascii_case(token))
+        .find(|kind| kind_code(*kind).eq_ignore_ascii_case(token))
 }
 
 fn gain_of(tokens: &[&str], kind: FilterKind) -> Option<i64> {

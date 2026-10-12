@@ -135,7 +135,11 @@ fn format_errors_explain_themselves() {
         ),
         (
             PresetFormatError::Envelope(EnvelopeError::Q),
-            "a filter lies outside the envelope: Q",
+            "a filter lies outside the envelope: Q outside 0.2..10",
+        ),
+        (
+            PresetFormatError::Envelope(EnvelopeError::TooManyFilters),
+            "the preset has more than ten filters",
         ),
     ];
     for (error, message) in cases {
