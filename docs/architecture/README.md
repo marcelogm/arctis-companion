@@ -6,6 +6,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | Page | Area |
 |---|---|
 | [rules.md](rules.md) | engineering rules and how `xtask/` enforces them |
+| [eq.md](eq.md) | equalizer core: envelope, curves, presets, APO, response, real-time filter |
 
 ## Workspace
 
