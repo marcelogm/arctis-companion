@@ -745,12 +745,27 @@ fn the_staged_mode_warns_too() {
     assert!(outcome.stderr.contains("401 lines"), "{}", outcome.stderr);
 }
 
+const GENERATED: [&str; 10] = [
+    "Cargo.lock",
+    "build-aux/cargo-sources.json",
+    "extension/package-lock.json",
+    "LICENSE",
+    "po/pt_BR.po",
+    "po/arctis-companion.pot",
+    "po/LINGUAS",
+    "po/POTFILES.in",
+    "data/icons/app.svg",
+    "data/screenshots/main.png",
+];
+
 #[test]
-fn generated_files_are_exempt() {
+fn every_entry_of_the_generated_list_is_exempt() {
     let fixture = Fixture::init();
-    fixture.write("Cargo.lock", &"line\n".repeat(900));
-    fixture.write("po/pt_BR.po", &"line\n".repeat(900));
+    for path in GENERATED {
+        fixture.write(path, &"line\n".repeat(900));
+    }
     let outcome = fixture.xtask(&["check-rules"]);
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
     assert!(!outcome.stderr.contains("warning"), "{}", outcome.stderr);
 }
 ```
@@ -898,7 +913,14 @@ git push
 ```rust
 mod support;
 
-use support::{assert_accepted, assert_rejected};
+use support::{Fixture, assert_accepted, assert_rejected};
+
+#[test]
+fn staged_mode_rejects_a_staged_comment() {
+    let fixture = Fixture::init();
+    fixture.write("src/lib.rs", "// why\n");
+    assert!(!fixture.xtask(&["check-rules", "--staged"]).succeeded());
+}
 
 #[test]
 fn rust_outer_doc_comment_is_rejected() {
@@ -1023,7 +1045,7 @@ fn repository_passes_check_rules() {
 - [ ] **Step 2: Run to verify it fails**
 
 Run (toolbox): `cargo test -p xtask --test comments`
-Expected: every `_is_rejected` test FAILS (exit code 0).
+Expected: every `_is_rejected` test and `staged_mode_rejects_a_staged_comment` FAIL (exit code 0).
 
 - [ ] **Step 3: Implement the shared helpers**
 
@@ -1259,39 +1281,63 @@ use std::process::Command;
 
 use support::Fixture;
 
-const PT_BR_PO: &str = "# Portuguese translations for arctis-companion package.\n# Copyright (C) 2026 THE arctis-companion'S COPYRIGHT HOLDER\n#, fuzzy\nmsgid \"\"\nmsgstr \"\"\n\"Project-Id-Version: arctis-companion\\n\"\n\"Content-Type: text/plain; charset=UTF-8\\n\"\n";
+const TEXT_RS: &str = "pub fn title() -> String {\n    gettext(\"Arctis Companion\")\n}\n";
+const XGETTEXT: [&str; 5] = [
+    "--language=Rust",
+    "--keyword=gettext",
+    "--package-name=arctis-companion",
+    "--output=po/arctis-companion.pot",
+    "src/text.rs",
+];
+const MSGINIT: [&str; 4] =
+    ["--no-translator", "--locale=pt_BR", "--input=po/arctis-companion.pot", "--output-file=po/pt_BR.po"];
+
+fn run_in(fixture: &Fixture, program: &str, args: &[&str]) {
+    let status = Command::new(program).args(args).current_dir(fixture.path()).status().expect("tool runs");
+    assert!(status.success(), "{program} {args:?}");
+}
 
 fn generate_lockfile(fixture: &Fixture) {
     fixture.write("Cargo.toml", "[package]\nname = \"fixture\"\nversion = \"0.1.0\"\nedition = \"2024\"\n");
     fixture.write("src/lib.rs", "");
-    let status = Command::new(env!("CARGO"))
-        .args(["generate-lockfile", "--offline", "--manifest-path"])
-        .arg(fixture.path().join("Cargo.toml"))
-        .status()
-        .expect("cargo runs");
-    assert!(status.success());
+    run_in(fixture, env!("CARGO"), &["generate-lockfile", "--offline"]);
     fixture.git(&["add", "Cargo.lock"]);
 }
 
+fn generate_translation(fixture: &Fixture) {
+    fixture.write("src/text.rs", TEXT_RS);
+    fixture.write("po/POTFILES.in", "src/text.rs\n");
+    fixture.write("po/LINGUAS", "pt_BR\n");
+    run_in(fixture, "xgettext", &XGETTEXT);
+    run_in(fixture, "msginit", &MSGINIT);
+    fixture.git(&["add", "po"]);
+}
+
 #[test]
-fn fresh_lockfile_and_translations_pass_check_rules() {
+fn fresh_lockfile_and_translation_pass_check_rules() {
     let fixture = Fixture::init();
     generate_lockfile(&fixture);
+    generate_translation(&fixture);
     let lockfile = fs::read_to_string(fixture.path().join("Cargo.lock")).expect("lockfile");
     assert!(lockfile.starts_with("# This file is automatically @generated"));
-    fixture.write("po/pt_BR.po", PT_BR_PO);
-    fixture.write("po/LINGUAS", "# Languages\npt_BR\n");
-    fixture.write("po/POTFILES.in", "# Translatable files\ncrates/ui/src/text.rs\n");
+    let translation = fs::read(fixture.path().join("po/pt_BR.po")).expect("translation");
+    assert!(translation.starts_with(b"# "), "msginit writes a comment header");
     let outcome = fixture.xtask(&["check-rules"]);
     assert!(outcome.succeeded(), "{}", outcome.stderr);
 }
 ```
 
+The `.po` file is read as bytes: `msginit` writes its header in the locale's charset, which may not be UTF-8.
+`xgettext` needs gettext ≥ 0.24 for `--language=Rust` (the toolbox has 0.26; the CI `test` job installs
+`gettext`).
+
 - [ ] **Step 2: Prove the test guards the rule**
 
+Run (toolbox): `rpm -q gettext || sudo dnf install -y gettext`
 Temporarily change `NAMES` in `xtask/src/check_rules/generated.rs` to drop `"Cargo.lock"`.
 Run (toolbox): `cargo test -p xtask --test generated`
-Expected: FAIL with `Cargo.lock:1: comments are not allowed`. Restore `"Cargo.lock"`.
+Expected: FAIL with `Cargo.lock:1: comments are not allowed`. Restore `"Cargo.lock"`, then repeat with `"po"`
+and `"pot"` dropped from `EXTENSIONS`: expect a comment error on `po/arctis-companion.pot`. Restore both.
 
 - [ ] **Step 3: Run to verify it passes**
 
@@ -1502,7 +1548,32 @@ fn turning_an_allow_into_warn_fails() {
     let manifest = repository_manifest().replace("doc_markdown = \"allow\"", "doc_markdown = \"warn\"");
     assert!(!check_rules_with(&manifest).succeeded());
 }
+
+const MEMBER: &str = "crates/core/Cargo.toml";
+const PACKAGE: &str = "[package]\nname = \"arctis-core\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
+
+fn check_rules_with_member(member_manifest: &str) -> support::Outcome {
+    let fixture = Fixture::init();
+    fixture.write("Cargo.toml", &repository_manifest()).write(MEMBER, member_manifest);
+    fixture.xtask(&["check-rules"])
+}
+
+#[test]
+fn member_inheriting_the_workspace_lints_passes() {
+    let outcome = check_rules_with_member(&format!("{PACKAGE}\n[lints]\nworkspace = true\n"));
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
+fn member_opting_out_of_the_workspace_lints_fails() {
+    let outcome = check_rules_with_member(PACKAGE);
+    assert!(!outcome.succeeded());
+    assert!(outcome.stderr.contains(MEMBER), "{}", outcome.stderr);
+}
 ```
+
+A member without `[lints] workspace = true` would drop every guarded allow and every complexity deny at once,
+so the guard covers member manifests too.
 
 `xtask/tests/clippy_config.rs`:
 
@@ -1564,7 +1635,8 @@ fn without_the_errors_doc_allow_the_same_function_fails() {
 - [ ] **Step 2: Run to verify the right tests fail**
 
 Run (toolbox): `cargo test -p xtask --test lints --test clippy_config`
-Expected: `removing_any_guarded_allow_fails` and `turning_an_allow_into_warn_fails` FAIL; both clippy tests PASS
+Expected: `removing_any_guarded_allow_fails`, `turning_an_allow_into_warn_fails` and
+`member_opting_out_of_the_workspace_lints_fails` FAIL; both clippy tests PASS
 already (Task 1 wrote the policy), which proves the allows do their job.
 
 - [ ] **Step 3: Implement**
@@ -1585,17 +1657,38 @@ const GUARDED: [&str; 5] = [
     "doc_markdown",
 ];
 
-pub fn check(root: &Path) -> Report {
-    let Ok(text) = fs::read_to_string(root.join("Cargo.toml")) else {
-        return Report::default();
-    };
-    match text.parse::<toml::Table>() {
-        Ok(manifest) => check_manifest(&manifest),
-        Err(error) => Report::failed(format!("Cargo.toml: {error}")),
+pub fn check(root: &Path, files: &[String]) -> Report {
+    let members = files.iter().filter(|file| file.ends_with("/Cargo.toml"));
+    members.map(|file| check_member(root, file)).fold(check_root(root), Report::merged)
+}
+
+fn check_root(root: &Path) -> Report {
+    match read_manifest(&root.join("Cargo.toml")) {
+        Some(Ok(manifest)) => check_workspace(&manifest),
+        Some(Err(error)) => Report::failed(format!("Cargo.toml: {error}")),
+        None => Report::default(),
     }
 }
 
-fn check_manifest(manifest: &toml::Table) -> Report {
+fn check_member(root: &Path, file: &str) -> Report {
+    match read_manifest(&root.join(file)) {
+        Some(Ok(manifest)) if inherits_lints(&manifest) => Report::default(),
+        Some(Ok(_)) => Report::failed(format!("{file}: add [lints] workspace = true so the lint policy applies")),
+        Some(Err(error)) => Report::failed(format!("{file}: {error}")),
+        None => Report::default(),
+    }
+}
+
+fn read_manifest(path: &Path) -> Option<Result<toml::Table, toml::de::Error>> {
+    fs::read_to_string(path).ok().map(|text| text.parse::<toml::Table>())
+}
+
+fn inherits_lints(manifest: &toml::Table) -> bool {
+    let workspace = manifest.get("lints").and_then(|lints| lints.get("workspace"));
+    !manifest.contains_key("package") || workspace.and_then(toml::Value::as_bool) == Some(true)
+}
+
+fn check_workspace(manifest: &toml::Table) -> Report {
     let Some(workspace) = manifest.get("workspace") else {
         return Report::default();
     };
@@ -1620,7 +1713,7 @@ In `xtask/src/check_rules/mod.rs` add `mod lints;` and make `check_tree` include
 ```rust
 fn check_tree(root: &Path, files: &[String]) -> Report {
     let per_file = files.iter().map(|file| check_file(root, file));
-    per_file.fold(Report::default(), Report::merged).merged(lints::check(root))
+    per_file.fold(Report::default(), Report::merged).merged(lints::check(root, files))
 }
 ```
 
@@ -1724,7 +1817,7 @@ fn check_tree(root: &Path, files: &[String]) -> Report {
     let per_file = files.iter().map(|file| check_file(root, file));
     per_file
         .fold(Report::default(), Report::merged)
-        .merged(lints::check(root))
+        .merged(lints::check(root, files))
         .merged(dbus_copy::check(root, files))
 }
 ```
@@ -1846,6 +1939,12 @@ fn non_conventional_pr_title_fails() {
 fn pr_body_with_a_co_author_fails() {
     let body = format!("Sets up the workspace.\n\n{TRAILER}");
     assert!(!Fixture::init().xtask(&["check-commits", "--pr-body", &body]).succeeded());
+}
+
+#[test]
+fn co_author_trailer_in_any_case_fails() {
+    let body = "Sets up the workspace.\n\nco-authored-BY: someone <someone@example.invalid>";
+    assert!(!Fixture::init().xtask(&["check-commits", "--pr-body", body]).succeeded());
 }
 
 #[test]
@@ -2338,6 +2437,16 @@ fn dev_dependencies_are_free() {
 }
 
 #[test]
+fn build_dependencies_are_checked() {
+    assert!(!workspace_with_core("[build-dependencies]\ncc = \"1\"\n").succeeded());
+}
+
+#[test]
+fn target_specific_dependencies_are_checked() {
+    assert!(!workspace_with_core("[target.'cfg(unix)'.dependencies]\nlibc = \"0.2\"\n").succeeded());
+}
+
+#[test]
 fn missing_core_package_fails() {
     let fixture = Fixture::init();
     fixture.write("Cargo.toml", "[workspace]\nresolver = \"3\"\nmembers = []\n");
@@ -2346,7 +2455,7 @@ fn missing_core_package_fails() {
 ```
 
 If `cargo metadata --no-deps --offline` refuses a registry dependency that is not cached, replace `serde`,
-`serde_json`, `rustix` and `proptest` in these fixtures with path dependencies of the same names created by
+`serde_json`, `rustix`, `proptest`, `cc` and `libc` in these fixtures with path dependencies of the same names created by
 `fixture.write("deps/<name>/Cargo.toml", …)`.
 
 Append to `xtask/tests/repository.rs`:
@@ -2362,7 +2471,8 @@ fn repository_passes_check_pure() {
 - [ ] **Step 2: Run to verify it fails**
 
 Run (toolbox): `cargo test -p xtask --test check_pure`
-Expected: `any_other_normal_dependency_fails` and `missing_core_package_fails` FAIL.
+Expected: `any_other_normal_dependency_fails`, `build_dependencies_are_checked`,
+`target_specific_dependencies_are_checked` and `missing_core_package_fails` FAIL.
 
 - [ ] **Step 3: Implement**
 
@@ -2414,7 +2524,7 @@ fn forbidden_dependencies(core: &Value) -> impl Iterator<Item = String> + '_ {
         .as_array()
         .into_iter()
         .flatten()
-        .filter(|dependency| dependency["kind"].is_null())
+        .filter(|dependency| dependency["kind"] != "dev")
         .filter_map(|dependency| dependency["name"].as_str())
         .filter(|name| !ALLOWED.contains(name))
         .map(str::to_owned)
@@ -2456,6 +2566,7 @@ mod support;
 use std::fs;
 use std::os::unix::fs::PermissionsExt;
 use std::path::Path;
+use std::process::Command;
 
 use support::{Fixture, git_succeeds};
 
@@ -2486,19 +2597,43 @@ fn installing_twice_succeeds() {
     assert!(fixture.xtask(&["install-hooks"]).succeeded());
 }
 
+fn run_hook(fixture: &Fixture, hook: &str, args: &[&str]) -> Option<i32> {
+    let script = fixture.path().join(".git/hooks").join(hook);
+    let status = Command::new("sh").arg(script).args(args).current_dir(fixture.path()).status();
+    status.expect("hook runs").code()
+}
+
 #[test]
-fn hooks_skip_checkouts_without_xtask() {
+fn pre_commit_hook_skips_checkouts_without_xtask() {
     let fixture = Fixture::init();
     fixture.xtask(&["install-hooks"]);
-    let script = fs::read_to_string(fixture.path().join(".git/hooks/pre-commit")).expect("hook written");
-    assert!(script.contains("[ -d xtask ] || exit 0"), "{script}");
+    assert_eq!(run_hook(&fixture, "pre-commit", &[]), Some(0));
+}
+
+#[test]
+fn commit_msg_hook_runs_the_legacy_guard_in_checkouts_without_xtask() {
+    let fixture = Fixture::init();
+    fixture.write(".githooks/commit-msg", "#!/bin/sh\nexit 7\n");
+    fixture.xtask(&["install-hooks"]);
+    assert_eq!(run_hook(&fixture, "commit-msg", &["message"]), Some(7));
+}
+
+#[test]
+fn commit_msg_hook_passes_checkouts_without_any_guard() {
+    let fixture = Fixture::init();
+    fixture.xtask(&["install-hooks"]);
+    assert_eq!(run_hook(&fixture, "commit-msg", &["message"]), Some(0));
 }
 ```
+
+Hooks live in the common git dir and so serve every worktree. Sibling branches that predate SP1 have no
+`xtask/` but still carry `.githooks/commit-msg`; the new `commit-msg` hook runs that legacy guard for them, so
+unsetting `core.hooksPath` never leaves a worktree without the attribution check.
 
 - [ ] **Step 2: Run to verify it fails**
 
 Run (toolbox): `cargo test -p xtask --test install_hooks`
-Expected: FAIL, hook files not written.
+Expected: FAIL, hook files not written (`run_hook` panics on the missing script or `sh` exits 127).
 
 - [ ] **Step 3: Implement**
 
@@ -2513,7 +2648,7 @@ use crate::git;
 use crate::report::Report;
 
 const PRE_COMMIT: &str = "#!/bin/sh\n[ -d xtask ] || exit 0\nexec cargo xtask check-rules --staged\n";
-const COMMIT_MSG: &str = "#!/bin/sh\n[ -d xtask ] || exit 0\nexec cargo xtask check-commits --message \"$1\"\n";
+const COMMIT_MSG: &str = "#!/bin/sh\nif [ -d xtask ]; then exec cargo xtask check-commits --message \"$1\"; fi\nif [ -f .githooks/commit-msg ]; then exec sh .githooks/commit-msg \"$1\"; fi\n";
 
 pub fn run(root: &Path) -> Report {
     install(root).map_or_else(Report::failed, |()| Report::default())
@@ -3010,14 +3145,16 @@ fn main() -> gtk::glib::ExitCode {
 }
 ```
 
-If constructing `adw::Application` outside a GTK main thread aborts the plain `#[test]`, turn it into
-`#[gtk::test]`.
+`adw::Application::builder()` skips the GTK initialisation assertion (`skip_assert_initialized!` in
+libadwaita 0.9), so the plain `#[test]` needs no display and runs in the CI `test` job. Do not turn it into
+`#[gtk::test]`: that job has no compositor.
 
 - [ ] **Step 4: Run to verify it passes, then smoke-run the window**
 
 Run (toolbox): `cargo test --workspace && cargo clippy --workspace --all-targets -- -D warnings`
 Expected: PASS.
-Run (toolbox): `timeout 5 cargo run -p arctis-app; test $? -eq 124 && echo window-stayed-open`
+Run (toolbox): `cargo build -p arctis-app && timeout 5 target/debug/arctis-companion; test $? -eq 124 && echo window-stayed-open`
+(build first, so compile time never eats the 5 s budget)
 Expected: an empty window titled "Arctis Companion" appears and `window-stayed-open` is printed.
 
 - [ ] **Step 5: Commit**
@@ -3079,21 +3216,52 @@ git push
 
 - [ ] **Step 1: Write the failing test**
 
-Append to `crates/app/tests/application.rs`:
+Append to `crates/app/tests/application.rs` (add `use std::fs;` and `use std::path::{Path, PathBuf};` to its
+imports):
 
 ```rust
+const HEADSET1: &str = "io.github.marcelogm.ArctisCompanion.Headset1";
+const HEADSET1_PROPERTIES: [&str; 11] = [
+    "State",
+    "Model",
+    "BatteryLevel",
+    "Charging",
+    "BatteryWarning",
+    "Route",
+    "Presets",
+    "ActivePreset",
+    "ActivePresetReason",
+    "AppRuleCount",
+    "AutomaticPresets",
+];
+
+fn data_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")
+}
+
 #[test]
 fn every_data_file_is_named_after_the_app_id() {
-    let data = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data");
     for suffix in [".desktop", ".metainfo.xml", ".gschema.xml", ".service.in"] {
-        let file = data.join(format!("{APP_ID}{suffix}"));
+        let file = data_dir().join(format!("{APP_ID}{suffix}"));
         assert!(file.is_file(), "{}", file.display());
     }
+}
+
+#[test]
+fn headset_contract_parses_and_declares_every_member() {
+    let xml = fs::read_to_string(data_dir().join(format!("dbus/{HEADSET1}.xml"))).expect("contract file");
+    let node = gtk::gio::DBusNodeInfo::for_xml(&xml).expect("valid introspection XML");
+    let interface = node.lookup_interface(HEADSET1).expect("Headset1 interface");
+    for property in HEADSET1_PROPERTIES {
+        assert!(interface.lookup_property(property).is_some(), "{property}");
+    }
+    assert!(interface.lookup_method("ActivatePreset").is_some());
 }
 ```
 
 Run (toolbox): `cargo test -p arctis-app`
-Expected: FAIL, `.desktop` missing.
+Expected: FAIL, `.desktop` missing. `headset_contract_parses_and_declares_every_member` already passes (the XML
+landed in Task 8); it guards the frozen contract against malformed edits before SP8's `gio::TestDBus` test.
 
 - [ ] **Step 2: Write the data files**
 
@@ -3275,6 +3443,7 @@ test('validate-schema', glib_compile_schemas, args: ['--strict', '--dry-run', me
 
 Run (toolbox): `cargo test -p arctis-app`
 Expected: PASS.
+Run (toolbox): `rpm -q meson ninja-build desktop-file-utils appstream || sudo dnf install -y meson ninja-build desktop-file-utils appstream`
 Run (toolbox): `rm -rf _build && meson setup _build --prefix=/usr && meson compile -C _build && meson test -C _build && DESTDIR=$PWD/_build/staging meson install -C _build --no-rebuild && find _build/staging -type f | sort`
 Expected: 3 meson tests OK; staging lists `/usr/bin/arctis-companion`, the desktop file, metainfo, gschema,
 `dbus-1/services/…service` (with `Exec=/usr/bin/arctis-companion --gapplication-service`), the Headset1 XML and
@@ -3299,7 +3468,9 @@ git push
 
 - [ ] **Step 1: Install Node in the toolbox**
 
-Run (toolbox): `rpm -q nodejs npm || sudo dnf install -y nodejs npm`
+Run (toolbox): `command -v node && command -v npm || sudo dnf install -y nodejs npm`
+(the toolbox already has Node 22 from a versioned package, so `rpm -q nodejs` reports it missing; do not
+install a second Node)
 
 - [ ] **Step 2: Write the package and config**
 
@@ -3498,8 +3669,9 @@ jobs:
       - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.98.1
           components: rustfmt
       - run: cargo fmt --all --check
       - run: cargo xtask check-rules
@@ -3514,7 +3686,7 @@ jobs:
           PR_BODY: ${{ github.event.pull_request.body }}
         run: cargo xtask check-commits --range "$BASE_SHA..$HEAD_SHA" --pr-title "$PR_TITLE" --pr-body "$PR_BODY"
       - name: check-commits for main
-        if: github.event_name == 'push'
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
         env:
           BEFORE_SHA: ${{ github.event.before }}
         run: cargo xtask check-commits --range "$BEFORE_SHA..$GITHUB_SHA"
@@ -3524,11 +3696,12 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:44
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git gcc clang-devel pipewire-devel gtk4-devel libadwaita-devel blueprint-compiler
+      - run: dnf install -y --setopt=install_weak_deps=False git gcc gettext clang-devel pipewire-devel gtk4-devel libadwaita-devel blueprint-compiler
       - uses: actions/checkout@v4
       - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
         with:
+          toolchain: 1.98.1
           components: clippy, llvm-tools-preview
       - uses: taiki-e/install-action@v2
         with:
@@ -3544,7 +3717,9 @@ jobs:
     steps:
       - run: dnf install -y --setopt=install_weak_deps=False git gcc gtk4-devel libadwaita-devel blueprint-compiler weston mesa-dri-drivers
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
       - name: widget tests under headless weston
         env:
           GDK_BACKEND: wayland
@@ -3603,7 +3778,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
       - uses: taiki-e/install-action@v2
         with:
           tool: cargo-mutants
@@ -3613,7 +3790,9 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: dtolnay/rust-toolchain@stable
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
       - run: cargo test --package arctis-core
         env:
           PROPTEST_CASES: "2560"
@@ -3799,7 +3978,7 @@ flowchart TD
     G -- no --> L["line_limit: warning only"]
     G -- no --> CO["comments: rust, c_like, hash, xml"]
     G -- no --> U["unsafe_api"]
-    R --> LI["lints: guarded allows in Cargo.toml"]
+    R --> LI["lints: guarded allows,<br/>members inherit workspace lints"]
     R --> D["dbus_copy: extension copies byte-equal"]
 ```
 
@@ -3808,7 +3987,7 @@ flowchart TD
 | No comments in any language | `xtask/src/check_rules/comments/mod.rs::check`, `xtask/src/check_rules/comments/rust.rs::first_comment_line`, `xtask/src/check_rules/comments/c_like.rs::first_comment_line`, `xtask/src/check_rules/comments/hash.rs::first_comment_line`, `xtask/src/check_rules/comments/xml.rs::first_comment_line` | `xtask/tests/comments.rs` |
 | Generated files exempt | `xtask/src/check_rules/generated.rs::is_generated` | `xtask/tests/generated.rs` |
 | About 400 lines per file, warning only | `xtask/src/check_rules/line_limit.rs::check` | `xtask/tests/line_limit.rs` |
-| Lints that demand docs stay allowed | `xtask/src/check_rules/lints.rs::check`, policy in `Cargo.toml` and `clippy.toml` | `xtask/tests/lints.rs`, `xtask/tests/clippy_config.rs` |
+| Lints that demand docs stay allowed; members inherit the workspace lints | `xtask/src/check_rules/lints.rs::check`, policy in `Cargo.toml` and `clippy.toml` | `xtask/tests/lints.rs`, `xtask/tests/clippy_config.rs` |
 | No public unsafe functions | `xtask/src/check_rules/unsafe_api.rs::check`, lexer wrapper `xtask/src/rust_tokens.rs::tokens` | `xtask/tests/unsafe_api.rs` |
 | Headset1 XML copies byte-equal | `xtask/src/check_rules/dbus_copy.rs::check` | `xtask/tests/dbus_copy.rs` |
 | Conventional commits, no attribution | `xtask/src/check_commits.rs::run`, `xtask/src/commit_message.rs::subject_problem`, `xtask/src/commit_message.rs::attribution_problem` | `xtask/tests/check_commits.rs` |
@@ -3897,7 +4076,8 @@ Expected: `rules`, `test`, `ui`, `extension`, `flatpak` all pass. On failure, re
 ### Task 24: After the PR merges — ruleset, merge settings, hooks
 
 Run only once the PR is merged into `main` with rebase (`gh pr merge --rebase`), so other branches can see the
-`rules` check before it becomes required.
+`rules` check before it becomes required. The executor does not merge on its own initiative: if whoever drives
+the sub-projects has not merged the PR, stop after Task 23 and report Task 24 as pending.
 
 - [ ] **Step 1: Restrict merge methods and apply the ruleset**
 
@@ -3905,8 +4085,15 @@ Run only once the PR is merged into `main` with rebase (`gh pr merge --rebase`),
 cd /home/marcelo/Desenvolvimento/arctis-wt/sp1
 gh api --method PATCH repos/marcelogm/arctis-companion \
   -F allow_squash_merge=false -F allow_merge_commit=false -F allow_rebase_merge=true
-gh api --method POST repos/marcelogm/arctis-companion/rulesets --input .github/rulesets/main.json
+existing=$(gh api repos/marcelogm/arctis-companion/rulesets --jq '.[] | select(.name == "main") | .id')
+if [ -n "$existing" ]; then
+  gh api --method PUT "repos/marcelogm/arctis-companion/rulesets/$existing" --input .github/rulesets/main.json
+else
+  gh api --method POST repos/marcelogm/arctis-companion/rulesets --input .github/rulesets/main.json
+fi
 ```
+
+Re-running the step updates the ruleset instead of creating a second one.
 
 - [ ] **Step 2: Verify**
 
@@ -3929,8 +4116,21 @@ cd /home/marcelo/Desenvolvimento/arctis-wt/sp1 && cargo xtask install-hooks
 git -C /home/marcelo/Desenvolvimento/arctis-companion config --get core.hooksPath || echo unset
 ```
 
-Expected: `unset`; `.git/hooks/pre-commit` and `.git/hooks/commit-msg` exist in the common git dir. Worktrees on
-branches without `xtask/` skip the hooks until they rebase onto `main`.
+Expected: `unset`; `.git/hooks/pre-commit` and `.git/hooks/commit-msg` exist in the common git dir. This step
+runs `cargo` on the host on purpose: git runs the hooks on the host, so the host toolchain (Fedora cargo 1.98 and
+gcc, no GTK needed for `xtask`) must build `xtask`. Worktrees on branches without `xtask/` skip the pre-commit
+check and run their tracked `.githooks/commit-msg` until they rebase onto `main`.
+
+- [ ] **Step 4: Prove the hooks fire**
+
+```bash
+cd /home/marcelo/Desenvolvimento/arctis-wt/sp1
+git commit --allow-empty -m "Add things"; echo exit=$?
+git commit --allow-empty -m "chore: probe" -m "Co-Authored-By: Someone <someone@example.invalid>"; echo exit=$?
+git log -1 --format=%s
+```
+
+Expected: both commits are rejected (`exit=1`) and `git log` still shows the merged SP1 commit, not a probe.
 
 ---
 
@@ -3967,11 +4167,15 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     segment is the checked item. Paths resolve from the repository root.
 12. **Extension XML copy location is SP13's choice**: every tracked file under `extension/` named
     `io.github.marcelogm.ArctisCompanion.Headset1.xml` must be byte-equal to the `data/dbus/` source.
-13. **Hooks skip checkouts without `xtask/`** (`[ -d xtask ] || exit 0`), because git config and hooks are shared
-    by every worktree and sibling branches predate xtask. `install-hooks` runs once, after SP1 merges (Task 24).
+13. **Hooks adapt to checkouts without `xtask/`**: git config and hooks are shared by every worktree and sibling
+    branches predate xtask. There `pre-commit` exits 0 and `commit-msg` runs the branch's tracked
+    `.githooks/commit-msg`, so unsetting `core.hooksPath` never drops the attribution guard. `install-hooks` runs
+    once, on the host, after SP1 merges (Task 24).
 14. **CI scope in SP1**: the `extension` job runs ESLint only (gjs tests and `gnome-extensions pack` arrive with
     SP13); `audio-integration` arrives with SP7; `release.yml` with SP14; nightly mutation testing covers all of
-    `arctis-core` until SP2/SP4/SP6 add the modules the spec names. Weston runs with `GSK_RENDERER=cairo`.
+    `arctis-core` until SP2/SP4/SP6 add the modules the spec names. Weston runs with `GSK_RENDERER=cairo`. The i18n
+    gates of quality §2 (stale POT, `msgfmt --check`, untranslated `pt_BR`) and the optional nested-shell smoke
+    arrive with the first `po/` directory (SP9) and the extension (SP13): SP1 has no catalogue to check.
 15. **Ruleset applied after merge** (Task 24), with the repository's merge settings also set to rebase-only. The
     ruleset JSON is tracked in `.github/rulesets/main.json`. If GitHub refuses rulesets on this private repository
     (plan limit), the merge settings plus the `rules` job on every push to `main` remain, and the gap is reported.
@@ -3981,3 +4185,12 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     verbose-commit scissors line are ignored in `--message` mode.
 18. **`gettext-rs` deferred to SP9**: the empty window has one translatable string in Blueprint; no Rust code
     resolves text yet.
+19. **`check-pure` checks build and target-specific dependencies too**: the spec frees only dev-dependencies and
+    ADR 0003 limits the dependency closure of `core`, so every dependency kind except `dev` must be `serde` or
+    `serde_json`.
+20. **Every member manifest must keep `[lints] workspace = true`** (`check-rules`, `lints.rs`): a member that opts
+    out drops the guarded allows and the complexity denies at once, which is the same failure as a removed allow.
+21. **CI pins Rust 1.98.1**, the version of the toolbox and of the Flatpak `rust-stable` extension, so pedantic
+    clippy with `-D warnings` gives the same verdict locally, in CI and in the Flatpak; bump all three together.
+22. **The `pt_BR.po` fixture is generated by `xgettext` and `msginit`** inside the test, so "a freshly generated
+    `pt_BR.po`" is literal; the CI `test` job installs `gettext`.
