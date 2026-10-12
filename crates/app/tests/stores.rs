@@ -173,6 +173,21 @@ fn an_unreadable_seen_apps_file_is_an_error_and_the_next_record_replaces_it() {
     assert_eq!(store.load().expect("load"), [firefox]);
 }
 
+#[test]
+fn a_seen_apps_path_that_cannot_be_read_is_never_overwritten() {
+    let scratch = Scratch::new();
+    let path = scratch.fresh().join("seen-apps.json");
+    fs::create_dir_all(&path).expect("a directory where the file goes");
+    let mut store = FileSeenApps::new(path.clone());
+    let firefox = SeenApp {
+        key: "firefox".to_owned(),
+        name: "Firefox".to_owned(),
+        identifiers: vec!["firefox".to_owned()],
+    };
+    assert!(store.record(&firefox).is_err());
+    assert!(path.is_dir());
+}
+
 const NOW_SECONDS: u64 = 1_760_000_000;
 
 fn app_settings() -> arctis_core::companion::app_settings::AppSettings {

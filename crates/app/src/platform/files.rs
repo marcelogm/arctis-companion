@@ -23,8 +23,14 @@ pub fn read_text(path: &Path) -> Result<Option<String>, StoreError> {
 pub fn write_atomically(path: &Path, text: &str) -> Result<(), StoreError> {
     create_parent(path)?;
     let temporary = path.with_extension("tmp");
-    fs::write(&temporary, text).map_err(|error| failure(&temporary, &error))?;
+    write_durably(&temporary, text).map_err(|error| failure(&temporary, &error))?;
     fs::rename(&temporary, path).map_err(|error| failure(path, &error))
+}
+
+fn write_durably(path: &Path, text: &str) -> io::Result<()> {
+    let mut file = fs::File::create(path)?;
+    file.write_all(text.as_bytes())?;
+    file.sync_all()
 }
 
 pub fn append(path: &Path, text: &str) -> Result<(), StoreError> {
