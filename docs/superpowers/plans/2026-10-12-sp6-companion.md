@@ -6796,7 +6796,7 @@ git push
 - Modify: `crates/core/src/companion/intents.rs`, `crates/core/src/companion/reducer.rs`
 - Test: `crates/core/tests/companion/presets_flow.rs`, `crates/core/tests/companion/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod presets_flow;` to `crates/core/tests/companion/main.rs`.
 
@@ -6900,12 +6900,12 @@ fn undo_restores_the_deleted_preset() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion presets_flow`
 Expected: FAIL (save and delete intents are ignored).
 
-- [ ] **Step 3: Handle preset intents in `intents.rs`**
+- [x] **Step 3: Handle preset intents in `intents.rs`**
 
 Add to the imports of `intents.rs`:
 
@@ -6954,7 +6954,7 @@ Add inside `impl Companion`:
     }
 ```
 
-- [ ] **Step 4: Throttle headset edits in `reducer.rs`**
+- [x] **Step 4: Throttle headset edits in `reducer.rs`**
 
 Replace `advance`, `apply_curve` and `write_headset_curve`, and add `write_active_headset_curve`:
 
@@ -6999,12 +6999,12 @@ Replace `advance`, `apply_curve` and `write_headset_curve`, and add `write_activ
 
 A settle that writes a new curve cancels a pending edit, because that write already carries the latest curve.
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
