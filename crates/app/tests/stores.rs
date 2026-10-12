@@ -4,15 +4,19 @@ use std::path::{Path, PathBuf};
 
 use arctis_app::platform::battery_store::FileBattery;
 use arctis_app::platform::preset_store::FilePresets;
+use arctis_app::platform::seen_apps_store::FileSeenApps;
 use arctis_core::battery::sample::{Reading, Sample, UnixSeconds};
+use arctis_core::companion::seen_apps::SeenApp;
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::ports::BatteryRepository;
 use arctis_core::ports::PresetRepository;
+use arctis_core::ports::SeenAppsRepository;
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::values::Percent;
 use arctis_core::testkit::repository_contracts::battery_repository_contract;
 use arctis_core::testkit::repository_contracts::preset_repository_contract;
+use arctis_core::testkit::repository_contracts::seen_apps_repository_contract;
 use tempfile::TempDir;
 
 struct Scratch {
@@ -137,4 +141,30 @@ fn a_malformed_row_loses_only_itself() {
     .expect("csv");
     let store = FileBattery::new(path);
     assert_eq!(store.load().expect("load"), [sample(1, 90), sample(2, 89)]);
+}
+
+#[test]
+fn file_seen_apps_pass_the_repository_contract() {
+    let scratch = Scratch::new();
+    seen_apps_repository_contract(
+        || FileSeenApps::new(scratch.fresh().join("seen-apps.json")),
+        |store| FileSeenApps::new(store.path().to_owned()),
+    );
+}
+
+#[test]
+fn an_unreadable_seen_apps_file_is_an_error_and_the_next_record_replaces_it() {
+    let scratch = Scratch::new();
+    let path = scratch.fresh().join("seen-apps.json");
+    fs::create_dir_all(path.parent().expect("parent")).expect("dir");
+    fs::write(&path, "[ broken").expect("file");
+    let mut store = FileSeenApps::new(path);
+    assert!(store.load().is_err());
+    let firefox = SeenApp {
+        key: "org.mozilla.firefox".to_owned(),
+        name: "Firefox".to_owned(),
+        identifiers: vec!["org.mozilla.firefox".to_owned(), "firefox".to_owned()],
+    };
+    store.record(&firefox).expect("record");
+    assert_eq!(store.load().expect("load"), [firefox]);
 }
