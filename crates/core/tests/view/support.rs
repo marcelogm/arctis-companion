@@ -149,3 +149,10 @@ pub fn with(phase: Phase, route: Route) -> Snapshot {
     s.audio.route = route;
     s
 }
+
+pub fn assert_close(actual: f64, expected: f64, tolerance: f64) {
+    assert!(
+        (actual - expected).abs() <= tolerance,
+        "got {actual}, expected {expected} ± {tolerance}"
+    );
+}

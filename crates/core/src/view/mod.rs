@@ -1,3 +1,4 @@
+pub mod eq_editor;
 pub mod equalizer_rows;
 pub mod headset_page;
 pub mod headset_rows;
