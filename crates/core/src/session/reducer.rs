@@ -3,6 +3,7 @@ use super::effect::{Cadence, Effect};
 use super::exchange::Exchange;
 use super::input::Input;
 use super::phase::Stage;
+use super::rebind::Rebinding;
 use super::timing::{ENUMERATION_SETTLE, HEADSET_OFF_POLL};
 use super::verify::Transaction;
 use crate::messages::device::{DeviceUpdate, Phase, SyncPolicy};
@@ -81,11 +82,13 @@ impl Session {
             Input::Found { pid, uniq } => self.found(pid, uniq),
             Input::Denied => self.denied(),
             Input::Lost => self.lost(),
+            Input::CommandPortLost => self.command_port_lost(),
+            Input::CommandPortBack => self.command_port_back(),
+            Input::CommandPortDenied => {}
             Input::Woke => self.scheduled = None,
             Input::Reply(bytes) => self.command_frame(&bytes),
             Input::Unsolicited { interface, bytes } => self.unsolicited(interface, &bytes),
             Input::Desired { settings, policy } => self.desire(settings, policy),
-            Input::CommandPortLost | Input::CommandPortBack | Input::CommandPortDenied => {}
         }
     }
 
@@ -122,6 +125,27 @@ impl Session {
         self.announce();
     }
 
+    fn command_port_lost(&mut self) {
+        if let Stage::Rebinding(rebinding) = &mut self.stage {
+            rebinding.vanished();
+            self.outbox.push(Effect::Rescan(Cadence::Rebinding));
+            return;
+        }
+        let Some(resume) = self.stage.resume_point() else {
+            return;
+        };
+        self.interrupt();
+        self.stage = Stage::Rebinding(Rebinding::new(resume, self.now));
+        self.outbox.push(Effect::Rescan(Cadence::Rebinding));
+    }
+
+    fn command_port_back(&mut self) {
+        if let Stage::Rebinding(rebinding) = &mut self.stage {
+            rebinding.reopened(self.now);
+            self.outbox.push(Effect::Rescan(Cadence::Off));
+        }
+    }
+
     fn desire(&mut self, settings: HeadsetSettings, policy: SyncPolicy) {
         self.failed.clear();
         match policy {
@@ -143,7 +167,7 @@ impl Session {
 
     pub(super) fn announce(&mut self) {
         let phase = self.stage.phase();
-        if phase != self.published {
+        if phase != Phase::Rebinding && phase != self.published {
             self.publish_phase(phase);
         }
     }
