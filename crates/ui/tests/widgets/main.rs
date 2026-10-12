@@ -17,6 +17,7 @@ mod headset_page;
 mod headset_status;
 mod intents;
 mod layout;
+mod new_preset;
 mod permission_dialog;
 mod preferences_dialog;
 mod preset_actions;

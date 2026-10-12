@@ -11,6 +11,7 @@ use arctis_core::view::headset_page::{
     BannerModel, HeadsetModel, HeadsetPageModel, StatusKind, headset_page,
 };
 use arctis_core::view::preferences::{Background, preferences};
+use arctis_core::view::preset_edits::new_preset;
 use arctis_core::view::status_page::StatusPageModel;
 use gtk::{gio, glib};
 
@@ -117,22 +118,23 @@ mod imp {
                 Some(glib::VariantTy::STRING),
                 |window, _, target| window.show_preset(target.and_then(glib::Variant::str)),
             );
-            klass.add_binding_action(
-                gdk::Key::comma,
-                gdk::ModifierType::CONTROL_MASK,
-                "win.preferences",
-            );
-            klass.add_binding_action(
-                gdk::Key::question,
-                gdk::ModifierType::CONTROL_MASK,
-                "win.shortcuts",
-            );
-            klass.add_binding_action(gdk::Key::w, gdk::ModifierType::CONTROL_MASK, "window.close");
+            klass.install_action("win.new-preset", None, |window, _, _| {
+                window.new_preset();
+            });
+            bind_shortcuts(klass);
         }
 
         fn instance_init(obj: &glib::subclass::InitializingObject<Self>) {
             obj.init_template();
         }
+    }
+
+    fn bind_shortcuts(klass: &mut <Window as ObjectSubclass>::Class) {
+        let control = gdk::ModifierType::CONTROL_MASK;
+        klass.add_binding_action(gdk::Key::n, control, "win.new-preset");
+        klass.add_binding_action(gdk::Key::comma, control, "win.preferences");
+        klass.add_binding_action(gdk::Key::question, control, "win.shortcuts");
+        klass.add_binding_action(gdk::Key::w, control, "window.close");
     }
 
     impl ObjectImpl for Window {
@@ -290,8 +292,24 @@ impl Window {
             return;
         }
         imp.eq_editor_page.open(&snapshot, &id);
-        if imp.navigation.visible_page_tag().as_deref() != Some(EDITOR_TAG) {
-            imp.navigation.push_by_tag(EDITOR_TAG);
+        self.show_editor();
+    }
+
+    fn new_preset(&self) {
+        let imp = self.imp();
+        let Some(snapshot) = imp.snapshot.borrow().clone() else {
+            return;
+        };
+        let preset = new_preset(&snapshot, resolve);
+        imp.sink.emit(Intent::SavePreset(preset.clone()));
+        imp.eq_editor_page.open_new(&snapshot, preset);
+        self.show_editor();
+    }
+
+    fn show_editor(&self) {
+        let navigation = &self.imp().navigation;
+        if navigation.visible_page_tag().as_deref() != Some(EDITOR_TAG) {
+            navigation.push_by_tag(EDITOR_TAG);
         }
     }
 

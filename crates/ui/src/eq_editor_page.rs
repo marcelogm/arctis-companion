@@ -125,9 +125,16 @@ impl EqEditorPage {
     }
 
     pub fn open(&self, snapshot: &Rc<Snapshot>, id: &PresetId) {
+        self.open_working(snapshot, snapshot.presets.find(id).cloned());
+    }
+
+    pub fn open_new(&self, snapshot: &Rc<Snapshot>, preset: Preset) {
+        self.open_working(snapshot, Some(preset));
+    }
+
+    fn open_working(&self, snapshot: &Rc<Snapshot>, preset: Option<Preset>) {
         self.end_preview();
         self.dismiss_undo_toast();
-        let preset = snapshot.presets.find(id).cloned();
         self.imp().working.replace(preset.map(WorkingCopy::opened));
         self.render(snapshot);
     }

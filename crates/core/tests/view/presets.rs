@@ -47,7 +47,7 @@ fn an_empty_custom_group_explains_itself() {
         .expect("description");
     assert_eq!(
         english(&description),
-        "Duplicate or import a preset to customize it"
+        "Create, duplicate or import a preset to customize it"
     );
 }
 

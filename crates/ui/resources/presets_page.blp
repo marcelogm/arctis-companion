@@ -8,6 +8,18 @@ template $ArctisPresetsPage: Adw.NavigationPage {
   child: Adw.ToolbarView {
     [top]
     Adw.HeaderBar {
+      [start]
+      Button new_preset {
+        name: "new-preset";
+        icon-name: "list-add-symbolic";
+        action-name: "win.new-preset";
+        tooltip-text: _("New Preset");
+
+        accessibility {
+          label: _("New Preset");
+        }
+      }
+
       [end]
       Button import {
         name: "import";
