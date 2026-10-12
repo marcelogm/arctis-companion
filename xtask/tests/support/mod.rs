@@ -46,6 +46,11 @@ impl Fixture {
         self
     }
 
+    pub fn edit_unstaged(&self, relative: &str, content: &str) -> &Self {
+        fs::write(self.path().join(relative), content).expect("edit working tree file");
+        self
+    }
+
     pub fn commit(&self, message: &str) -> &Self {
         let args = [
             "-c",

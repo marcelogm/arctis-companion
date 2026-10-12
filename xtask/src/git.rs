@@ -16,6 +16,21 @@ pub fn run(root: &Path, args: &[&str]) -> Result<String, String> {
     }
 }
 
+pub fn staged_blob(root: &Path, file: &str) -> Option<String> {
+    let output = Command::new("git")
+        .arg("-C")
+        .arg(root)
+        .arg("show")
+        .arg(format!(":{file}"))
+        .output()
+        .ok()?;
+    output
+        .status
+        .success()
+        .then(|| String::from_utf8(output.stdout).ok())
+        .flatten()
+}
+
 pub fn tracked_files(root: &Path) -> Result<Vec<String>, String> {
     run(root, &["ls-files", "-z"]).map(|text| split_nul(&text))
 }

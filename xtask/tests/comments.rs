@@ -10,6 +10,25 @@ fn staged_mode_rejects_a_staged_comment() {
 }
 
 #[test]
+fn staged_mode_checks_the_index_not_the_working_tree() {
+    let fixture = Fixture::init();
+    fixture
+        .write("src/lib.rs", "fn f() {} // why\n")
+        .edit_unstaged("src/lib.rs", "fn f() {}\n");
+    assert!(!fixture.xtask(&["check-rules", "--staged"]).succeeded());
+}
+
+#[test]
+fn staged_mode_ignores_an_unstaged_comment() {
+    let fixture = Fixture::init();
+    fixture
+        .write("src/lib.rs", "fn f() {}\n")
+        .edit_unstaged("src/lib.rs", "fn f() {} // why\n");
+    let outcome = fixture.xtask(&["check-rules", "--staged"]);
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
 fn rust_outer_doc_comment_is_rejected() {
     assert_rejected("src/lib.rs", "/// Adds two numbers.\npub fn add() {}\n");
 }
