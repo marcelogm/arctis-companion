@@ -6,6 +6,7 @@ mod check_pure;
 mod check_rules;
 mod cli;
 mod commit_message;
+mod doc_refs;
 mod git;
 mod install_hooks;
 mod report;
