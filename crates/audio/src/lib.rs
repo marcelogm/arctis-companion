@@ -5,6 +5,7 @@ pub mod graph;
 pub mod links;
 pub mod outputs;
 pub mod streams;
+pub mod volume;
 
 pub fn init() {
     pipewire::init();

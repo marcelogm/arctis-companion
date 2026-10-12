@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use crate::volume::{Volume, VolumeChange};
+
 pub type ObjectId = u32;
 
 pub const MEDIA_CLASS: &str = "media.class";
@@ -37,10 +39,11 @@ impl<'a> FromIterator<(&'a str, &'a str)> for Props {
     }
 }
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, Default, PartialEq)]
 pub struct Node {
     pub props: Props,
     pub running: bool,
+    pub volume: Volume,
 }
 
 impl Node {
@@ -104,6 +107,18 @@ impl Graph {
         if let Some(node) = self.nodes.get_mut(&id) {
             node.running = running;
         }
+    }
+
+    pub fn change_volume(&mut self, id: ObjectId, change: &VolumeChange) {
+        if let Some(node) = self.nodes.get_mut(&id) {
+            node.volume = node.volume.merged(change);
+        }
+    }
+
+    #[must_use]
+    pub fn volume_of(&self, name: &str) -> Option<Volume> {
+        let volume = &self.node(self.node_named(name)?)?.volume;
+        (!volume.channels.is_empty()).then(|| volume.clone())
     }
 
     pub fn put_device(&mut self, id: ObjectId, props: Props) {
