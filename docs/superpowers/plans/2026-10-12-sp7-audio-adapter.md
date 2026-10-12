@@ -98,11 +98,16 @@ keeping the behaviour its test asserts.
 crates/audio/Cargo.toml                 + triple_buffer, async-channel, pipewire feature v1_2_0; dev serde_json, allocation-counter
 crates/audio/src/
   lib.rs            module list, AudioHandle and AudioCommands re-exports, init
-  graph.rs          Graph, Props, Node (props, running, last Props volume), Link, Defaults; default-metadata JSON names (pure)
+  keys.rs           every PipeWire property key the crate reads or writes (pure)
+  eq_names.rs       our node names, description and link group (pure)
+  metadata_value.rs default-metadata JSON names (pure)
+  graph.rs          Graph, Props, Node (props, running, last Props volume), Link, Defaults (pure)
   links.rs          follow: chain from a node to its terminal sink, MAX_HOPS (pure)
-  outputs.rs        sink_kind, default_sink, insertion_target, Outputs (insert/remove/manager_denied) (pure)
+  sinks.rs          sink_kind, has_nova_bluetooth, default_sink (pure)
+  insertion.rs      insertion_target, Insertion (plan_insert/commit/remove/manager_denied) (pure)
   streams.rs        streams, identifiers (pure)
-  changes.rs        Published: AudioEvents only on change (pure)
+  changes.rs        Published: AudioEvents only on change, DefaultSink held while Settling (pure)
+  pod.rs            pod_bytes, format_pod (pure over libspa pods)
   volume.rs         VolumeChange, Volume, VolumeMirror, Props pods (pure over libspa pods)
   samples.rs        Processor: f32 bytes through core::eq::Equalizer, coefficients from triple_buffer (pure)
   designer.rs       Designer: curve and negotiated rate → coefficients into triple_buffer; rate_of (pure, Task 9b)
@@ -113,12 +118,12 @@ crates/audio/src/
   handle.rs         AudioHandle::spawn, AudioCommands, Drop
 crates/audio/tests/
   init.rs                     (exists, unchanged)
-  pure/main.rs support.rs graph.rs links.rs outputs.rs streams.rs changes.rs volume.rs samples.rs designer.rs
+  pure/main.rs support.rs graph.rs links.rs sinks.rs insertion.rs streams.rs changes.rs volume.rs samples.rs designer.rs
   samples_allocations.rs      counting allocator around Processor::run
   unreachable.rs              #[ignore]: no PipeWire → Unavailable, prompt quit
   reconnect.rs                #[ignore]: PipeWire started and stopped by the test → Available, Unavailable
   headless/run.sh session.sh pipewire.conf wireplumber.conf
-  headless/main.rs lab.rs tools.rs tone.rs equalizer.rs volume.rs streams.rs gain.rs   (#[ignore])
+  headless/main.rs lab.rs tools.rs tone.rs meter.rs equalizer.rs volume.rs streams.rs gain.rs   (#[ignore])
 .github/workflows/ci.yml       + audio-integration job
 docs/architecture/audio.md      diagrams + code paths and symbols
 docs/architecture/README.md     audio row, crate entry point, CI diagram
@@ -138,7 +143,7 @@ prototype showed:
 | 5 | App streams are `Stream/Output/Audio` nodes without `node.link-group` (filter outputs) and not named `arctis_companion_eq_out`; a stream with no identifier is skipped; the display name is `application.name` from the node, else the client, else the app key | our own and EasyEffects' outputs are not apps; `StreamInfo.ids` must name an app |
 | 6 | Each of the three identifiers is read from the node props, else from the Client named by `client.id` | audio §4 says so for the portal app id; one rule for all three is simpler |
 | 7 | `sink_kind` only classifies `Audio/Sink` nodes; a sink's Device must have vendor `0x1038` and a PID that `Model::lookup` calls `Supported` | the Nova 5 microphones share the Device and the bluez properties |
-| 8 | No default, a vanished default or no chain gives `DefaultSink { terminal: Other, via_equalizer: false, via_easy_effects: false }`; EasyEffects is any node named `ee_*` in the chain | `DefaultSink` has no "unknown"; routing to `None` is SP6's (audio §1) |
+| 8 | No default or no chain gives `DefaultSink { terminal: Other, via_equalizer: false, via_easy_effects: false }`; an effective default (`default.audio.sink`) naming a node not in the graph gives no `DefaultSink` at all, so the last route stands (see 28); EasyEffects is any node named `ee_*` in the chain | `DefaultSink` has no "unknown"; routing to `None` is SP6's (audio §1) |
 | 9 | ManagerDenied: after writing `default.configured.audio.sink`, the worker checks again `MANAGER_CONFIRM_AFTER` (1 s) later; it is denied when the configured default is not our sink and the current default is still the bluez node it replaced | hardware-findings §6.2, §9: a denied write is silent and the metadata lives in WirePlumber, so a core sync cannot confirm it; a user who moved away meanwhile is not a denial |
 | 10 | Headless tests connect as a native host client, which always gets the Manager permissions, so the denial path is covered by the `outputs.rs` tables only; the Flatpak case joins SP14's checklist. What the headless suite does check is the request itself: our client object carries `media.category = Manager` (Task 9a) | SP0 §6.2 shows only a Flatpak client is denied, and that a category set anywhere but the core properties never reaches the client object |
 | 11 | Removal restores the bluez node when either `default.audio.sink` or `default.configured.audio.sink` names our sink, by writing `default.configured.audio.sink`; `Retarget` and `RemoveEqualizer` without an insertion do nothing; `InsertEqualizer` while inserted retargets; `InsertEqualizer` over any default other than the bluez node itself does nothing | audio §2 "Removal"; SP0 note: restore the configured key explicitly |
@@ -158,6 +163,9 @@ prototype showed:
 | 25 | The volume mirror runs one way, our sink → bluez node. A volume change made on the bluez node itself (the headset's dial over AVRCP, or another app) is not copied back onto our sink's slider while inserted | audio §2 names only that direction; copying back risks a feedback loop between two nodes. SP14's Bluetooth checklist records how the dial behaves |
 | 26 | `crates/audio/tests/reconnect.rs` starts its own `pipewire` (no WirePlumber) as a child process before `session.sh` starts the shared one, and stops it by its PID | the only way to see the reconnect path; `Available` needs only the registry, and a PID the test spawned can never be the user's daemon |
 | 27 | The coefficient designer and the `Format` rate parser move out of `eq_sink.rs` into the pure `designer.rs` (Task 9b) | the rate redesign of Deviation 16 had no test: the headless graph always runs at 48 kHz |
+| 28 | Settling: after `InsertEqualizer` creates the sink, and after `RemoveEqualizer` removes an insertion, `Published` holds `DefaultSink` back until the end state arrives (insertion: `NovaBluetooth` via the equalizer; removal: a default other than our sink that resolves to a node, not via the equalizer) or until `SETTLE_WITHIN` (1 s) passes, then publishes whatever the graph holds. Each settling carries a ticket so an older deadline cannot end a newer one. Streams and the other events are never held | review 3: between the command and the settled graph the default named unbound nodes or ended at our own sink, and SP6's reducer read each transient as a route change, looping insert/remove forever |
+| 29 | When the `default` metadata global is removed, the registry drops its proxy and the `Graph` clears its defaults | review 3: a WirePlumber restart left writes going to a dead proxy and stale defaults in the graph |
+| 30 | Review 3 asked to replace the sleeper thread with a loop timer; kept the thread. `TimerSource<'l>` borrows the loop, while the worker lives in `'static` PipeWire callbacks, so it cannot own or arm one. A message a sleeper posts after its session ended is a no-op in the next one: `Retry` is ignored while connected, `ConfirmManager` finds nothing inserted, `Settled` at worst ends a newer settling early (the graph is then published as it is), and the shutdown `Quit` only arrives after the outcome is already `Quit` | `pipewire` 0.10 API; Deviation 13 |
 
 ---
 
