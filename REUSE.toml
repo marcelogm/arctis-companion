@@ -4,3 +4,9 @@ version = 1
 path = "**"
 SPDX-FileCopyrightText = "2026 marcelogm"
 SPDX-License-Identifier = "GPL-3.0-or-later"
+
+[[annotations]]
+path = ["crates/core/data/*.csv", "crates/core/data/*.txt"]
+precedence = "override"
+SPDX-FileCopyrightText = "2018-2022 Jaakko Pasanen"
+SPDX-License-Identifier = "MIT"
