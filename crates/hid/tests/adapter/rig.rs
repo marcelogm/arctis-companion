@@ -76,6 +76,10 @@ impl SocketRig {
         }
     }
 
+    pub fn plug_with_permission_after(&mut self, delay: u64) {
+        self.bench().plug_with_permission_after(delay);
+    }
+
     fn bench(&self) -> std::cell::RefMut<'_, Bench> {
         self.bench.borrow_mut()
     }

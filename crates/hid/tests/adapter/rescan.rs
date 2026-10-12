@@ -31,3 +31,13 @@ fn cadence_off_never_scans() {
     assert_eq!(rescan.next(), None);
     assert_eq!(rescan.take_due(Millis(u64::MAX)), None);
 }
+
+#[test]
+fn a_quick_retry_comes_once_then_the_cadence_resumes() {
+    let mut rescan = Rescan::starting_at(Millis(0));
+    assert_eq!(rescan.take_due(Millis(0)), Some(Cadence::Absent));
+    rescan.retry_soon(Millis(0));
+    assert_eq!(rescan.next(), Some(Millis(RESCAN_REBINDING)));
+    assert_eq!(rescan.take_due(Millis(RESCAN_REBINDING)), Some(Cadence::Absent));
+    assert_eq!(rescan.next(), Some(Millis(RESCAN_REBINDING + RESCAN_ABSENT)));
+}

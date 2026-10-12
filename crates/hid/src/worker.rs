@@ -43,6 +43,7 @@ pub struct Worker<O, W> {
     dongle: Option<OpenDongle>,
     rescan: Rescan,
     wake_at: Option<Millis>,
+    retrying_denied: bool,
 }
 
 impl<O: Opener, W: Waiter> Worker<O, W> {
@@ -58,6 +59,7 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
             dongle: None,
             rescan: Rescan::starting_at(now),
             wake_at: None,
+            retrying_denied: false,
         }
     }
 
@@ -177,13 +179,14 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
     }
 
     fn discover(&mut self, nodes: &[Node]) {
+        let retried = std::mem::take(&mut self.retrying_denied);
         match discovery::first_dongle(nodes) {
-            Some(found) => self.open_dongle(found),
+            Some(found) => self.open_dongle(found, retried),
             None => self.forget_denied_dongle(),
         }
     }
 
-    fn open_dongle(&mut self, found: Dongle) {
+    fn open_dongle(&mut self, found: Dongle, retried: bool) {
         match OpenDongle::open(&mut self.opener, &found) {
             Ok(open) => {
                 self.dongle = Some(open);
@@ -192,8 +195,17 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
                     uniq: found.uniq,
                 });
             }
-            Err(OpenError::Denied) => self.feed(Input::Denied),
+            Err(OpenError::Denied) => self.denied(retried),
             Err(OpenError::Gone) => {}
+        }
+    }
+
+    fn denied(&mut self, retried: bool) {
+        if retried || self.session.phase() != Phase::Absent {
+            self.feed(Input::Denied);
+        } else {
+            self.retrying_denied = true;
+            self.rescan.retry_soon(self.waiter.now());
         }
     }
 

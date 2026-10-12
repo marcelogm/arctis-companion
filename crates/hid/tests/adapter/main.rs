@@ -2,6 +2,7 @@ mod bench;
 mod discovery;
 mod handle;
 mod opening;
+mod permission;
 mod port;
 mod rescan;
 mod rig;
