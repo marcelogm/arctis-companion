@@ -3786,3 +3786,6 @@ All thirteen findings of the post-execution review were verified and fixed; none
     separate file because the device and quality specs name that path. The duplicate curve round-trip golden test
     is deleted, the frozen-message tests are exhaustive matches with payload type checks instead of string echoes,
     and the allow-list proptest classifies arguments by variant instead of through `readback()`.
+29. **SP3 merged first.** On the rebase its `eq` files replaced SP2's copies as they are, plus `Curve::from_slots`
+    (Deviation 24), and `crates/core/tests/protocol/eq_types.rs` was deleted because `crates/core/tests/eq/`
+    covers those types.

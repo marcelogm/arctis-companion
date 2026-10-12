@@ -2,7 +2,6 @@ mod strategies;
 mod support;
 
 mod command;
-mod eq_types;
 mod eq_wire;
 mod event;
 mod golden_frames;
