@@ -1,0 +1,39 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisPreferencesDialog: Adw.PreferencesDialog {
+  search-enabled: false;
+
+  Adw.PreferencesPage {
+    Adw.PreferencesGroup {
+      Adw.SwitchRow run_in_background {
+        name: "run-in-background";
+        title: _("Run in Background");
+        use-markup: false;
+      }
+
+      Adw.SpinRow low_battery {
+        name: "low-battery";
+        title: _("Low Battery Warning");
+
+        adjustment: Adjustment {
+          lower: 5;
+          upper: 50;
+          step-increment: 1;
+          page-increment: 5;
+        };
+      }
+
+      Adw.ActionRow shell_integration {
+        name: "shell-integration";
+        title: _("GNOME Shell Integration");
+        activatable: true;
+
+        [suffix]
+        Image {
+          icon-name: "adw-external-link-symbolic";
+        }
+      }
+    }
+  }
+}
