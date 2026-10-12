@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 14:32-0300\n"
+"POT-Creation-Date: 2026-10-12 14:35-0300\n"
 "PO-Revision-Date: 2026-10-12 14:29-0300\n"
 "Last-Translator: Automatically generated\n"
 "Language-Team: none\n"
@@ -852,10 +852,53 @@ msgstr ""
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid ""
-"Change headset settings and equalizer presets, switch presets per app and "
-"follow the battery."
+"Change the headset’s settings and equalizer, let presets follow the app that "
+"plays sound, and keep an eye on the battery."
 msgstr ""
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
-msgid "marcelogm"
+msgid ""
+"Sidetone, microphone volume, mute light, volume limiter, wireless mode and "
+"automatic power off"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"Built-in and custom equalizer presets with a parametric editor and Equalizer "
+"APO import"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "App presets that switch the equalizer while a chosen app plays"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "Battery history and low battery notifications"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "A Quick Settings toggle through the companion GNOME Shell extension"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"The wireless dongle is reached through hidraw, so the app needs access to "
+"all devices and a udev rule on the computer, 70-arctis-companion.rules. When "
+"permission is missing, the app shows the rule and the command to load it."
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "Not supported yet:"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "Switching the headset between 2.4 GHz and Bluetooth audio"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "The Bluetooth equalizer preset for audio from a phone"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid "First release."
 msgstr ""

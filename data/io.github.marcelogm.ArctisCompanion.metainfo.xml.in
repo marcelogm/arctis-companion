@@ -6,12 +6,26 @@
   <name>Arctis Companion</name>
   <summary>Control your SteelSeries Arctis Nova 5 headset</summary>
   <description>
-    <p>Change headset settings and equalizer presets, switch presets per app and follow the battery.</p>
+    <p>Change the headset’s settings and equalizer, let presets follow the app that plays sound, and keep an eye on the battery.</p>
+    <ul>
+      <li>Sidetone, microphone volume, mute light, volume limiter, wireless mode and automatic power off</li>
+      <li>Built-in and custom equalizer presets with a parametric editor and Equalizer APO import</li>
+      <li>App presets that switch the equalizer while a chosen app plays</li>
+      <li>Battery history and low battery notifications</li>
+      <li>A Quick Settings toggle through the companion GNOME Shell extension</li>
+    </ul>
+    <p>The wireless dongle is reached through hidraw, so the app needs access to all devices and a udev rule on the computer, 70-arctis-companion.rules. When permission is missing, the app shows the rule and the command to load it.</p>
+    <p>Not supported yet:</p>
+    <ul>
+      <li>Switching the headset between 2.4 GHz and Bluetooth audio</li>
+      <li>The Bluetooth equalizer preset for audio from a phone</li>
+    </ul>
   </description>
   <developer id="io.github.marcelogm">
-    <name>marcelogm</name>
+    <name translate="no">marcelogm</name>
   </developer>
   <launchable type="desktop-id">io.github.marcelogm.ArctisCompanion.desktop</launchable>
+  <translation type="gettext">arctis-companion</translation>
   <url type="homepage">https://github.com/marcelogm/arctis-companion</url>
   <url type="bugtracker">https://github.com/marcelogm/arctis-companion/issues</url>
   <content_rating type="oars-1.1"/>
@@ -24,6 +38,10 @@
     <control>touch</control>
   </supports>
   <releases>
-    <release version="0.1.0" date="2026-10-12"/>
+    <release version="0.1.0" date="2026-10-12">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
   </releases>
 </component>
