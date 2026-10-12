@@ -7,7 +7,7 @@ use arctis_core::messages::device::DeviceUpdate;
 
 use crate::support::{
     Harness, START, adopted, audio_commands, curve_of, default_sink, device_curves, id, observed,
-    observed_with, persisted, ready, unique_curve, wakes,
+    observed_with, persisted, published, ready, unique_curve, wakes,
 };
 
 fn mine(curve: Curve) -> Preset {
@@ -114,4 +114,18 @@ fn undo_restores_the_deleted_preset() {
     let _ = h.headset_holds("flat");
     let restored = h.intent(Intent::SavePreset(mine(unique_curve())));
     assert_eq!(device_curves(&restored), [unique_curve()]);
+}
+
+#[test]
+fn saving_a_preset_publishes_it_in_the_same_turn() {
+    let mut h = Harness::new(persisted());
+    let actions = h.intent(Intent::SavePreset(mine(unique_curve())));
+    assert!(published(&actions).is_some_and(|s| s.presets.find(&id("mine")).is_some()));
+}
+
+#[test]
+fn deleting_a_preset_publishes_its_absence_in_the_same_turn() {
+    let mut h = using_mine();
+    let actions = h.intent(Intent::DeletePreset(id("mine")));
+    assert!(published(&actions).is_some_and(|s| s.presets.find(&id("mine")).is_none()));
 }
