@@ -4,7 +4,7 @@ use arctis_core::eq::{Filter, FilterKind};
 use arctis_core::testkit::english::english;
 use arctis_core::view::preset_edits::{
     Applied, BandEdit, NEW_BAND, WorkingCopy, add_band, apply_edit, copy_name, duplicate,
-    remove_band, renamed, saved_toast,
+    new_preset, remove_band, renamed, saved_toast,
 };
 
 use crate::support::{custom, custom_preset, filter, id, snapshot, with_preset};
@@ -113,6 +113,34 @@ fn a_duplicate_is_a_custom_copy_under_a_fresh_id() {
     assert_eq!(copy.name(), "Bass Boost (Copy)");
     assert_eq!(copy.kind(), PresetKind::Custom);
     assert_eq!(copy.curve(), source.curve());
+}
+
+#[test]
+fn a_new_preset_is_a_flat_custom_preset() {
+    let preset = new_preset(&snapshot(), english);
+    assert_eq!(preset.name(), "Custom Preset");
+    assert_eq!(preset.id(), &id("custom-preset"));
+    assert_eq!(preset.kind(), PresetKind::Custom);
+    assert_eq!(preset.curve(), library::flat().curve());
+}
+
+#[test]
+fn a_new_preset_takes_the_first_free_numbered_name() {
+    let mut s = snapshot();
+    s.presets.all.push(custom("Custom Preset"));
+    s.presets.all.push(custom("Custom Preset 3"));
+    let preset = new_preset(&s, english);
+    assert_eq!(preset.name(), "Custom Preset 2");
+    assert!(s.presets.find(preset.id()).is_none());
+}
+
+#[test]
+fn a_new_preset_keeps_the_base_name_when_numbering_never_frees_one() {
+    let mut s = snapshot();
+    s.presets.all.push(custom("Custom Preset"));
+    let preset = new_preset(&s, |_| "Custom Preset".to_owned());
+    assert_eq!(preset.name(), "Custom Preset");
+    assert!(s.presets.find(preset.id()).is_none());
 }
 
 #[test]

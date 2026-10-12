@@ -17,7 +17,7 @@ use arctis_core::view::equalizer_rows::equalizer_group;
 use arctis_core::view::headset_page::{banner, headset_page};
 use arctis_core::view::headset_rows::{auto_power_off_text, sidetone_text};
 use arctis_core::view::preferences::{Background, preferences};
-use arctis_core::view::preset_edits::{copy_name, saved_toast};
+use arctis_core::view::preset_edits::{copy_name, new_preset_name, saved_toast};
 use arctis_core::view::preset_files::{export_failed, import_preset};
 use arctis_core::view::presets::{deleted_toast, presets_page};
 use arctis_core::view::text::{Arg, Text, preset_title};
@@ -154,6 +154,7 @@ fn preset_dumps() -> Vec<String> {
                 dump(&export_failed(preset)),
             ]
         })
+        .chain([dump(&new_preset_name(1)), dump(&new_preset_name(2))])
         .collect()
 }
 
@@ -226,6 +227,7 @@ fn the_census_reaches_every_family_of_views() {
         "Bass Boost",
         "Off",
         "Headset Battery Low",
+        "Custom Preset {number}",
     ] {
         assert!(census.contains(msgid), "{msgid} not reached: {census:#?}");
     }

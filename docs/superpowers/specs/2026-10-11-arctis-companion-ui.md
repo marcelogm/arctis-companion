@@ -82,8 +82,10 @@ from (SP0 captures `B0[1]` and `B9` while pressing QuickSwitch with both links u
 ## 3. Presets and EQ editor
 
 - `PresetsPage`: two `AdwPreferencesGroup`s, Built-in and Custom, each row `AdwActionRow` + `go-next-symbolic`. The
-  Custom group has the description "Duplicate or import a preset to customize it" while it is empty. Header
-  button: Import (APO or JSON through the file chooser portal).
+  Custom group has the description "Create, duplicate or import a preset to customize it" while it is empty. Header
+  buttons: New Preset (`list-add-symbolic`, also Ctrl+N anywhere in the window: a custom copy of the Flat curve named
+  "Custom Preset", "Custom Preset 2", …, opened in the editor) and Import (APO or JSON through the file chooser
+  portal).
 - `EqEditorPage` (`AdwNavigationPage`): a read-only `ResponseGraph` (snapshot drawing, log axis 20 Hz–20 kHz, ±10 dB
   grid, curve from `core::eq::response`, accessible description from `core::view::eq_editor`, which calls the
   headset curve "nominal") above a list of up to 10 `EqBandRow`s (`AdwExpanderRow` titled "250 Hz · +2.0 dB"
@@ -96,7 +98,8 @@ from (SP0 captures `B0[1]` and `B9` while pressing QuickSwitch with both links u
   the picked path while the page is open, and ends that pick when the page closes. Editing a preset that is
   active, by preview or otherwise, applies live: the system engine immediately, the headset engine throttled by
   `Companion` to one `Change::Desired` per 250 ms, each verified.
-- `AdwBreakpoint` at `max-width: 720sp`: graph above the list; wider: side by side.
+- One column at every width: the graph above the band list, both in an `AdwClamp` of 720 px, so a wide window centres
+  the editor like a preferences page instead of splitting it.
 
 ## 4. App presets, battery, preferences, text
 

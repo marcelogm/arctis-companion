@@ -17,7 +17,7 @@ fn about_comes_from_the_metainfo() {
 }
 
 #[gtk::test]
-fn the_shortcuts_dialog_lists_three_shortcuts() {
+fn the_shortcuts_dialog_lists_four_shortcuts() {
     init();
     let _ = shortcuts_dialog();
     let builder = shortcuts_builder();
@@ -30,7 +30,12 @@ fn the_shortcuts_dialog_lists_three_shortcuts() {
     accelerators.sort();
     assert_eq!(
         accelerators,
-        ["<Control>comma", "<Control>question", "<Control>w"]
+        [
+            "<Control>comma",
+            "<Control>n",
+            "<Control>question",
+            "<Control>w"
+        ]
     );
 }
 
