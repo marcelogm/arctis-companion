@@ -140,6 +140,13 @@ impl ManualAlarm {
             pending: Rc::default(),
         }
     }
+
+    pub fn fire(&self) {
+        let wake = self.pending.borrow_mut().take();
+        if let Some(wake) = wake {
+            wake();
+        }
+    }
 }
 
 impl Alarm for ManualAlarm {
@@ -155,6 +162,10 @@ pub struct ManualClock(Rc<Cell<Millis>>);
 impl ManualClock {
     pub fn starting_at(start: Millis) -> Self {
         Self(Rc::new(Cell::new(start)))
+    }
+
+    pub fn advance(&self, milliseconds: u64) {
+        self.0.set(self.0.get().after(milliseconds));
     }
 }
 
