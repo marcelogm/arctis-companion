@@ -86,7 +86,7 @@ fn a_new_snapshot_refreshes_the_rows() {
     let shown = shown(snapshot());
     shown.page.render(&Rc::new(with_preset(&one_peak())));
     assert_eq!(titles(&shown.page, "custom-presets"), ["Mine"]);
-    assert_eq!(titles(&shown.page, "built-in-presets").len(), 10);
+    assert_eq!(titles(&shown.page, "built-in-presets").len(), 11);
 }
 
 #[gtk::test]

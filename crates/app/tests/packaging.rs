@@ -96,6 +96,17 @@ fn the_metainfo_explains_the_device_permission() {
 }
 
 #[test]
+fn the_metainfo_and_the_licences_credit_the_frequency_response_data() {
+    let metainfo = repo_file(METAINFO);
+    for source in ["RTINGS.com", "Brüel &amp; Kjær 5128", "AutoEq", "MIT"] {
+        assert!(metainfo.contains(source), "{source}");
+    }
+    let licences = repo_file("THIRD_PARTY_LICENSES");
+    assert!(licences.contains("MIT License"));
+    assert!(licences.contains("Copyright (c) 2018-2022 Jaakko Pasanen"));
+}
+
+#[test]
 fn a_tag_publishes_the_bundle_the_extension_and_the_rule() {
     let workflow = repo_file(RELEASE);
     assert!(workflow.contains("tags: [\"v*\"]"));

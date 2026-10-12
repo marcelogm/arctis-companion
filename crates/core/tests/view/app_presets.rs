@@ -1,4 +1,5 @@
 use arctis_core::companion::seen_apps::SeenApp;
+use arctis_core::eq::library;
 use arctis_core::testkit::english::english;
 use arctis_core::view::app_presets::{
     AppPresetsContent, RuleRowModel, add_rule_dialog, app_presets,
@@ -84,7 +85,7 @@ fn the_page_explains_what_the_headset_keeps() {
         english(&page.description),
         "On the 2.4 GHz connection the headset keeps an app's preset if this computer stops unexpectedly"
     );
-    assert_eq!(page.presets.len(), 10);
+    assert_eq!(page.presets.len(), library::library().len());
 }
 
 #[test]

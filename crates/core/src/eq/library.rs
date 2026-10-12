@@ -4,6 +4,7 @@ use super::preset::{Preset, PresetId};
 use crate::l10n::msgid;
 
 pub const FLAT_ID: &str = "flat";
+pub const HARMAN_ID: &str = "harman";
 
 const FACTORY_Q: u16 = 1_410;
 const SHELF_Q: u16 = 707;
@@ -20,11 +21,19 @@ const fn peaking(hz: u16, half_db: i8, milli_q: u16) -> Filter {
 }
 
 const fn low_shelf(hz: u16, half_db: i8) -> Filter {
-    band(FilterKind::LowShelf, hz, half_db, SHELF_Q)
+    low_shelf_q(hz, half_db, SHELF_Q)
+}
+
+const fn low_shelf_q(hz: u16, half_db: i8, milli_q: u16) -> Filter {
+    band(FilterKind::LowShelf, hz, half_db, milli_q)
 }
 
 const fn high_shelf(hz: u16, half_db: i8) -> Filter {
-    band(FilterKind::HighShelf, hz, half_db, SHELF_Q)
+    high_shelf_q(hz, half_db, SHELF_Q)
+}
+
+const fn high_shelf_q(hz: u16, half_db: i8, milli_q: u16) -> Filter {
+    band(FilterKind::HighShelf, hz, half_db, milli_q)
 }
 
 const FLAT: [Filter; 10] = [
@@ -70,6 +79,18 @@ const PODCAST: [Filter; 4] = [
     peaking(3_000, 6, 1_200),
     high_shelf(9_000, -4),
 ];
+const HARMAN: [Filter; 10] = [
+    peaking(54, 4, 5_150),
+    low_shelf_q(105, 1, 700),
+    peaking(139, -13, 770),
+    peaking(212, -4, 1_190),
+    peaking(452, 13, 1_170),
+    peaking(4_320, 10, 3_730),
+    peaking(4_910, 4, 3_070),
+    peaking(6_263, -10, 5_860),
+    peaking(9_164, -13, 2_070),
+    high_shelf_q(10_000, 8, 700),
+];
 const LATE_NIGHT: [Filter; 3] = [
     low_shelf(120, -6),
     peaking(3_000, -2, 1_000),
@@ -94,6 +115,7 @@ pub fn library() -> Vec<Preset> {
         built_in("movie-night", msgid("Movie Night"), MOVIE_NIGHT),
         built_in("podcast", msgid("Podcast"), PODCAST),
         built_in("late-night", msgid("Late Night"), LATE_NIGHT),
+        built_in(HARMAN_ID, msgid("Harman target"), HARMAN),
     ]
 }
 

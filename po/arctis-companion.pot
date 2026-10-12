@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 14:35-0300\n"
+"POT-Creation-Date: 2026-10-12 18:29-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -68,6 +68,10 @@ msgid "Footsteps"
 msgstr ""
 
 #: crates/core/src/eq/library.rs
+msgid "Harman target"
+msgstr ""
+
+#: crates/core/src/eq/library.rs
 msgid "Late Night"
 msgstr ""
 
@@ -89,6 +93,26 @@ msgstr ""
 
 #: crates/core/src/eq/library.rs
 msgid "Vocal Clarity"
+msgstr ""
+
+#: crates/core/src/eq/reference.rs
+msgid "Diffuse field (B&K 5128)"
+msgstr ""
+
+#: crates/core/src/eq/reference.rs
+msgid "Frequency response data"
+msgstr ""
+
+#: crates/core/src/eq/reference.rs
+msgid "Harman (B&K 5128)"
+msgstr ""
+
+#: crates/core/src/eq/reference.rs
+msgid "Headset"
+msgstr ""
+
+#: crates/core/src/eq/reference.rs
+msgid "Headset with EQ"
 msgstr ""
 
 #: crates/core/src/view/app_presets.rs crates/ui/resources/add_rule_dialog.blp
@@ -897,6 +921,13 @@ msgstr ""
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
 msgid "The Bluetooth equalizer preset for audio from a phone"
+msgstr ""
+
+#: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in
+msgid ""
+"The headset’s frequency response was measured by RTINGS.com on a Brüel & "
+"Kjær 5128 and comes, with the target curves and the Harman target preset, "
+"from the AutoEq project by Jaakko Pasanen (MIT licence)."
 msgstr ""
 
 #: data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in

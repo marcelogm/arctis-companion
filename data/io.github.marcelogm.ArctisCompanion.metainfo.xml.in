@@ -20,6 +20,7 @@
       <li>Switching the headset between 2.4 GHz and Bluetooth audio</li>
       <li>The Bluetooth equalizer preset for audio from a phone</li>
     </ul>
+    <p>The headset’s frequency response was measured by RTINGS.com on a Brüel &amp; Kjær 5128 and comes, with the target curves and the Harman target preset, from the AutoEq project by Jaakko Pasanen (MIT licence).</p>
   </description>
   <developer id="io.github.marcelogm">
     <name translate="no">marcelogm</name>

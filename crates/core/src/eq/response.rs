@@ -9,10 +9,15 @@ const GOLDEN_RATIO: f64 = 0.618_033_988_749_894_9;
 
 #[must_use]
 pub fn response(curve: &Curve, frequencies: &[f32]) -> Vec<f32> {
+    let wide: Vec<f64> = frequencies.iter().copied().map(f64::from).collect();
+    gains_db(curve, &wide).into_iter().map(narrow).collect()
+}
+
+pub(crate) fn gains_db(curve: &Curve, frequencies: &[f64]) -> Vec<f64> {
     let biquads: Vec<Biquad> = shaping_biquads(curve, RESPONSE_RATE).collect();
     frequencies
         .iter()
-        .map(|&hz| narrow(total_db(&biquads, f64::from(hz), RESPONSE_RATE)))
+        .map(|&hz| total_db(&biquads, hz, RESPONSE_RATE))
         .collect()
 }
 

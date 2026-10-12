@@ -1,4 +1,5 @@
 use arctis_core::companion::Snapshot;
+use arctis_core::eq::library;
 use arctis_core::messages::audio::SoundPath;
 use arctis_core::testkit::english::english;
 use arctis_core::view::presets::{
@@ -34,7 +35,7 @@ fn built_in_and_custom_presets_are_grouped() {
     let mut s = snapshot();
     s.presets.all.push(custom("Mine"));
     let page = presets_page(&s);
-    assert_eq!(page.built_in.len(), 10);
+    assert_eq!(page.built_in.len(), library::library().len());
     let custom_titles: Vec<Text> = page.custom.iter().map(|item| item.title.clone()).collect();
     assert_eq!(custom_titles, [Text::verbatim("Mine")]);
     assert_eq!(page.custom_description, None);
@@ -54,7 +55,7 @@ fn an_empty_custom_group_explains_itself() {
 #[test]
 fn preset_items_list_every_preset_in_order() {
     let items = preset_items(&snapshot());
-    assert_eq!(items.len(), 10);
+    assert_eq!(items.len(), library::library().len());
     assert_eq!(items[0].id, id("flat"));
     assert_eq!(items[0].title, Text::plain("Flat"));
 }

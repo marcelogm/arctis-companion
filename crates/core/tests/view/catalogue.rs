@@ -7,7 +7,9 @@ use std::fmt::Debug;
 use arctis_core::battery::sample::{Reading, UnixSeconds};
 use arctis_core::battery::series::Window;
 use arctis_core::companion::alerts::Alerts;
+use arctis_core::eq::Curve;
 use arctis_core::eq::library::library;
+use arctis_core::eq::reference::plot;
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::values::AutoPowerOff;
 use arctis_core::view::app_presets::{add_rule_dialog, app_presets};
@@ -239,6 +241,15 @@ fn every_view_message_is_translated_to_pt_br() {
         .filter(|msgid| !catalogue.is_translated(msgid))
         .collect();
     assert!(missing.is_empty(), "untranslated: {missing:#?}");
+}
+
+#[test]
+fn every_plotted_series_label_is_translated_to_pt_br() {
+    let catalogue = Catalogue::parse(PT_BR);
+    for series in plot(&Curve::default()) {
+        let label = series.id.label();
+        assert!(catalogue.is_translated(label), "untranslated: {label}");
+    }
 }
 
 #[test]

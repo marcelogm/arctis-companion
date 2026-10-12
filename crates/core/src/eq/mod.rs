@@ -5,14 +5,17 @@ pub mod curve;
 pub mod decimal;
 pub mod equalizer;
 pub mod filter;
+pub mod frequency_response;
 pub mod library;
 pub mod preset;
+pub mod reference;
 pub mod response;
 
 pub use coefficients::Coefficients;
 pub use curve::Curve;
 pub use equalizer::Equalizer;
 pub use filter::{EnvelopeError, Filter, FilterKind, Gain, Hertz, Q};
+pub use frequency_response::FrequencyResponse;
 pub use library::library;
 pub use preset::{Preset, PresetFormatError, PresetId, PresetKind};
 pub use response::response;

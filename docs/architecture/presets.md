@@ -63,6 +63,21 @@ before the burst. The page keeps the toast handle only to dismiss it when anothe
 | Gain off for pass filters | `crates/core/src/eq/filter.rs::FilterKind`, `crates/ui/src/eq_band_row.rs::EqBandRow` |
 | Combo positions | `crates/core/src/view/eq_editor.rs::kind_at`, `crates/core/src/view/eq_editor.rs::kind_position` |
 
+## Harman target
+
+The built-in "Harman target" (id `harman`, `crates/core/src/eq/library.rs::library`) brings the measured Nova 5 to the
+Harman-style target on the same rig. The editor graph can overlay the measured headset, the headset with the
+preset's curve and both targets from `crates/core/src/eq/reference.rs::plot`; data and alignment are in the
+equalizer core document (`docs/architecture/eq.md`).
+
+```mermaid
+flowchart LR
+    A["AutoEq ParametricEQ.txt"] -- "rounded as apo::parse does, checked by a test" --> C["ten filters by frequency"]
+    C --> L["library: harman"]
+    L --> G["reference::plot(curve)"]
+    G --> U["ResponseGraph series"]
+```
+
 ## Import and export
 
 ```mermaid
