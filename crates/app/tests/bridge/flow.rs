@@ -1,4 +1,4 @@
-use std::cell::{Cell, RefCell};
+use std::cell::Cell;
 use std::rc::{Rc, Weak};
 
 use arctis_app::bridge::Bridge;
@@ -9,21 +9,10 @@ use arctis_core::intent::Intent;
 use arctis_core::messages::audio::AudioEvent;
 use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::testkit::snapshots::id;
-use gtk::glib;
 
 use crate::fakes::{BrokenPresets, Seen};
+use crate::main_context::{drain, on_own_context};
 use crate::rig::{Rig, mine, persisted, published};
-
-fn on_own_context(test: impl FnOnce(&glib::MainContext)) {
-    let context = glib::MainContext::new();
-    context
-        .with_thread_default(|| test(&context))
-        .expect("the test owns its main context");
-}
-
-fn drain(context: &glib::MainContext) {
-    while context.iteration(false) {}
-}
 
 #[test]
 fn device_updates_are_pumped_into_the_companion() {
@@ -54,32 +43,59 @@ fn audio_events_are_pumped_into_the_companion() {
 }
 
 struct Echo {
-    bridge: RefCell<Weak<Bridge>>,
-    sent: Cell<bool>,
+    bridge: Weak<Bridge>,
+    armed: Cell<bool>,
+    automatic_right_after_submit: Cell<Option<bool>>,
+}
+
+impl Echo {
+    fn armed_after_attach(bridge: &Rc<Bridge>) -> Rc<Self> {
+        let echo = Rc::new(Self {
+            bridge: Rc::downgrade(bridge),
+            armed: Cell::new(false),
+            automatic_right_after_submit: Cell::new(None),
+        });
+        bridge.attach(echo.clone());
+        echo.armed.set(true);
+        echo
+    }
 }
 
 impl SnapshotView for Echo {
     fn publish(&self, _snapshot: &Rc<Snapshot>) {
-        if self.sent.replace(true) {
+        if !self.armed.replace(false) {
             return;
         }
-        if let Some(bridge) = self.bridge.borrow().upgrade() {
+        if let Some(bridge) = self.bridge.upgrade() {
             bridge.submit(Input::Intent(Intent::SetAutomaticPresets(false)));
+            let automatic = bridge.snapshot().presets.automatic;
+            self.automatic_right_after_submit.set(Some(automatic));
         }
     }
 }
 
+fn settling() -> Input {
+    Input::Device(DeviceUpdate::Phase(Phase::Settling))
+}
+
 #[test]
 fn an_input_submitted_while_actions_run_waits_its_turn() {
+    let alone = Rig::new(persisted()).send(settling());
     let rig = Rig::new(persisted());
-    let echo = Rc::new(Echo {
-        bridge: RefCell::new(Rc::downgrade(&rig.bridge)),
-        sent: Cell::new(true),
-    });
-    rig.bridge.attach(echo.clone());
-    echo.sent.set(false);
-    let seen = rig.send(Input::Device(DeviceUpdate::Phase(Phase::Settling)));
-    assert!(seen.contains(&Seen::Persisted(PersistedChange::AutomaticPresets(false))));
+    let echo = Echo::armed_after_attach(&rig.bridge);
+    let seen = rig.send(settling());
+    assert_eq!(
+        echo.automatic_right_after_submit.get(),
+        Some(true),
+        "the nested input has not run yet"
+    );
+    assert_eq!(
+        seen[..alone.len()],
+        alone[..],
+        "the first input finishes first"
+    );
+    let echoed = Seen::Persisted(PersistedChange::AutomaticPresets(false));
+    assert!(seen[alone.len()..].contains(&echoed));
     assert!(!rig.bridge.snapshot().presets.automatic);
 }
 

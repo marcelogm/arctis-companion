@@ -1,34 +1,27 @@
-use std::collections::BTreeSet;
 use std::mem;
 
 use arctis_core::companion::adoption::{AdoptionStatus, DongleIdentity};
 use arctis_core::companion::alerts::AlertId;
-use arctis_core::companion::app_settings::{
-    AppSettings, HeadsetValues, Persisted, PersistedChange, RoutePresets,
-};
+use arctis_core::companion::app_settings::{HeadsetValues, PersistedChange};
 use arctis_core::companion::selection::PresetReason;
 use arctis_core::companion::{Action, Companion, Input};
 use arctis_core::eq::curve::{Curve, equivalent};
-use arctis_core::eq::library;
-use arctis_core::eq::preset::PresetId;
 use arctis_core::intent::Intent;
-use arctis_core::messages::audio::{
-    AppIdentifiers, AudioEvent, DefaultSink, SinkKind, SoundPath, StreamInfo,
-};
+use arctis_core::messages::audio::{AudioCommand, AudioEvent, DefaultSink, SinkKind, SoundPath};
 use arctis_core::messages::device::{Change, DeviceUpdate, Phase, SyncPolicy};
 use arctis_core::protocol::{Command, Frame, Query, encode};
 use arctis_core::session::timing::ENUMERATION_SETTLE;
-use arctis_core::testkit::snapshots::{percent, values};
+use arctis_core::testkit::companion::{NOVA_5_PRODUCT, curve, firefox, with_rule};
+use arctis_core::testkit::snapshots::{id, percent, values};
 use arctis_core::testkit::{FakeHeadset, Flap, Simulation};
 use arctis_core::time::Millis;
 
 const START: Millis = Millis(1_760_000_000_000);
 const STEP: u64 = 10;
-const NOVA_5: u16 = 0x2232;
 const CONNECTED: u64 = ENUMERATION_SETTLE + 2_000;
 
 struct Stage {
-    actions: Vec<Action>,
+    steps: Vec<Step>,
     wire: Vec<u8>,
     frames: Vec<Frame>,
     phases: Vec<Phase>,
@@ -40,16 +33,18 @@ struct EndToEnd {
     delivered: usize,
     wake: Option<Millis>,
     actions: Vec<Action>,
+    shown: Phase,
 }
 
 impl EndToEnd {
     fn new() -> Self {
         Self {
             simulation: Simulation::new(FakeHeadset::nova_5()),
-            companion: Companion::new(persisted()),
+            companion: Companion::new(with_rule("firefox", "footsteps")),
             delivered: 0,
             wake: None,
             actions: Vec::new(),
+            shown: Phase::Absent,
         }
     }
 
@@ -102,10 +97,25 @@ impl EndToEnd {
         }
     }
 
+    fn shown_phases(&mut self, actions: &[Action]) -> Vec<Phase> {
+        let published = actions.iter().filter_map(|action| match action {
+            Action::Publish(snapshot) => Some(snapshot.dongle.phase),
+            _ => None,
+        });
+        let mut current = self.shown;
+        let shown = published
+            .filter(|phase| *phase != mem::replace(&mut current, *phase))
+            .collect();
+        self.shown = current;
+        shown
+    }
+
     fn stage(&mut self, act: impl FnOnce(&mut Self)) -> Stage {
         act(self);
+        let actions = mem::take(&mut self.actions);
+        let shown = self.shown_phases(&actions);
         let stage = Stage {
-            actions: mem::take(&mut self.actions),
+            steps: actions.iter().filter_map(step).collect(),
             wire: self.simulation.sent_ids(),
             frames: self
                 .simulation
@@ -117,49 +127,8 @@ impl EndToEnd {
         };
         self.simulation.clear_logs();
         self.delivered = 0;
+        assert_eq!(shown, stage.phases, "published phases follow the device");
         stage
-    }
-}
-
-fn id(text: &str) -> PresetId {
-    PresetId::new(text)
-}
-
-fn curve(preset: &str) -> Curve {
-    library::find(&id(preset))
-        .expect("built-in preset")
-        .curve()
-        .clone()
-}
-
-fn persisted() -> Persisted {
-    Persisted {
-        settings: AppSettings {
-            headset: values(),
-            route_presets: RoutePresets {
-                dongle: id("flat"),
-                bluetooth: id("flat"),
-            },
-            app_rules: [("firefox".to_owned(), id("footsteps"))]
-                .into_iter()
-                .collect(),
-            automatic_presets: true,
-            adopted_identity: None,
-            bluetooth_sink_seen: false,
-            low_battery_threshold: percent(15),
-        },
-        custom_presets: Vec::new(),
-        seen_apps: Vec::new(),
-        battery: Vec::new(),
-    }
-}
-
-fn firefox() -> StreamInfo {
-    StreamInfo {
-        ids: AppIdentifiers::new(Some("org.mozilla.firefox"), None, Some("firefox")),
-        name: "Firefox".to_owned(),
-        running: true,
-        path: Some(SoundPath::Dongle),
     }
 }
 
@@ -192,78 +161,42 @@ fn connect_reads() -> Vec<u8> {
     .collect()
 }
 
-const fn kind(action: &Action) -> &'static str {
-    match action {
-        Action::Persist(_) => "Persist",
-        Action::StorePreset(_) => "StorePreset",
-        Action::RecordBattery(_) => "RecordBattery",
-        Action::RecordSeenApp(_) => "RecordSeenApp",
-        Action::SendDevice(_) => "SendDevice",
-        Action::SendAudio(_) => "SendAudio",
-        Action::Publish(_) => "Publish",
-        Action::Notify(_) => "Notify",
-        Action::Withdraw(_) => "Withdraw",
-        Action::WakeAt(_) => "WakeAt",
-        Action::ReadyToQuit => "ReadyToQuit",
-    }
+#[derive(Debug, PartialEq)]
+enum Step {
+    Persist(PersistedChange),
+    Desire(SyncPolicy, HeadsetValues, Curve),
+    Battery(u8, bool),
+    SeenApp(String),
+    Audio(AudioCommand),
+    Notify(AlertId),
+    Withdraw(AlertId),
+    WakeAfter(u64),
+    Other(String),
 }
 
-fn kinds(actions: &[Action]) -> BTreeSet<&'static str> {
-    actions.iter().map(kind).collect()
+fn step(action: &Action) -> Option<Step> {
+    Some(match action {
+        Action::Publish(_) => return None,
+        Action::Persist(change) => Step::Persist(change.clone()),
+        Action::SendDevice(Change::Desired { settings, policy }) => Step::Desire(
+            *policy,
+            HeadsetValues::from_settings(settings),
+            settings.equalizer.clone(),
+        ),
+        Action::RecordBattery(sample) => {
+            Step::Battery(sample.reading.percent.get(), sample.reading.is_connected())
+        }
+        Action::RecordSeenApp(app) => Step::SeenApp(app.key.clone()),
+        Action::SendAudio(command) => Step::Audio(command.clone()),
+        Action::Notify(alert) => Step::Notify(alert.id),
+        Action::Withdraw(id) => Step::Withdraw(*id),
+        Action::WakeAt(at) => Step::WakeAfter(at.since(START)),
+        other => Step::Other(format!("{other:?}")),
+    })
 }
 
-fn assert_only(actions: &[Action], allowed: &[&str]) {
-    let unexpected: Vec<&str> = actions
-        .iter()
-        .map(kind)
-        .filter(|name| !allowed.contains(name))
-        .collect();
-    assert!(unexpected.is_empty(), "unexpected actions: {unexpected:?}");
-}
-
-fn policies(actions: &[Action]) -> Vec<SyncPolicy> {
-    actions
-        .iter()
-        .filter_map(|action| match action {
-            Action::SendDevice(Change::Desired { policy, .. }) => Some(*policy),
-            _ => None,
-        })
-        .collect()
-}
-
-fn curves(actions: &[Action]) -> Vec<Curve> {
-    actions
-        .iter()
-        .filter_map(|action| match action {
-            Action::SendDevice(Change::Desired { settings, .. }) => {
-                Some(settings.equalizer.clone())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-fn battery_percents(actions: &[Action]) -> Vec<u8> {
-    actions
-        .iter()
-        .filter_map(|action| match action {
-            Action::RecordBattery(sample) if sample.reading.is_connected() => {
-                Some(sample.reading.percent.get())
-            }
-            _ => None,
-        })
-        .collect()
-}
-
-fn alerts(actions: &[Action]) -> Vec<(bool, AlertId)> {
-    actions
-        .iter()
-        .filter_map(|action| match action {
-            Action::Notify(alert) => Some((true, alert.id)),
-            Action::Withdraw(id) => Some((false, *id)),
-            _ => None,
-        })
-        .collect()
+fn desire(policy: SyncPolicy, values: HeadsetValues, preset: &str) -> Step {
+    Step::Desire(policy, values, curve(preset))
 }
 
 fn connect(run: &mut EndToEnd) -> HeadsetValues {
@@ -282,7 +215,19 @@ fn connect(run: &mut EndToEnd) -> HeadsetValues {
         ]
     );
     assert_eq!(connect.wire, connect_reads());
-    assert_adopted(&connect.actions, factory);
+    let identity = DongleIdentity::new(NOVA_5_PRODUCT, None);
+    assert_eq!(
+        connect.steps,
+        [
+            desire(SyncPolicy::Adopt, values(), "flat"),
+            Step::Battery(37, true),
+            desire(SyncPolicy::Adopt, values(), "flat"),
+            Step::Persist(PersistedChange::Headset(factory)),
+            Step::Persist(PersistedChange::RoutePreset(SoundPath::Dongle, id("flat"))),
+            Step::Persist(PersistedChange::AdoptedIdentity(identity)),
+            desire(SyncPolicy::Enforce, factory, "flat"),
+        ]
+    );
     assert_eq!(
         run.companion.snapshot().dongle.adoption,
         AdoptionStatus::Adopted
@@ -290,21 +235,7 @@ fn connect(run: &mut EndToEnd) -> HeadsetValues {
     factory
 }
 
-fn assert_adopted(actions: &[Action], factory: HeadsetValues) {
-    let sent = policies(actions);
-    assert_eq!(sent.first(), Some(&SyncPolicy::Adopt));
-    assert_eq!(sent.last(), Some(&SyncPolicy::Enforce));
-    let identity = DongleIdentity::new(NOVA_5, None);
-    assert!(actions.contains(&Action::Persist(PersistedChange::AdoptedIdentity(identity))));
-    assert!(actions.contains(&Action::Persist(PersistedChange::Headset(factory))));
-    assert_eq!(battery_percents(actions), [37]);
-    assert_only(
-        actions,
-        &["Persist", "SendDevice", "RecordBattery", "Publish"],
-    );
-}
-
-fn set_route_preset(run: &mut EndToEnd) {
+fn set_route_preset(run: &mut EndToEnd, factory: HeadsetValues) {
     let set = run.stage(|run| {
         run.send(Input::Intent(Intent::SetRoutePreset(
             SoundPath::Dongle,
@@ -314,29 +245,36 @@ fn set_route_preset(run: &mut EndToEnd) {
     });
     assert_eq!(set.wire, [equalizer_id(), Query::Audio.id()]);
     assert_eq!(set.frames.first(), Some(&equalizer_frame("bass-boost")));
-    assert_eq!(curves(&set.actions), [curve("bass-boost")]);
     let persisted = PersistedChange::RoutePreset(SoundPath::Dongle, id("bass-boost"));
-    assert!(set.actions.contains(&Action::Persist(persisted)));
-    assert_only(&set.actions, &["Persist", "SendDevice", "Publish"]);
+    assert_eq!(
+        set.steps,
+        [
+            Step::Persist(persisted),
+            desire(SyncPolicy::Enforce, factory, "bass-boost"),
+        ]
+    );
     assert!(equivalent(
         &run.simulation.headset().settings().equalizer,
         &curve("bass-boost")
     ));
 }
 
-fn switch_for_a_ruled_app(run: &mut EndToEnd) {
+fn switch_for_a_ruled_app(run: &mut EndToEnd, factory: HeadsetValues) {
     let switch = run.stage(|run| {
         run.send(Input::Audio(AudioEvent::DefaultSink(dongle_sink())));
-        run.send(Input::Audio(AudioEvent::Streams(vec![firefox()])));
+        let firefox = firefox(Some(SoundPath::Dongle));
+        run.send(Input::Audio(AudioEvent::Streams(vec![firefox])));
         run.run_for(1_500);
     });
     assert_eq!(switch.wire, [equalizer_id(), Query::Audio.id()]);
     assert_eq!(switch.frames.first(), Some(&equalizer_frame("footsteps")));
-    assert_eq!(curves(&switch.actions), [curve("footsteps")]);
-    assert!(kinds(&switch.actions).is_superset(&BTreeSet::from(["WakeAt", "RecordSeenApp"])));
-    assert_only(
-        &switch.actions,
-        &["WakeAt", "RecordSeenApp", "SendDevice", "Publish"],
+    assert_eq!(
+        switch.steps,
+        [
+            Step::SeenApp("org.mozilla.firefox".to_owned()),
+            Step::WakeAfter(7_000),
+            desire(SyncPolicy::Enforce, factory, "footsteps"),
+        ]
     );
     let active = run.companion.snapshot().presets.active.dongle.clone();
     assert_eq!(active.preset, id("footsteps"));
@@ -353,9 +291,10 @@ fn warn_about_a_low_battery(run: &mut EndToEnd) {
         run.run_for(200);
     });
     assert!(low.wire.is_empty());
-    assert_eq!(alerts(&low.actions), [(true, AlertId::LowBattery)]);
-    assert_eq!(battery_percents(&low.actions), [14]);
-    assert_only(&low.actions, &["RecordBattery", "Notify", "Publish"]);
+    assert_eq!(
+        low.steps,
+        [Step::Battery(14, true), Step::Notify(AlertId::LowBattery)]
+    );
 }
 
 fn absorb_a_flap(run: &mut EndToEnd) {
@@ -369,7 +308,7 @@ fn absorb_a_flap(run: &mut EndToEnd) {
     assert!(flap.wire.is_empty(), "Rebinding sends no queries");
     assert!(flap.phases.is_empty(), "a short flap is silent");
     assert_eq!(run.simulation.phase(), Phase::Ready);
-    assert_only(&flap.actions, &["Publish"]);
+    assert_eq!(flap.steps, []);
 }
 
 fn reconnect(run: &mut EndToEnd, factory: HeadsetValues) {
@@ -394,38 +333,28 @@ fn reconnect(run: &mut EndToEnd, factory: HeadsetValues) {
         connect_reads(),
         "no drift, so nothing is written"
     );
-    assert_reconnected(&again.actions);
+    assert_eq!(
+        again.steps,
+        [
+            Step::Battery(14, false),
+            Step::Withdraw(AlertId::LowBattery),
+            desire(SyncPolicy::Enforce, factory, "footsteps"),
+            Step::Battery(14, true),
+            Step::Notify(AlertId::LowBattery),
+            desire(SyncPolicy::Enforce, factory, "footsteps"),
+        ]
+    );
     let settings = run.simulation.headset().settings();
     assert_eq!(HeadsetValues::from_settings(settings), factory);
     assert!(equivalent(&settings.equalizer, &curve("footsteps")));
-}
-
-fn assert_reconnected(actions: &[Action]) {
-    let sent = policies(actions);
-    assert!(!sent.contains(&SyncPolicy::Adopt));
-    assert_eq!(sent.last(), Some(&SyncPolicy::Enforce));
-    assert_eq!(
-        alerts(actions),
-        [(false, AlertId::LowBattery), (true, AlertId::LowBattery)]
-    );
-    assert_only(
-        actions,
-        &[
-            "SendDevice",
-            "RecordBattery",
-            "Withdraw",
-            "Notify",
-            "Publish",
-        ],
-    );
 }
 
 #[test]
 fn connect_adopt_set_switch_warn_flap_and_reconnect() {
     let mut run = EndToEnd::new();
     let factory = connect(&mut run);
-    set_route_preset(&mut run);
-    switch_for_a_ruled_app(&mut run);
+    set_route_preset(&mut run, factory);
+    switch_for_a_ruled_app(&mut run, factory);
     warn_about_a_low_battery(&mut run);
     absorb_a_flap(&mut run);
     reconnect(&mut run, factory);

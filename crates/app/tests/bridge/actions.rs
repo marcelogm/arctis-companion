@@ -7,19 +7,12 @@ use arctis_core::intent::Intent;
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, DefaultSink, SinkKind};
 use arctis_core::messages::device::{Change, DeviceUpdate, Phase, SyncPolicy};
 use arctis_core::protocol::firmware::Firmware;
-use arctis_core::protocol::status::{Charging, Link};
-use arctis_core::testkit::snapshots::{id, nova_5, percent};
+use arctis_core::protocol::status::Charging;
+use arctis_core::testkit::companion::status;
+use arctis_core::testkit::snapshots::{id, nova_5};
 
 use crate::fakes::{Recorder, Seen};
 use crate::rig::{Rig, curve, firefox, mine, persisted, published};
-
-fn status(level: u8, charging: Charging) -> Input {
-    Input::Device(DeviceUpdate::Status {
-        battery: percent(level),
-        charging,
-        link: Link::Connected,
-    })
-}
 
 #[test]
 fn a_persisted_change_reaches_the_settings_store() {

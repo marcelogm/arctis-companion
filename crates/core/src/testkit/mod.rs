@@ -1,4 +1,5 @@
 pub mod autoeq;
+pub mod companion;
 pub mod english;
 mod fake_headset;
 pub mod memory_repositories;

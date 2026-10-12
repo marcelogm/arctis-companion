@@ -8,12 +8,11 @@ use arctis_core::messages::audio::{AudioEvent, DefaultSink, SinkKind, SoundPath}
 use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::protocol::firmware::Firmware;
 use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::testkit::companion::NOVA_5_PRODUCT;
 use arctis_core::testkit::snapshots::{nova_5, values};
 
 use crate::fakes::Seen;
 use crate::rig::{Rig, curve, device_curves, firefox, with_rule};
-
-const NOVA_5: u16 = 0x2232;
 
 fn observed(preset: &str) -> Input {
     Input::Device(DeviceUpdate::Observed(observed_settings(curve(preset))))
@@ -39,7 +38,7 @@ fn connect_adopted(rig: &Rig) {
 
 fn app_preset_on_the_headset() -> Rig {
     let mut saved = with_rule("firefox", "bass-boost");
-    saved.settings.adopted_identity = Some(DongleIdentity::new(NOVA_5, None));
+    saved.settings.adopted_identity = Some(DongleIdentity::new(NOVA_5_PRODUCT, None));
     let rig = Rig::new(saved);
     connect_adopted(&rig);
     let sink = DefaultSink {
