@@ -1,4 +1,5 @@
 mod equalizer;
+mod gain;
 mod lab;
 mod streams;
 mod tone;
