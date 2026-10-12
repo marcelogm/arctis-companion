@@ -12,7 +12,8 @@
     "--share=ipc",
     "--socket=wayland",
     "--socket=fallback-x11",
-    "--device=dri"
+    "--device=all",
+    "--filesystem=xdg-run/pipewire-0"
   ],
   "build-options": {
     "append-path": "/usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/llvm22/bin",
