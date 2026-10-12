@@ -5,6 +5,7 @@ mod alerts;
 mod app_settings;
 mod catalog;
 mod dongle;
+mod engines;
 mod intent;
 mod routing;
 mod seen_apps;
