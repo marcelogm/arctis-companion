@@ -5,6 +5,7 @@ mod bounded;
 pub mod battery;
 pub mod companion;
 pub mod eq;
+pub mod intent;
 pub mod messages;
 pub mod ports;
 pub mod protocol;

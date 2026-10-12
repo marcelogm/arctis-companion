@@ -3721,7 +3721,7 @@ git push
 - Modify: `crates/core/src/lib.rs`
 - Test: `crates/core/tests/companion/intent.rs`, `crates/core/tests/companion/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod intent;` to `crates/core/tests/companion/main.rs`.
 
@@ -3797,12 +3797,12 @@ fn other_intents_are_not_setting_changes() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion intent`
 Expected: FAIL to compile (`arctis_core::intent` missing).
 
-- [ ] **Step 3: Implement `intent`**
+- [x] **Step 3: Implement `intent`**
 
 `crates/core/src/intent.rs`:
 
@@ -3888,12 +3888,12 @@ but `SettingChange` holds a `Curve`), drop `const`.
 
 Add `pub mod intent;` to `crates/core/src/lib.rs` (after `pub mod eq;`).
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion intent`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src crates/core/tests/companion
