@@ -18,6 +18,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [battery-page.md](battery-page.md) | battery history page and chart |
 | [presets.md](presets.md) | presets page, equalizer editor, response graph, preset import and export |
 | [app.md](app.md) | app platform: bridge, ports, settings and file stores, Headset1, background, notifications |
+| [packaging.md](packaging.md) | Flatpak build, translations, release, install |
 
 ## Workspace
 
@@ -49,8 +50,10 @@ Workspace manifest and lint policy: `Cargo.toml`, `clippy.toml`, `rustfmt.toml`,
 sequenceDiagram
     participant M as main
     participant A as application::run
+    participant L as locale::init
     participant U as arctis_ui
     M->>A: run()
+    A->>L: setlocale, bindtextdomain, textdomain
     A->>U: register_resources()
     alt resources registered
         A->>A: build(Threads::system).run(), see app.md
@@ -65,25 +68,8 @@ The window template is `crates/ui/resources/window.blp`, compiled by `crates/ui/
 
 ## Build and packaging
 
-```mermaid
-flowchart LR
-    FP["Flatpak manifest<br/>GNOME 50 + rust-stable + llvm22"] --> MS["meson.build"]
-    MS --> CB["cargo build --release<br/>package arctis-app"]
-    MS --> DM["data/meson.build"]
-    DM --> I["desktop, metainfo, gschema,<br/>D-Bus service, Headset1 XML, icons"]
-    DM --> T["meson test: desktop-file-validate,<br/>appstreamcli, glib-compile-schemas --strict"]
-```
-
-| Piece | Path |
-|---|---|
-| Flatpak manifest | `build-aux/io.github.marcelogm.ArctisCompanion.json` |
-| Top-level meson | `meson.build` |
-| Data install and validation | `data/meson.build` |
-| D-Bus contract | `data/dbus/io.github.marcelogm.ArctisCompanion.Headset1.xml` |
-| Desktop entry | `data/io.github.marcelogm.ArctisCompanion.desktop.in` |
-| AppStream metadata | `data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in` |
-| Settings schema | `data/io.github.marcelogm.ArctisCompanion.gschema.xml` |
-| D-Bus activation | `data/io.github.marcelogm.ArctisCompanion.service.in` |
+The Flatpak build, the translations, the release workflow and the install steps are in
+[packaging.md](packaging.md).
 
 ## Continuous integration
 
@@ -93,10 +79,12 @@ flowchart LR
     R --> T["test: clippy -D warnings, cargo test,<br/>llvm-cov 90 % on core"]
     R --> G["ui: weston headless, dbus-daemon,<br/>cargo test -p arctis-ui -p arctis-app"]
     R --> X["extension: eslint, gjs tests,<br/>catalogue check, pack"]
+    R --> I["i18n: po/check.sh"]
     T --> F["flatpak: flatpak-builder"]
     T --> A["audio-integration: private PipeWire + WirePlumber,<br/>crates/audio/tests/headless/run.sh"]
     N["nightly"] --> M["cargo mutants, proptest x10,<br/>optional shell smoke"]
+    TG["tag v*"] --> RL["release: bundle, extension zip, udev rule"]
 ```
 
-Workflows: `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`. Branch ruleset: `.github/rulesets/main.json`
+Workflows: `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`, `.github/workflows/release.yml`. Branch ruleset: `.github/rulesets/main.json`
 (rebase merges only, `rules` required).
