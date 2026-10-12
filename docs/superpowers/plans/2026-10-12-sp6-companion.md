@@ -5788,7 +5788,7 @@ git push
 - Modify: `crates/core/src/companion/reducer.rs`
 - Test: `crates/core/tests/companion/routing_flow.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod routing_flow;` to `crates/core/tests/companion/main.rs`.
 
@@ -5932,12 +5932,12 @@ fn an_app_that_starts_playing_is_recorded_once() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion routing_flow`
 Expected: FAIL (audio events are ignored).
 
-- [ ] **Step 3: Handle audio events in `reducer.rs`**
+- [x] **Step 3: Handle audio events in `reducer.rs`**
 
 Add to the imports:
 
@@ -6011,12 +6011,12 @@ Replace `dispatch` and add `audio_event`, `record_seen_apps`, `bluetooth_seen`, 
 `AudioState::apply(&AudioEvent::Unavailable)` resets it, so PipeWire going away sends no `RemoveEqualizer` (there
 is nothing left to remove). EasyEffects showing up in the chain removes an inserted equalizer (Deviation 33).
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
