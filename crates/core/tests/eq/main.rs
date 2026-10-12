@@ -1,6 +1,7 @@
 mod biquad;
 mod coefficients;
 mod curve;
+mod equalizer;
 mod filter;
 mod library;
 mod preset;
