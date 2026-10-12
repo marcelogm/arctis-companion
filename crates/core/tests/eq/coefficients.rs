@@ -1,7 +1,9 @@
+use arctis_core::eq::biquad::shaping_biquads;
+use arctis_core::eq::response::preamp_db_at;
 use arctis_core::eq::{Coefficients, Curve, Filter, FilterKind, Gain, Hertz, Q, library};
 use proptest::prelude::*;
 
-use crate::support::{any_filter, assert_close, filter, peaking};
+use crate::support::{any_filter, assert_close, filter, peaking, poles_inside_unit_circle};
 
 const CORNERS: [(u16, u16); 4] = [
     (Hertz::MIN, Q::MIN_MILLI),
@@ -11,11 +13,8 @@ const CORNERS: [(u16, u16); 4] = [
 ];
 
 fn stable(candidate: Filter, rate: u32) -> bool {
-    let coefficients = Coefficients::design(&Curve::from_array([candidate]), rate);
-    coefficients
-        .sections()
-        .iter()
-        .all(|section| section.poles_inside_unit_circle())
+    shaping_biquads(&Curve::from_array([candidate]), rate)
+        .all(|biquad| poles_inside_unit_circle(&biquad))
 }
 
 fn gains_for(kind: FilterKind) -> Vec<i8> {
@@ -73,11 +72,13 @@ fn the_preamp_follows_overlapping_boosts() {
 }
 
 #[test]
-fn coefficients_remember_their_rate() {
-    assert_eq!(
-        Coefficients::design(&Curve::default(), 44_100).rate(),
-        44_100
-    );
+fn the_preamp_follows_the_rate() {
+    let curve = Curve::from_array([filter(FilterKind::HighShelf, 20_000, 20, 10_000)]);
+    for rate in [44_100, 48_000] {
+        let preamp = f64::from(Coefficients::design(&curve, rate).preamp());
+        let expected = 10f64.powf(preamp_db_at(&curve, rate) / 20.0);
+        assert_close(preamp, expected, 1e-6, &format!("{rate} Hz"));
+    }
 }
 
 #[test]

@@ -1,6 +1,20 @@
 use std::f64::consts::TAU;
 
+use super::curve::Curve;
 use super::filter::{Filter, FilterKind};
+
+pub fn shaping_biquads(curve: &Curve, rate: u32) -> impl Iterator<Item = Biquad> + '_ {
+    curve
+        .filters()
+        .iter()
+        .copied()
+        .filter(move |filter| filter.shapes_sound() && below_nyquist(*filter, rate))
+        .map(move |filter| Biquad::design(&Params::from(filter), f64::from(rate)))
+}
+
+fn below_nyquist(filter: Filter, rate: u32) -> bool {
+    2 * u32::from(filter.hz().get()) < rate
+}
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Params {
@@ -181,13 +195,6 @@ impl Section {
         state.s1 = audible_or_zero(self.b1 * input - self.a1 * output + state.s2);
         state.s2 = audible_or_zero(self.b2 * input - self.a2 * output);
         output
-    }
-
-    #[must_use]
-    pub fn poles_inside_unit_circle(self) -> bool {
-        let a1 = f64::from(self.a1);
-        let a2 = f64::from(self.a2);
-        a2.abs() < 1.0 && a1.abs() < 1.0 + a2
     }
 }
 
