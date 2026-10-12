@@ -166,6 +166,7 @@ pub fn build(threads: ThreadFactory) -> CompanionApplication {
 
 #[must_use]
 pub fn run() -> glib::ExitCode {
+    crate::locale::init();
     match arctis_ui::register_resources() {
         Ok(()) => build(Threads::system).run(),
         Err(error) => {
