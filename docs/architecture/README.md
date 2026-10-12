@@ -11,6 +11,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [protocol.md](protocol.md) | protocol codec, headset settings, thread messages |
 | [shell-extension.md](shell-extension.md) | GNOME Shell Quick Settings extension and its tests |
 | [companion.md](companion.md) | companion reducer, battery history, ports, intents and view models |
+| [session.md](session.md) | device session reducer, lifecycle, write-then-verify, testkit |
 
 ## Workspace
 
@@ -27,7 +28,7 @@ flowchart BT
 
 | Crate | Entry points |
 |---|---|
-| `crates/core/` | `crates/core/src/lib.rs`, `crates/core/src/time.rs::Millis`, `crates/core/src/protocol/mod.rs`, `crates/core/src/messages/mod.rs`, `crates/core/src/companion/mod.rs`, `crates/core/src/view/mod.rs` |
+| `crates/core/` | `crates/core/src/lib.rs`, `crates/core/src/time.rs::Millis`, `crates/core/src/protocol/mod.rs`, `crates/core/src/messages/mod.rs`, `crates/core/src/companion/mod.rs`, `crates/core/src/view/mod.rs`, `crates/core/src/session/mod.rs`, `crates/core/src/testkit/mod.rs` |
 | `crates/hid/` | `crates/hid/src/lib.rs` |
 | `crates/audio/` | `crates/audio/src/lib.rs::init`, `crates/audio/src/handle.rs::AudioHandle` |
 | `crates/ui/` | `crates/ui/src/lib.rs::register_resources`, `crates/ui/src/window.rs::Window` |
