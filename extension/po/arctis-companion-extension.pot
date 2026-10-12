@@ -1,0 +1,55 @@
+# SOME DESCRIPTIVE TITLE.
+# Copyright (C) YEAR THE PACKAGE'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the arctis-companion-extension package.
+# FIRST AUTHOR <EMAIL@ADDRESS>, YEAR.
+#
+#, fuzzy
+msgid ""
+msgstr ""
+"Project-Id-Version: arctis-companion-extension\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-12 02:46-0300\n"
+"PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
+"Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
+"Language-Team: LANGUAGE <LL@li.org>\n"
+"Language: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+#: arctis-companion@marcelogm.github.io/lib/toggle.js
+msgid "App Presets"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "No app rules"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "{preset} · {app}"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "{preset} · Until {app} stops"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "Headset"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "Charging"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "Charging · {percent} %"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "{percent} %"
+msgstr ""
+
+#: arctis-companion@marcelogm.github.io/lib/toggle.js
+msgid "Headset Settings"
+msgstr ""
