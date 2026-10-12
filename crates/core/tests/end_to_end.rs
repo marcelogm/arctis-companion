@@ -11,10 +11,11 @@ use arctis_core::messages::audio::{AudioCommand, AudioEvent, DefaultSink, SinkKi
 use arctis_core::messages::device::{Change, DeviceUpdate, Phase, SyncPolicy};
 use arctis_core::protocol::{Command, Frame, Query, encode};
 use arctis_core::session::timing::ENUMERATION_SETTLE;
-use arctis_core::testkit::companion::{NOVA_5_PRODUCT, curve, firefox, with_rule};
+use arctis_core::testkit::companion::{NOVA_5_PRODUCT, curve, firefox, persisted, with_rule};
 use arctis_core::testkit::snapshots::{id, percent, values};
 use arctis_core::testkit::{FakeHeadset, Flap, Simulation};
 use arctis_core::time::Millis;
+use arctis_core::view::headset_page::{BannerKind, banner};
 
 const START: Millis = Millis(1_760_000_000_000);
 const STEP: u64 = 10;
@@ -358,4 +359,24 @@ fn connect_adopt_set_switch_warn_flap_and_reconnect() {
     warn_about_a_low_battery(&mut run);
     absorb_a_flap(&mut run);
     reconnect(&mut run, factory);
+}
+
+#[test]
+fn a_restart_with_the_headset_off_shows_the_adopted_banner() {
+    let mut saved = persisted();
+    saved.settings.adopted_identity = Some(DongleIdentity::new(NOVA_5_PRODUCT, None));
+    let mut run = EndToEnd {
+        simulation: Simulation::new(FakeHeadset::nova_5().powered_off()),
+        companion: Companion::new(saved),
+        ..EndToEnd::new()
+    };
+    run.simulation.plug();
+    run.run_for(CONNECTED);
+    let snapshot = run.companion.snapshot();
+    assert_eq!(snapshot.dongle.phase, Phase::HeadsetOff);
+    assert_eq!(snapshot.dongle.adoption, AdoptionStatus::Adopted);
+    assert_eq!(
+        banner(&snapshot).map(|b| b.kind),
+        Some(BannerKind::HeadsetOff)
+    );
 }
