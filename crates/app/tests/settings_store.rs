@@ -1,6 +1,9 @@
 #[path = "common/schema.rs"]
 mod schema;
 
+use std::cell::RefCell;
+use std::rc::Rc;
+
 use arctis_app::platform::settings_store::GSettingsStore;
 use arctis_app::ports::SettingsStore;
 use arctis_core::companion::adoption::DongleIdentity;
@@ -12,6 +15,7 @@ use arctis_core::settings::values::{
     AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone, WirelessMode,
 };
 use gtk::gio::prelude::*;
+use gtk::glib;
 
 use schema::{compiled_dir, memory_pair};
 
@@ -234,4 +238,69 @@ fn removing_an_app_rule_deletes_only_that_rule() {
     let rules = store.load().app_rules;
     assert_eq!(rules.len(), 1);
     assert!(rules.preset_for("spotify").is_some());
+}
+
+fn on_own_context(test: impl FnOnce(&glib::MainContext)) {
+    let context = glib::MainContext::new();
+    context
+        .with_thread_default(|| test(&context))
+        .expect("the test owns its main context");
+}
+
+fn drain(context: &glib::MainContext) {
+    while context.iteration(false) {}
+}
+
+type Seen = Rc<RefCell<Vec<AppSettings>>>;
+
+fn watched(store: &GSettingsStore) -> (arctis_app::platform::settings_store::SettingsWatch, Seen) {
+    let seen = Seen::default();
+    let log = Rc::clone(&seen);
+    let watch = store.watch(move |settings| log.borrow_mut().push(settings));
+    (watch, seen)
+}
+
+#[test]
+fn an_outside_change_reaches_the_watcher_once_per_turn() {
+    on_own_context(|context| {
+        let dir = compiled_dir();
+        let (ours, theirs) = memory_pair(dir.path());
+        let (_watch, seen) = watched(&GSettingsStore::new(ours));
+        theirs.set_int("sidetone", 6).expect("sidetone");
+        theirs
+            .set_boolean("automatic-presets", false)
+            .expect("automatic presets");
+        drain(context);
+        let seen = seen.borrow();
+        assert_eq!(seen.len(), 1);
+        assert_eq!(seen[0].headset.sidetone.get(), 6);
+        assert!(!seen[0].automatic_presets);
+    });
+}
+
+#[test]
+fn a_multi_key_write_is_seen_whole() {
+    on_own_context(|context| {
+        let dir = compiled_dir();
+        let (ours, _) = memory_pair(dir.path());
+        let store = GSettingsStore::new(ours);
+        let (_watch, seen) = watched(&store);
+        store.persist(&PersistedChange::Headset(headset_values()));
+        drain(context);
+        assert_eq!(seen.borrow().len(), 1);
+        assert_eq!(seen.borrow()[0].headset, headset_values());
+    });
+}
+
+#[test]
+fn dropping_the_watch_stops_it() {
+    on_own_context(|context| {
+        let dir = compiled_dir();
+        let (ours, theirs) = memory_pair(dir.path());
+        let (watch, seen) = watched(&GSettingsStore::new(ours));
+        drop(watch);
+        theirs.set_int("sidetone", 6).expect("sidetone");
+        drain(context);
+        assert!(seen.borrow().is_empty());
+    });
 }

@@ -1,3 +1,6 @@
+use std::cell::Cell;
+use std::rc::Rc;
+
 use arctis_core::companion::app_settings::AppSettings;
 use arctis_core::companion::app_settings::PersistedChange;
 use gtk::gio;
@@ -65,5 +68,58 @@ impl SettingsStore for GSettingsStore {
         if let Err(error) = self.write(change) {
             warn(&format!("could not save {change:?}: {error}"));
         }
+    }
+}
+
+pub struct SettingsWatch {
+    settings: gio::Settings,
+    handler: Option<glib::SignalHandlerId>,
+}
+
+impl Drop for SettingsWatch {
+    fn drop(&mut self) {
+        if let Some(handler) = self.handler.take() {
+            self.settings.disconnect(handler);
+        }
+    }
+}
+
+impl GSettingsStore {
+    #[must_use]
+    pub fn watch(&self, on_change: impl Fn(AppSettings) + 'static) -> SettingsWatch {
+        let coalesced = Coalesced {
+            pending: Rc::new(Cell::new(false)),
+            store: self.clone(),
+            on_change: Rc::new(on_change),
+        };
+        let handler = self
+            .settings
+            .connect_changed(None, move |_, _| coalesced.schedule());
+        SettingsWatch {
+            settings: self.settings.clone(),
+            handler: Some(handler),
+        }
+    }
+}
+
+#[derive(Clone)]
+struct Coalesced {
+    pending: Rc<Cell<bool>>,
+    store: GSettingsStore,
+    on_change: Rc<dyn Fn(AppSettings)>,
+}
+
+impl Coalesced {
+    fn schedule(&self) {
+        if self.pending.replace(true) {
+            return;
+        }
+        let coalesced = self.clone();
+        glib::spawn_future_local(async move { coalesced.deliver() });
+    }
+
+    fn deliver(&self) {
+        self.pending.set(false);
+        (self.on_change)(self.store.load());
     }
 }
