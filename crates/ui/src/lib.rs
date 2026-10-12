@@ -1,6 +1,8 @@
 #![forbid(unsafe_code)]
 
+pub mod intents;
 pub mod text;
+pub mod widget_values;
 mod window;
 
 pub use window::Window;

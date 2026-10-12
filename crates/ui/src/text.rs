@@ -73,13 +73,13 @@ impl Resolver {
         }
     }
 
-    fn fill(&self, template: &str, args: &[(&str, Arg)]) -> String {
+    fn fill(self, template: &str, args: &[(&str, Arg)]) -> String {
         args.iter().fold(template.to_owned(), |text, (name, arg)| {
             text.replace(&format!("{{{name}}}"), &self.argument(arg))
         })
     }
 
-    fn argument(&self, arg: &Arg) -> String {
+    fn argument(self, arg: &Arg) -> String {
         match arg {
             Arg::Percent(percent) => format!("{} %", percent.get()),
             Arg::Decibels(gain) => format!("{} dB", self.numbers.signed_tenths(gain.db())),
