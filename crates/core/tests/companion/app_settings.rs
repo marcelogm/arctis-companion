@@ -82,6 +82,16 @@ fn rules_can_be_set_and_removed() {
 }
 
 #[test]
+fn setting_a_case_variant_replaces_the_rule() {
+    let mut app_rules = rules(&[("Firefox", "footsteps"), ("chromium", "podcast")]);
+    let replaced = app_rules.set("firefox".to_owned(), id("podcast"));
+    assert_eq!(replaced, ["Firefox"]);
+    assert_eq!(app_rules.len(), 2);
+    assert_eq!(app_rules.preset_for("FIREFOX"), Some(&id("podcast")));
+    assert!(app_rules.entries().any(|(stored, _)| stored == "firefox"));
+}
+
+#[test]
 fn route_presets_are_kept_per_path() {
     let mut presets = RoutePresets {
         dongle: id("flat"),

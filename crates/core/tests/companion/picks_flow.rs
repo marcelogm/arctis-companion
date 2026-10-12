@@ -256,6 +256,25 @@ fn app_rules_are_persisted() {
 }
 
 #[test]
+fn a_case_variant_rule_replaces_the_stored_one() {
+    let mut h = ruled(&[("Firefox", "footsteps")]);
+    let actions = h.intent(Intent::SetAppRule {
+        identifier: "firefox".to_owned(),
+        preset: id("podcast"),
+    });
+    let gone = PersistedChange::AppRule {
+        identifier: "Firefox".to_owned(),
+        preset: None,
+    };
+    let rule = PersistedChange::AppRule {
+        identifier: "firefox".to_owned(),
+        preset: Some(id("podcast")),
+    };
+    assert_eq!(persisted_changes(&actions), [gone, rule]);
+    assert_eq!(h.snapshot().presets.rules.len(), 1);
+}
+
+#[test]
 fn a_new_low_battery_threshold_is_persisted_and_re_evaluated() {
     let mut h = Harness::new(persisted());
     let status = DeviceUpdate::Status {

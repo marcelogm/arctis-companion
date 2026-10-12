@@ -67,8 +67,18 @@ pub type RoutePresets = PerPath<PresetId>;
 pub struct AppRules(BTreeMap<String, PresetId>);
 
 impl AppRules {
-    pub fn set(&mut self, identifier: String, preset: PresetId) {
+    pub fn set(&mut self, identifier: String, preset: PresetId) -> Vec<String> {
+        let replaced: Vec<String> = self
+            .0
+            .keys()
+            .filter(|stored| **stored != identifier && stored.eq_ignore_ascii_case(&identifier))
+            .cloned()
+            .collect();
+        for stored in &replaced {
+            self.0.remove(stored);
+        }
         self.0.insert(identifier, preset);
+        replaced
     }
 
     pub fn remove(&mut self, identifier: &str) {
