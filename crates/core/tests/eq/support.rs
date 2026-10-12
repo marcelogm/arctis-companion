@@ -1,4 +1,6 @@
-use arctis_core::eq::{Curve, Filter, FilterKind, Gain, Hertz, Q};
+use std::f32::consts::TAU;
+
+use arctis_core::eq::{Curve, Equalizer, Filter, FilterKind, Gain, Hertz, Q};
 use proptest::prelude::*;
 
 const FACTORY_BANDS: [u16; 10] = [32, 64, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000];
@@ -43,4 +45,30 @@ pub fn any_filter() -> impl Strategy<Value = Filter> {
         let half_db = if kind.has_gain() { half_db } else { 0 };
         filter(kind, hz, half_db, milli_q)
     })
+}
+
+pub const BLOCK: usize = 512;
+
+pub fn sine(hz: f32, rate: f32, frames: usize) -> Vec<f32> {
+    let step = TAU * hz / rate;
+    std::iter::successors(Some(0.0_f32), |phase| Some((phase + step) % TAU))
+        .take(frames)
+        .map(|phase| 0.5 * phase.sin())
+        .collect()
+}
+
+pub fn stereo(mono: &[f32]) -> Vec<f32> {
+    mono.iter().flat_map(|&sample| [sample, sample]).collect()
+}
+
+pub fn processed(equalizer: &mut Equalizer, input: &[f32]) -> Vec<f32> {
+    let mut output = input.to_vec();
+    for block in output.chunks_mut(BLOCK) {
+        equalizer.process(block);
+    }
+    output
+}
+
+pub fn bits(samples: &[f32]) -> Vec<u32> {
+    samples.iter().map(|sample| sample.to_bits()).collect()
 }
