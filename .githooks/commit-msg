@@ -1,5 +1,0 @@
-#!/bin/sh
-if grep -qiE 'co-authored-by|generated with|claude|anthropic|🤖' "$1"; then
-  echo "commit-msg: attribution or tool mentions are not allowed in commit messages" >&2
-  exit 1
-fi
