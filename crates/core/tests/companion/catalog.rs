@@ -11,7 +11,7 @@ fn the_catalog_lists_built_ins_then_custom_presets() {
         .iter()
         .map(|p| p.id().as_str().to_owned())
         .collect();
-    assert_eq!(ids.len(), 11);
+    assert_eq!(ids.len(), library::library().len() + 1);
     assert_eq!(ids.first().map(String::as_str), Some("flat"));
     assert_eq!(ids.last().map(String::as_str), Some("mine"));
 }
