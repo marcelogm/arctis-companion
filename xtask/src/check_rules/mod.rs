@@ -1,3 +1,4 @@
+mod comments;
 mod generated;
 mod line_limit;
 
@@ -39,6 +40,9 @@ fn check_text(path: &Path, text: &str) -> Report {
     let mut report = Report::default();
     if let Some(warning) = line_limit::check(path, text) {
         report.warning(warning);
+    }
+    if let Some(error) = comments::check(path, text) {
+        report.error(error);
     }
     report
 }
