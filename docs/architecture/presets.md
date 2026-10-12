@@ -51,7 +51,8 @@ sequenceDiagram
 
 `WorkingCopy` owns the rules the widget must not: a published copy replaces the working copy, the first edit of a
 burst is remembered for Undo, `burst_ended` (toast gone) opens the next burst, `undo` returns the preset as it was
-before the burst. The page keeps the toast handle only to dismiss it when another preset opens.
+before the burst. The page keeps the toast handle only to dismiss it when another preset opens or the preset is
+deleted, and Undo does nothing once the preset is gone from the snapshot.
 
 | Concern | Code |
 |---|---|

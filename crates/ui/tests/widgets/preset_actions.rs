@@ -13,11 +13,19 @@ use arctis_core::testkit::english::english;
 use arctis_core::testkit::snapshots::{id, snapshot, with};
 use arctis_core::view::preset_files::export_text;
 use arctis_core::view::presets::deleted_toast;
+use arctis_ui::EqEditorPage;
 
 use crate::support::{
-    band_rows, click, drain, named, one_peak, open_editor, rendered_window, saved, shown,
-    shows_text, standalone_editor, step_up, visible_tag, with_preset,
+    Mounted, band_rows, click, dismiss_toast, drain, named, one_peak, open_editor, rendered_window,
+    saved, shown, shows_text, standalone_editor, step_up, visible_tag, with_preset,
 };
+
+fn step_up_gain(editor: &Mounted<EqEditorPage>) {
+    step_up(&named::<adw::SpinRow>(
+        &band_rows(&editor.page)[0],
+        "band-gain",
+    ));
+}
 
 fn picked(preset: &str) -> Snapshot {
     let mut s = snapshot();
@@ -226,6 +234,32 @@ fn duplicating_ends_the_preview_first() {
     assert_eq!(log[0], Intent::StartPreview(id("bass-boost")));
     assert_eq!(log[1], Intent::EndPreview);
     assert!(matches!(log[2], Intent::SavePreset(_)));
+}
+
+#[gtk::test]
+fn deleting_withdraws_the_undo_of_an_earlier_edit() {
+    let editor = standalone_editor(with_preset(&one_peak()), "mine");
+    step_up_gain(&editor);
+    editor
+        .page
+        .activate_action("editor.delete", None)
+        .expect("the action exists");
+    drain();
+    dismiss_toast(&editor.toasts);
+    assert!(!shows_text(&editor.toasts, "Saved “Mine”"));
+    assert!(matches!(
+        editor.log.borrow().last(),
+        Some(Intent::DeletePreset(_))
+    ));
+}
+
+#[gtk::test]
+fn undo_does_nothing_once_the_preset_is_gone() {
+    let editor = standalone_editor(with_preset(&one_peak()), "mine");
+    step_up_gain(&editor);
+    editor.page.render(&Rc::new(snapshot()));
+    click(&editor.toasts, "Undo");
+    assert_eq!(editor.log.borrow().len(), 1);
 }
 
 #[gtk::test]

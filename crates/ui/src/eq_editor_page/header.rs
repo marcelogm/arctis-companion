@@ -77,6 +77,8 @@ impl EqEditorPage {
         let id = preset.id().clone();
         let sink = services.sink.clone();
         let title = deleted_toast(&snapshot, &preset);
+        self.dismiss_undo_toast();
+        self.imp().working.replace(None);
         services.urgent_undo_toast(&title, move || {
             sink.emit(Intent::SavePreset(preset.clone()));
         });
