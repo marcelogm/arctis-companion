@@ -9,7 +9,7 @@ use gtk::glib;
 use crate::app_icons::display_icon_name;
 use crate::intents::IntentSink;
 use crate::text::resolve;
-use crate::widget_values::{index, show_choices};
+use crate::widget_values::{chosen, show_choices};
 
 mod imp {
     use std::cell::RefCell;
@@ -35,7 +35,7 @@ mod imp {
         pub seen_rows: RefCell<Vec<adw::ActionRow>>,
         pub shown_seen: RefCell<Vec<SeenRowModel>>,
         pub choices: RefCell<Vec<PresetId>>,
-        pub sink: RefCell<Option<IntentSink>>,
+        pub sink: RefCell<IntentSink>,
     }
 
     #[glib::object_subclass]
@@ -78,7 +78,7 @@ impl Default for AddRuleDialog {
 
 impl AddRuleDialog {
     pub fn connect_intents(&self, sink: &IntentSink) {
-        self.imp().sink.replace(Some(sink.clone()));
+        self.imp().sink.replace(sink.clone());
     }
 
     pub fn render(&self, model: &AddRuleModel, presets: &[PresetItem]) {
@@ -87,7 +87,7 @@ impl AddRuleDialog {
         imp.other_app.set_title(&resolve(&model.other_title));
         imp.other_group
             .set_description(Some(&resolve(&model.other_hint)));
-        imp.seen_group.set_visible(!model.seen.is_empty());
+        imp.seen_group.set_visible(offers_seen_apps(&model.seen));
         if *imp.shown_seen.borrow() != model.seen {
             self.show_seen(&model.seen);
         }
@@ -104,7 +104,7 @@ impl AddRuleDialog {
     pub fn open(&self, parent: &impl IsA<gtk::Widget>) {
         let imp = self.imp();
         self.present(Some(parent));
-        if !imp.seen_group.get_visible() {
+        if !offers_seen_apps(&imp.shown_seen.borrow()) {
             self.set_focus(Some(&*imp.other_app));
         }
     }
@@ -154,7 +154,7 @@ impl AddRuleDialog {
 
     fn add_rule(&self, identifier: &str) {
         if let Some(intent) = rule_intent(identifier, self.chosen_preset()) {
-            self.emit(intent);
+            self.imp().sink.borrow().clone().emit(intent);
             self.imp().other_app.set_text("");
             self.close();
         }
@@ -162,18 +162,12 @@ impl AddRuleDialog {
 
     fn chosen_preset(&self) -> Option<PresetId> {
         let imp = self.imp();
-        imp.choices
-            .borrow()
-            .get(index(imp.preset.selected())?)
-            .cloned()
+        chosen(&imp.choices.borrow(), imp.preset.selected())
     }
+}
 
-    fn emit(&self, intent: Intent) {
-        let sink = self.imp().sink.borrow().clone();
-        if let Some(sink) = sink {
-            sink.emit(intent);
-        }
-    }
+fn offers_seen_apps(seen: &[SeenRowModel]) -> bool {
+    !seen.is_empty()
 }
 
 fn rule_intent(identifier: &str, preset: Option<PresetId>) -> Option<Intent> {

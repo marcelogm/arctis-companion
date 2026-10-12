@@ -90,6 +90,17 @@ fn without_seen_apps_the_entry_takes_the_focus() {
 }
 
 #[gtk::test]
+fn with_seen_apps_the_entry_does_not_take_the_focus() {
+    let (dialog, _, _) = rendered_dialog(&spotify_seen());
+    let _window = presented(&dialog);
+    let entry = named::<adw::EntryRow>(&dialog, "other-app");
+    let in_entry = dialog.focus().is_some_and(|focus| {
+        focus == entry.clone().upcast::<gtk::Widget>() || focus.is_ancestor(&entry)
+    });
+    assert!(!in_entry);
+}
+
+#[gtk::test]
 fn the_preset_row_offers_the_library() {
     let s = snapshot();
     let (dialog, _, _) = rendered_dialog(&s);

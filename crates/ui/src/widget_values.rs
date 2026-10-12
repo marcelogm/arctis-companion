@@ -18,6 +18,11 @@ pub fn index(position: u32) -> Option<usize> {
 }
 
 #[must_use]
+pub fn chosen<T: Clone>(choices: &[T], position: u32) -> Option<T> {
+    choices.get(index(position)?).cloned()
+}
+
+#[must_use]
 pub fn position(index: usize) -> u32 {
     u32::try_from(index).unwrap_or(gtk::INVALID_LIST_POSITION)
 }

@@ -5,6 +5,7 @@ use crate::companion::alerts::BatteryWarning;
 use crate::companion::app_settings::{AppRules, HeadsetValues, RoutePresets};
 use crate::companion::per_path::PerPath;
 use crate::companion::routing::{AudioService, Route};
+use crate::companion::seen_apps::SeenApp;
 use crate::companion::selection::ActivePreset;
 use crate::companion::snapshot::{AudioSnapshot, BatterySnapshot, DongleSnapshot, PresetsSnapshot};
 use crate::eq::library;
@@ -131,4 +132,26 @@ pub fn with(phase: Phase, route: Route) -> Snapshot {
     s.dongle.phase = phase;
     s.audio.route = route;
     s
+}
+
+#[must_use]
+pub fn rules(entries: &[(&str, &str)]) -> AppRules {
+    entries
+        .iter()
+        .map(|(app, preset)| ((*app).to_owned(), id(preset)))
+        .collect()
+}
+
+#[must_use]
+pub fn seen_app(name: &str, identifiers: &[&str]) -> SeenApp {
+    SeenApp {
+        key: identifiers
+            .first()
+            .map_or_else(String::new, |key| (*key).to_owned()),
+        name: name.to_owned(),
+        identifiers: identifiers
+            .iter()
+            .map(|identifier| (*identifier).to_owned())
+            .collect(),
+    }
 }

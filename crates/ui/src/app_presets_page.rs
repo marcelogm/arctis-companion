@@ -16,15 +16,19 @@ use crate::widget_values::show_if;
 
 const ADD_RULE_ACTION: &str = "app-presets.add-rule";
 
+pub struct AddRuleInputs {
+    model: AddRuleModel,
+    presets: Vec<PresetItem>,
+}
+
 mod imp {
     use std::cell::{OnceCell, RefCell};
 
     use adw::subclass::prelude::*;
-    use arctis_core::view::app_presets::AddRuleModel;
-    use arctis_core::view::presets::PresetItem;
     use gtk::glib;
     use gtk::glib::prelude::StaticTypeExt;
 
+    use super::AddRuleInputs;
     use crate::add_rule_dialog::AddRuleDialog;
     use crate::app_rule_row::AppRuleRow;
     use crate::intents::IntentSink;
@@ -49,7 +53,7 @@ mod imp {
         pub rules_group: TemplateChild<adw::PreferencesGroup>,
         pub rows: RefCell<Vec<AppRuleRow>>,
         pub sink: RefCell<IntentSink>,
-        pub dialog_model: RefCell<Option<(AddRuleModel, Vec<PresetItem>)>>,
+        pub add_rule_inputs: RefCell<Option<AddRuleInputs>>,
         pub dialog: OnceCell<AddRuleDialog>,
     }
 
@@ -88,7 +92,7 @@ impl AppPresetsPage {
         self.imp().sink.replace(sink.clone());
     }
 
-    pub fn render(&self, model: &AppPresetsModel, dialog: &AddRuleModel) {
+    pub fn render(&self, model: &AppPresetsModel, add_rule: &AddRuleModel) {
         let imp = self.imp();
         imp.rules_page.set_description(&resolve(&model.description));
         self.show_automatic_off(model.automatic_off.as_ref());
@@ -96,28 +100,28 @@ impl AppPresetsPage {
             AppPresetsContent::Empty(empty) => self.show_empty(empty),
             AppPresetsContent::Rules(rows) => self.show_rules(rows, &model.presets),
         }
-        self.remember_dialog(dialog, &model.presets);
+        self.keep_add_rule_inputs(add_rule, &model.presets);
     }
 
     #[must_use]
     pub fn add_rule_dialog(&self) -> AddRuleDialog {
         let imp = self.imp();
-        let dialog = imp
-            .dialog
+        imp.dialog
             .get_or_init(|| {
                 let dialog = AddRuleDialog::default();
                 dialog.connect_intents(&imp.sink.borrow());
+                self.render_dialog(&dialog);
                 dialog
             })
-            .clone();
-        self.render_dialog(&dialog);
-        dialog
+            .clone()
     }
 
-    fn remember_dialog(&self, model: &AddRuleModel, presets: &[PresetItem]) {
+    fn keep_add_rule_inputs(&self, model: &AddRuleModel, presets: &[PresetItem]) {
         let imp = self.imp();
-        imp.dialog_model
-            .replace(Some((model.clone(), presets.to_vec())));
+        imp.add_rule_inputs.replace(Some(AddRuleInputs {
+            model: model.clone(),
+            presets: presets.to_vec(),
+        }));
         if let Some(dialog) = imp.dialog.get() {
             self.render_dialog(dialog);
         }
@@ -125,10 +129,10 @@ impl AppPresetsPage {
 
     fn render_dialog(&self, dialog: &AddRuleDialog) {
         let imp = self.imp();
-        if let Some((model, presets)) = imp.dialog_model.borrow().as_ref() {
+        if let Some(inputs) = imp.add_rule_inputs.borrow().as_ref() {
             imp.sink
                 .borrow()
-                .rendering(|| dialog.render(model, presets));
+                .rendering(|| dialog.render(&inputs.model, &inputs.presets));
         }
     }
 
@@ -155,7 +159,7 @@ impl AppPresetsPage {
     }
 
     fn sync_rows(&self, models: &[RuleRowModel], presets: &[PresetItem]) {
-        if !self.shows_identifiers(models) {
+        if !self.rows_match(models) {
             self.rebuild_rows(models.len());
         }
         for (row, model) in self.imp().rows.borrow().iter().zip(models) {
@@ -163,7 +167,7 @@ impl AppPresetsPage {
         }
     }
 
-    fn shows_identifiers(&self, models: &[RuleRowModel]) -> bool {
+    fn rows_match(&self, models: &[RuleRowModel]) -> bool {
         let rows = self.imp().rows.borrow();
         rows.len() == models.len()
             && rows

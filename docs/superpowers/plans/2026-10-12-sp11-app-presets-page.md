@@ -151,6 +151,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 15 | No pt_BR entries are added | `po/` does not exist yet; SP14 creates the catalogue from the `_()` marks |
 | 16 | Accessible labels of icon-only buttons ("Add Rule", "Remove Rule") are static Blueprint strings | the row title already names the app; the static label keeps the models unchanged (Deviation 1) |
 | 17 | The dialog closes itself after emitting a rule. Every test that makes it emit presents it first in an `adw::Window` (or through the window's `app-presets.add-rule`) | `adw::Dialog::close` on a dialog that was never presented logs `Adwaita-CRITICAL: Trying to close … that's not presented` (probed in the toolbox); a presented dialog leaves `visible_dialog()` synchronously, which gives the tests a close assertion |
+| 18 | The "missing preset" choice is built by `missing_choice(model)` matching on `RuleRowModel.preset`, titled with the model subtitle; `RuleRowModel` is not changed to carry an explicit label | core is outside SP11 (Deviation 1); the named function states the contract |
 
 ---
 

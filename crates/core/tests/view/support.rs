@@ -1,9 +1,8 @@
-use arctis_core::companion::app_settings::AppRules;
 use arctis_core::eq::library;
 use arctis_core::eq::preset::Preset;
 use arctis_core::eq::{Gain, Hertz};
 
-pub use arctis_core::testkit::snapshots::{id, nova_5, percent, snapshot, with};
+pub use arctis_core::testkit::snapshots::{id, nova_5, percent, rules, snapshot, with};
 
 pub fn gain(half_db: i8) -> Gain {
     Gain::from_half_db(half_db).expect("gain in the envelope")
@@ -19,13 +18,6 @@ pub fn custom(name: &str) -> Preset {
         name.to_owned(),
         library::flat().curve().clone(),
     )
-}
-
-pub fn rules(entries: &[(&str, &str)]) -> AppRules {
-    entries
-        .iter()
-        .map(|(app, preset)| ((*app).to_owned(), id(preset)))
-        .collect()
 }
 
 pub fn assert_close(actual: f64, expected: f64, tolerance: f64) {
