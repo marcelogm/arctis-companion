@@ -37,6 +37,16 @@ pub fn load_persisted(settings: AppSettings, stores: &mut Stores, now: Millis) -
     }
 }
 
+#[must_use]
+pub const fn settings_only(settings: AppSettings) -> Persisted {
+    Persisted {
+        settings,
+        custom_presets: Vec::new(),
+        seen_apps: Vec::new(),
+        battery: Vec::new(),
+    }
+}
+
 fn loaded<T>(result: Result<Vec<T>, StoreError>) -> Vec<T> {
     result.unwrap_or_else(|error| {
         warn(&format!("starting without stored data: {error}"));

@@ -1,10 +1,11 @@
 use arctis_app::platform::notifications::GioNotifier;
 use arctis_core::protocol::status::Charging;
+use arctis_core::testkit::companion::status;
 use gtk::gio;
 use gtk::gio::prelude::*;
 
 use crate::bus::{Bus, wait_until};
-use crate::fixtures::{quiet_bridge, status};
+use crate::fixtures::quiet_bridge;
 use crate::notification_service::{NotificationService, Shown};
 
 const TEST_APP_ID: &str = "io.github.marcelogm.ArctisCompanion.NotificationTest";

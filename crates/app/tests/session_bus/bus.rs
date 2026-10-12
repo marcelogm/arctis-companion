@@ -7,7 +7,9 @@ use gtk::gio;
 use gtk::gio::prelude::*;
 use gtk::glib;
 
-use crate::fixtures::{INTERFACE, PATH};
+use arctis_app::dbus::headset_object::INTERFACE;
+
+use crate::fixtures::PATH;
 
 const PATIENCE: Duration = Duration::from_secs(5);
 const CALL_TIMEOUT_MS: i32 = 5_000;
@@ -82,23 +84,33 @@ pub fn settle() {
     }
 }
 
+pub async fn call_async(
+    connection: &gio::DBusConnection,
+    target: &Target<'_>,
+    method: &str,
+    parameters: Option<&glib::Variant>,
+) -> Result<glib::Variant, glib::Error> {
+    connection
+        .call_future(
+            Some(target.name),
+            target.path,
+            target.interface,
+            method,
+            parameters,
+            None,
+            gio::DBusCallFlags::NONE,
+            CALL_TIMEOUT_MS,
+        )
+        .await
+}
+
 pub fn call(
     connection: &gio::DBusConnection,
     target: &Target,
     method: &str,
     parameters: Option<&glib::Variant>,
 ) -> Result<glib::Variant, glib::Error> {
-    let reply = connection.call_future(
-        Some(target.name),
-        target.path,
-        target.interface,
-        method,
-        parameters,
-        None,
-        gio::DBusCallFlags::NONE,
-        CALL_TIMEOUT_MS,
-    );
-    glib::MainContext::default().block_on(reply)
+    glib::MainContext::default().block_on(call_async(connection, target, method, parameters))
 }
 
 pub fn property(connection: &gio::DBusConnection, name: &str, property: &str) -> glib::Variant {

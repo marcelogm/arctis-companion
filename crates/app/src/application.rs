@@ -5,8 +5,9 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use gtk::{gio, glib};
 
+use crate::dbus::headset_object::HeadsetObject;
 use crate::logging::LOG_DOMAIN;
-use crate::runtime::Runtime;
+use crate::runtime::{Runtime, stored_snapshot};
 use crate::threads::Threads;
 
 pub const APP_ID: &str = "io.github.marcelogm.ArctisCompanion";
@@ -22,11 +23,13 @@ mod imp {
     use gtk::{gio, glib};
 
     use super::ThreadFactory;
+    use crate::dbus::headset_object::HeadsetObject;
     use crate::runtime::Runtime;
 
     #[derive(Default)]
     pub struct CompanionApplication {
         pub threads: Cell<Option<ThreadFactory>>,
+        pub headset: RefCell<Option<Rc<HeadsetObject>>>,
         pub runtime: RefCell<Option<Rc<Runtime>>>,
     }
 
@@ -46,18 +49,18 @@ mod imp {
             path: &str,
         ) -> Result<(), glib::Error> {
             self.parent_dbus_register(connection, path)?;
-            self.obj().export(connection, path)
+            self.obj().register_headset(connection, path)
         }
 
         fn dbus_unregister(&self, connection: &gio::DBusConnection, path: &str) {
-            self.obj().unexport();
+            self.headset.take();
             self.parent_dbus_unregister(connection, path);
         }
 
         fn startup(&self) {
             self.parent_startup();
             self.obj().install_actions();
-            let _ = self.obj().runtime();
+            self.obj().start_runtime();
         }
 
         fn activate(&self) {
@@ -66,7 +69,7 @@ mod imp {
         }
 
         fn shutdown(&self) {
-            self.obj().stop_runtime();
+            self.obj().drop_runtime();
             self.parent_shutdown();
         }
     }
@@ -83,17 +86,25 @@ glib::wrapper! {
 }
 
 impl CompanionApplication {
-    fn runtime(&self) -> Option<Rc<Runtime>> {
+    fn register_headset(
+        &self,
+        connection: &gio::DBusConnection,
+        path: &str,
+    ) -> Result<(), glib::Error> {
+        let object = HeadsetObject::register(connection, path, stored_snapshot())?;
+        self.imp().headset.replace(Some(object));
+        Ok(())
+    }
+
+    fn start_runtime(&self) {
         let imp = self.imp();
-        if let Some(runtime) = imp.runtime.borrow().as_ref() {
-            return Some(Rc::clone(runtime));
-        }
-        let threads = imp.threads.take()?;
+        let Some(threads) = imp.threads.take() else {
+            return;
+        };
         match threads() {
             Ok(threads) => {
-                let runtime = Runtime::start(self.upcast_ref(), threads);
-                imp.runtime.replace(Some(Rc::clone(&runtime)));
-                Some(runtime)
+                let runtime = Runtime::start(self.upcast_ref(), threads, imp.headset.take());
+                imp.runtime.replace(Some(runtime));
             }
             Err(error) => {
                 glib::g_critical!(
@@ -101,31 +112,21 @@ impl CompanionApplication {
                     "the device and audio threads did not start: {error}"
                 );
                 self.quit();
-                None
             }
         }
     }
 
-    fn export(&self, connection: &gio::DBusConnection, path: &str) -> Result<(), glib::Error> {
-        self.runtime()
-            .map_or(Ok(()), |runtime| runtime.export(connection, path))
+    fn running_runtime(&self) -> Option<Rc<Runtime>> {
+        self.imp().runtime.borrow().clone()
     }
 
-    fn unexport(&self) {
-        if let Some(runtime) = self.imp().runtime.borrow().as_ref() {
-            runtime.unexport();
-        }
+    fn drop_runtime(&self) {
+        self.imp().runtime.take();
     }
 
     fn present(&self) {
-        if let Some(runtime) = self.runtime() {
+        if let Some(runtime) = self.running_runtime() {
             runtime.present(self.upcast_ref());
-        }
-    }
-
-    fn stop_runtime(&self) {
-        if let Some(runtime) = self.imp().runtime.take() {
-            runtime.unexport();
         }
     }
 
@@ -141,14 +142,14 @@ impl CompanionApplication {
     }
 
     fn quit_gracefully(&self) {
-        match self.runtime() {
+        match self.running_runtime() {
             Some(runtime) => runtime.quit(),
             None => self.quit(),
         }
     }
 
     fn show_battery(&self) {
-        if let Some(runtime) = self.runtime() {
+        if let Some(runtime) = self.running_runtime() {
             runtime.show_battery(self.upcast_ref());
         }
     }

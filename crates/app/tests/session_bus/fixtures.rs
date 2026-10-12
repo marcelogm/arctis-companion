@@ -5,25 +5,22 @@ use std::rc::Rc;
 
 use arctis_app::alarm::{GlibAlarm, SystemClock};
 use arctis_app::bridge::Bridge;
+use arctis_app::dbus::headset_object::INTERFACE;
 use arctis_app::ports::{AudioPort, DevicePort, Lifetime, Notifier, Ports, SettingsStore, Stores};
 use arctis_app::threads::Threads;
 use arctis_core::battery::sample::{Sample, UnixSeconds};
-use arctis_core::companion::app_settings::{
-    AppRules, AppSettings, Persisted, PersistedChange, RoutePresets,
-};
+use arctis_core::companion::Companion;
+use arctis_core::companion::app_settings::PersistedChange;
 use arctis_core::companion::seen_apps::SeenApp;
-use arctis_core::companion::{Companion, Input};
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::intent::Intent;
 use arctis_core::messages::audio::AudioCommand;
 use arctis_core::messages::audio::AudioEvent;
 use arctis_core::messages::device::{Change, DeviceUpdate};
 use arctis_core::ports::{BatteryRepository, PresetRepository, SeenAppsRepository, StoreError};
-use arctis_core::protocol::status::{Charging, Link};
-use arctis_core::testkit::snapshots::{id, percent, values};
+use arctis_core::testkit::companion::persisted;
 
 pub const PATH: &str = "/io/github/marcelogm/ArctisCompanion";
-pub const INTERFACE: &str = "io.github.marcelogm.ArctisCompanion.Headset1";
 
 pub fn contract_xml() -> String {
     let file = Path::new(env!("CARGO_MANIFEST_DIR"))
@@ -34,9 +31,9 @@ pub fn contract_xml() -> String {
 
 pub type Intents = Rc<RefCell<Vec<Intent>>>;
 
-pub fn recorder(log: &Intents) -> impl Fn(Intent) + 'static {
+pub fn recorder(log: &Intents) -> Rc<dyn Fn(Intent)> {
     let log = Rc::clone(log);
-    move |intent| log.borrow_mut().push(intent)
+    Rc::new(move |intent| log.borrow_mut().push(intent))
 }
 
 pub struct Quiet;
@@ -95,26 +92,6 @@ impl SeenAppsRepository for Quiet {
     }
 }
 
-pub fn persisted() -> Persisted {
-    Persisted {
-        settings: AppSettings {
-            headset: values(),
-            route_presets: RoutePresets {
-                dongle: id("flat"),
-                bluetooth: id("flat"),
-            },
-            app_rules: AppRules::default(),
-            automatic_presets: true,
-            adopted_identity: None,
-            bluetooth_sink_seen: false,
-            low_battery_threshold: percent(15),
-        },
-        custom_presets: Vec::new(),
-        seen_apps: Vec::new(),
-        battery: Vec::new(),
-    }
-}
-
 pub fn quiet_bridge(notifier: Box<dyn Notifier>) -> Rc<Bridge> {
     let ports = Ports {
         settings: Box::new(Quiet),
@@ -131,14 +108,6 @@ pub fn quiet_bridge(notifier: Box<dyn Notifier>) -> Rc<Bridge> {
         seen_apps: Box::new(Quiet),
     };
     Bridge::new(Companion::new(persisted()), ports, stores)
-}
-
-pub fn status(level: u8, charging: Charging) -> Input {
-    Input::Device(DeviceUpdate::Status {
-        battery: percent(level),
-        charging,
-        link: Link::Connected,
-    })
 }
 
 pub struct Silent<T> {
