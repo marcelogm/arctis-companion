@@ -3913,7 +3913,7 @@ git push
 `input.rs`, `action.rs` and the snapshot types carry no behaviour of their own; Task 15 pins them with the
 §3.2 contract test and the snapshot behaviour tests once `Companion` can produce them.
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod dongle;` to `crates/core/tests/companion/main.rs`.
 
@@ -4033,12 +4033,12 @@ fn a_headset_change_updates_the_observed_copy() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion dongle`
 Expected: FAIL to compile (`companion::dongle` missing).
 
-- [ ] **Step 3: Implement `dongle`**
+- [x] **Step 3: Implement `dongle`**
 
 `crates/core/src/companion/dongle.rs`:
 
@@ -4162,7 +4162,7 @@ fn same_value(observed: &HeadsetSettings, desired: &HeadsetSettings, setting: Se
 }
 ```
 
-- [ ] **Step 4: Add the input, action and snapshot types**
+- [x] **Step 4: Add the input, action and snapshot types**
 
 `crates/core/src/companion/input.rs`:
 
@@ -4317,12 +4317,12 @@ pub mod snapshot;
 pub mod timing;
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS (7 new `dongle` tests).
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
