@@ -4,6 +4,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::intent::Intent;
+use arctis_core::view::app_presets::{add_rule_dialog, app_presets};
 use arctis_core::view::headset_page::{
     BannerModel, HeadsetModel, HeadsetPageModel, StatusKind, headset_page,
 };
@@ -27,6 +28,7 @@ mod imp {
     use gtk::{gdk, glib};
 
     use crate::app_dialogs::{about_dialog, shortcuts_dialog};
+    use crate::app_presets_page::AppPresetsPage;
     use crate::headset_page::HeadsetPage;
     use crate::intents::IntentSink;
     use crate::permission_dialog::PermissionDialog;
@@ -49,6 +51,8 @@ mod imp {
         pub status_view: TemplateChild<StatusView>,
         #[template_child]
         pub headset_page: TemplateChild<HeadsetPage>,
+        #[template_child]
+        pub app_presets_page: TemplateChild<AppPresetsPage>,
         pub sink: IntentSink,
         pub toast_feed: ToastFeed,
         pub snapshot: RefCell<Option<Rc<Snapshot>>>,
@@ -65,6 +69,7 @@ mod imp {
         fn class_init(klass: &mut Self::Class) {
             StatusView::ensure_type();
             HeadsetPage::ensure_type();
+            AppPresetsPage::ensure_type();
             klass.bind_template();
             klass.install_action("win.preferences", None, |window, _, _| {
                 window.preferences_dialog().present(Some(window));
@@ -105,6 +110,7 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
             self.headset_page.connect_intents(&self.sink);
+            self.app_presets_page.connect_intents(&self.sink);
         }
     }
 
@@ -138,6 +144,7 @@ impl Window {
         imp.snapshot.replace(Some(Rc::clone(snapshot)));
         imp.sink.rendering(|| {
             self.render_main(&headset_page(snapshot));
+            self.render_app_presets(snapshot);
             self.render_preferences();
         });
     }
@@ -174,6 +181,12 @@ impl Window {
         if let Some(page) = tag.and_then(|tag| navigation.find_page(tag)) {
             navigation.push(&page);
         }
+    }
+
+    fn render_app_presets(&self, snapshot: &Snapshot) {
+        self.imp()
+            .app_presets_page
+            .render(&app_presets(snapshot), &add_rule_dialog(snapshot));
     }
 
     fn render_main(&self, model: &HeadsetPageModel) {
