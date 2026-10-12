@@ -2,8 +2,9 @@ use super::echo::EchoFilter;
 use super::exchange::{Outgoing, Unanswered};
 use super::verify::{Progress, Transaction, same};
 use crate::messages::device::{DeviceUpdate, SyncPolicy};
-use crate::protocol::Reply;
+use crate::protocol::reply::{AudioReadback, UxReadback};
 use crate::protocol::status::Link;
+use crate::protocol::{Query, Reply};
 use crate::settings::headset_settings::{HeadsetSettings, Setting, SettingChange};
 use crate::time::Millis;
 
@@ -43,12 +44,19 @@ impl Reconciler {
 
     pub(crate) fn observe(&mut self, settings: HeadsetSettings) -> Vec<DeviceUpdate> {
         self.observed = Some(settings);
-        self.unknown.clear();
         self.observed_update()
     }
 
-    pub(crate) fn clear_failures(&mut self) {
+    pub(crate) fn start_syncing(&mut self) {
         self.failed.clear();
+        self.unknown.clear();
+    }
+
+    pub(crate) fn assume(&mut self, query: Query) -> Option<Reply> {
+        let reply = assumed(query, self.desired.as_ref()?)?;
+        self.unknown
+            .extend(settings_in(&reply).iter().map(SettingChange::setting));
+        Some(reply)
     }
 
     pub(crate) fn interrupt(&mut self, now: Millis) {
@@ -90,10 +98,18 @@ impl Reconciler {
                 .cloned()
                 .for_each(|reading| observed.apply(reading));
         }
+        self.verify(&readings, now)
+    }
+
+    pub(crate) fn on_unreadable(&mut self, now: Millis) -> Vec<DeviceUpdate> {
+        self.verify(&[], now)
+    }
+
+    fn verify(&mut self, readings: &[SettingChange], now: Millis) -> Vec<DeviceUpdate> {
         let Some(transaction) = &mut self.transaction else {
             return Vec::new();
         };
-        match transaction.check(&readings) {
+        match transaction.check(readings) {
             Progress::Pending => Vec::new(),
             Progress::Done => self.finish(Vec::new(), now),
             Progress::Failed(settings) => self.finish(settings, now),
@@ -215,6 +231,23 @@ impl Reconciler {
 
 fn holds(settings: &HeadsetSettings, wanted: &SettingChange) -> bool {
     same(&settings.value_of(wanted.setting()), wanted)
+}
+
+fn assumed(query: Query, desired: &HeadsetSettings) -> Option<Reply> {
+    match query {
+        Query::Audio => Some(Reply::Audio(AudioReadback {
+            equalizer: desired.equalizer.clone(),
+            mic_volume: desired.mic_volume,
+            sidetone: desired.sidetone,
+            volume_limiter: desired.volume_limiter,
+        })),
+        Query::Ux => Some(Reply::Ux(UxReadback {
+            auto_power_off: desired.auto_power_off,
+            mute_light: desired.mute_light,
+        })),
+        Query::Wireless => Some(Reply::Wireless(desired.wireless_mode)),
+        Query::Status | Query::Firmware => None,
+    }
 }
 
 fn settings_in(reply: &Reply) -> Vec<SettingChange> {

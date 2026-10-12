@@ -2,7 +2,7 @@ use super::replies;
 use crate::eq::library::flat;
 use crate::eq::{Curve, Filter};
 use crate::protocol::command::{EQUALIZER, WIRELESS_MODE};
-use crate::protocol::eq_wire::decode_curve;
+use crate::protocol::eq_wire::{BAND_LEN, decode_curve};
 use crate::protocol::event::{BATTERY, DeviceEvent, LINK, decode_event};
 use crate::protocol::frame::PAYLOAD_LEN;
 use crate::protocol::status::{Charging, Link, Status};
@@ -60,6 +60,7 @@ pub struct FakeHeadset {
     status: Status,
     buffer: [u8; PAYLOAD_LEN],
     received: Vec<Frame>,
+    unreadable_band: Option<[u8; BAND_LEN]>,
 }
 
 impl FakeHeadset {
@@ -78,6 +79,7 @@ impl FakeHeadset {
             },
             buffer: [0; PAYLOAD_LEN],
             received: Vec::new(),
+            unreadable_band: None,
         }
     }
 
@@ -122,6 +124,10 @@ impl FakeHeadset {
 
     pub fn set(&mut self, change: SettingChange) {
         self.settings.apply(change);
+    }
+
+    pub fn hold_unreadable_band(&mut self, band: [u8; BAND_LEN]) {
+        self.unreadable_band = Some(band);
     }
 
     pub fn receive(&mut self, frame: &Frame, now: Millis) -> Vec<Emission> {
@@ -178,7 +184,7 @@ impl FakeHeadset {
         match query {
             Query::Status => replies::status(self.status),
             Query::Firmware => replies::firmware(self.status.link.is_connected()),
-            Query::Audio => replies::audio(&self.settings),
+            Query::Audio => replies::audio(&self.settings, self.unreadable_band),
             Query::Ux => replies::ux(&self.settings, self.status.link.is_connected()),
             Query::Wireless => replies::wireless(&self.settings),
         }
@@ -258,6 +264,8 @@ impl FakeHeadset {
         let (landed, waiting) = self.landing.drain(..).partition(|(at, _)| *at <= now);
         self.landing = waiting;
         for (_, change) in landed {
+            let rewrites_curve = matches!(change, SettingChange::Equalizer(_));
+            self.unreadable_band = self.unreadable_band.filter(|_| !rewrites_curve);
             self.settings.apply(change);
         }
     }

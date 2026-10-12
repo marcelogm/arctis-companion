@@ -94,6 +94,7 @@ stateDiagram-v2
 | `Lost` from any phase forgets the dongle, desired settings included | `crates/core/src/session/reducer.rs::lost` |
 | Frames on iface 3 are drained while Settling and Rebinding | `crates/core/src/session/phase.rs::drains_command_frames`, `crates/core/src/session/frames.rs::command_frame` |
 | A query unanswered twice means HeadsetOff, unless asked inside a wireless-mode grace | `crates/core/src/session/drive.rs::unanswered`, `crates/core/src/session/verify.rs::tolerates` |
+| A reply with the awaited id that fails to decode is answered, never resent. An unreadable `B0` means HeadsetOff; an unreadable Syncing read is assumed to hold the desired values and its settings stay unknown, so drift overwrites them (without desired settings Syncing waits); an unreadable readback is a mismatch | `crates/core/src/session/exchange.rs::answer`, `crates/core/src/session/frames.rs::on_unreadable`, `crates/core/src/session/reconcile.rs::assume`, `crates/core/src/session/reconcile.rs::on_unreadable` |
 | Link events; `B9` link 3 while HeadsetOff, or while Rebinding from HeadsetOff, polls `B0` at once | `crates/core/src/session/frames.rs::on_link_event`, `crates/core/src/session/frames.rs::poll_status_now`, `crates/core/src/session/rebind.rs::link_up`, `crates/core/src/session/frames.rs::on_link` |
 | Rebinding sends nothing, publishes `Phase::Rebinding` only after `REBIND_NOTICE`, resumes the interrupted phase | `crates/core/src/session/rebind.rs::step`, `crates/core/src/session/drive.rs::rebinding_step`, `crates/core/src/session/reducer.rs::command_port_lost` |
 | The published phase never repeats | `crates/core/src/session/reducer.rs::announce` |
@@ -119,7 +120,7 @@ sequenceDiagram
 |---|---|
 | No desired settings, no write; `Adopt` ends any open transaction, writes nothing and republishes observed | `crates/core/src/session/reconcile.rs::desire` |
 | A newer desired value drops the older target from the open transaction, so only the latest value is written and verified; a dropped target that was already written leaves the setting unknown until a readback or an event, so drift writes the latest value again | `crates/core/src/session/verify.rs::keep_wanted`, `crates/core/src/session/reconcile.rs::drop_unwanted_targets`, `crates/core/src/session/reconcile.rs::drift` |
-| Only drifted fields are written, wireless mode last, failed fields skipped until the next `Change::Desired` or the next Syncing | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/reconcile.rs::next`, `crates/core/src/session/reducer.rs::enter` |
+| Only drifted fields are written, wireless mode last, failed fields skipped until the next `Change::Desired` or the next Syncing | `crates/core/src/session/reconcile.rs::drift`, `crates/core/src/session/reconcile.rs::next`, `crates/core/src/session/reducer.rs::enter`, `crates/core/src/session/reconcile.rs::start_syncing` |
 | One readback per query kind, backoff steps, one retry | `crates/core/src/session/verify.rs::next`, `crates/core/src/session/verify.rs::check` |
 | Curves compare with `equivalent` | `crates/core/src/session/verify.rs::same`, `crates/core/src/eq/curve.rs::equivalent` |
 | A wireless-mode write opens a grace: link drops and silence wait for it | `crates/core/src/session/verify.rs::link_lost_at`, `crates/core/src/session/frames.rs::on_link` |
@@ -140,10 +141,10 @@ flowchart LR
 
 | Piece | Code |
 |---|---|
-| Modelled dongle: registers, stale tails through one reused buffer, readback latency, Q quantization, echoes, dropped writes, silence, events, another claimant's leftover reply | `crates/core/src/testkit/fake_headset.rs::FakeHeadset`, `crates/core/src/testkit/fake_headset.rs::Behaviour`, `crates/core/src/testkit/fake_headset.rs::Emission`, `crates/core/src/testkit/replies.rs` |
+| Modelled dongle: registers, stale tails through one reused buffer, readback latency, Q quantization, echoes, dropped writes, silence, events, another claimant's leftover reply, a curve band outside the envelope | `crates/core/src/testkit/fake_headset.rs::FakeHeadset`, `crates/core/src/testkit/fake_headset.rs::Behaviour`, `crates/core/src/testkit/fake_headset.rs::Emission`, `crates/core/src/testkit/fake_headset.rs::hold_unreadable_band`, `crates/core/src/testkit/replies.rs` |
 | Virtual clock, rescans while Rebinding, flaps with EACCES windows, EIO on a write, wire and update logs | `crates/core/src/testkit/simulation.rs::Simulation`, `crates/core/src/testkit/simulation.rs::Flap`, `crates/core/src/testkit/simulation.rs::run_for` |
 | Fidelity to the SP0 captures | `crates/core/tests/session/testkit.rs` |
 | One table row per arrow of the lifecycle | `crates/core/tests/session/lifecycle.rs`, `crates/core/tests/session/rebinding.rs`, `crates/core/tests/session/support.rs::assert_arrows` |
-| Scenarios | `crates/core/tests/session/polling.rs`, `crates/core/tests/session/reconcile.rs`, `crates/core/tests/session/verify.rs`, `crates/core/tests/session/echo.rs`, `crates/core/tests/session/wireless.rs` |
+| Scenarios | `crates/core/tests/session/polling.rs`, `crates/core/tests/session/reconcile.rs`, `crates/core/tests/session/verify.rs`, `crates/core/tests/session/echo.rs`, `crates/core/tests/session/wireless.rs`, `crates/core/tests/session/unreadable.rs` |
 | Scenario catalogue, also run by `crates/hid` over sockets (`docs/architecture/hid.md`) | `crates/core/src/testkit/scenarios/mod.rs` (`scenario_tests!`), `crates/core/src/testkit/rig.rs::Rig`, `crates/core/tests/session/scenarios.rs` |
 | Mutation testing skips the testkit | `.cargo/mutants.toml` |

@@ -1,4 +1,4 @@
-use crate::protocol::eq_wire::encode_curve;
+use crate::protocol::eq_wire::{BAND_LEN, encode_curve};
 use crate::protocol::status::Status;
 use crate::settings::headset_settings::HeadsetSettings;
 
@@ -34,9 +34,12 @@ pub(super) fn firmware(headset_on: bool) -> Vec<u8> {
     bytes
 }
 
-pub(super) fn audio(settings: &HeadsetSettings) -> Vec<u8> {
+pub(super) fn audio(settings: &HeadsetSettings, first_band: Option<[u8; BAND_LEN]>) -> Vec<u8> {
     let mut bytes = vec![0x20];
     bytes.extend_from_slice(&encode_curve(&settings.equalizer));
+    if let Some(band) = first_band {
+        bytes[1..=BAND_LEN].copy_from_slice(&band);
+    }
     bytes.extend_from_slice(&[
         settings.mic_volume.get(),
         settings.sidetone.get(),

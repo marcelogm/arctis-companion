@@ -1,11 +1,12 @@
+use super::exchange::Answer;
 use super::input::Interface;
 use super::phase::Stage;
 use super::reducer::Session;
 use super::syncing::Readings;
 use crate::messages::device::DeviceUpdate;
-use crate::protocol::Reply;
 use crate::protocol::event::{DeviceEvent, decode_event};
 use crate::protocol::status::{Link, Status};
+use crate::protocol::{Query, Reply};
 
 impl Session {
     pub(super) fn command_frame(&mut self, bytes: &[u8]) {
@@ -13,7 +14,8 @@ impl Session {
             return;
         }
         match self.exchange.answer(bytes) {
-            Some(reply) => self.on_reply(reply),
+            Some(Answer::Read(reply)) => self.on_reply(reply),
+            Some(Answer::Unreadable(query)) => self.on_unreadable(query),
             None => self.on_event(bytes),
         }
     }
@@ -32,6 +34,27 @@ impl Session {
         match reply {
             Reply::Status(status) => self.on_status(status),
             other => self.on_readback(&other),
+        }
+    }
+
+    fn on_unreadable(&mut self, query: Query) {
+        match query {
+            Query::Status => self.lost_contact(),
+            _ if self.is_reading() => self.assume_reading(query),
+            _ => {
+                let updates = self.reconciler.on_unreadable(self.now);
+                self.publish_all(updates);
+            }
+        }
+    }
+
+    fn is_reading(&self) -> bool {
+        matches!(&self.stage, Stage::Syncing(readings) if !readings.is_complete())
+    }
+
+    fn assume_reading(&mut self, query: Query) {
+        if let Some(reply) = self.reconciler.assume(query) {
+            self.on_readback(&reply);
         }
     }
 

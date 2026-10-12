@@ -9,6 +9,12 @@ pub(crate) enum Outgoing {
     Write(SettingChange),
 }
 
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Answer {
+    Read(Reply),
+    Unreadable(Query),
+}
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub(crate) struct Unanswered {
     pub(crate) query: Query,
@@ -57,14 +63,13 @@ impl Exchange {
         }
     }
 
-    pub(crate) fn answer(&mut self, bytes: &[u8]) -> Option<Reply> {
-        let awaiting = self.awaiting?;
-        if bytes.first() != Some(&awaiting.query.id()) {
+    pub(crate) fn answer(&mut self, bytes: &[u8]) -> Option<Answer> {
+        let query = self.awaiting?.query;
+        if bytes.first() != Some(&query.id()) {
             return None;
         }
-        let reply = decode_reply(awaiting.query, bytes).ok()?;
         self.awaiting = None;
-        Some(reply)
+        Some(decode_reply(query, bytes).map_or(Answer::Unreadable(query), Answer::Read))
     }
 
     pub(crate) fn expire(&mut self, now: Millis) -> Option<Expiry> {
