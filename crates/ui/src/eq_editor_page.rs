@@ -7,7 +7,7 @@ use adw::subclass::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::intent::Intent;
-use arctis_core::view::eq_editor::{EqEditorModel, eq_editor_for};
+use arctis_core::view::eq_editor::{EqEditorModel, PreviewState, eq_editor_for};
 use arctis_core::view::preset_edits::{WorkingCopy, apply_edit, remove_band, saved_toast};
 use gtk::glib;
 
@@ -55,6 +55,7 @@ mod imp {
         pub band_rows: RefCell<Vec<EqBandRow>>,
         pub undo_toast: RefCell<Option<adw::Toast>>,
         pub rendering: Cell<bool>,
+        pub picked: Cell<bool>,
     }
 
     #[glib::object_subclass]
@@ -89,7 +90,12 @@ mod imp {
         }
     }
 
-    impl WidgetImpl for EqEditorPage {}
+    impl WidgetImpl for EqEditorPage {
+        fn unmap(&self) {
+            self.parent_unmap();
+            self.obj().end_preview();
+        }
+    }
 
     impl NavigationPageImpl for EqEditorPage {
         fn hidden(&self) {
@@ -154,14 +160,22 @@ impl EqEditorPage {
         imp.duplicate.set_visible(!model.editable);
         imp.menu.set_visible(model.editable);
         imp.add_band.set_visible(model.editable);
-        imp.preview.set_visible(model.preview_available);
-        if !model.preview_available {
-            imp.preview.set_active(false);
-        }
+        self.show_preview(model);
         self.action_set_enabled("editor.add-band", model.editable && model.can_add_band);
         self.action_set_enabled("editor.duplicate", !model.editable);
         for action in EDITABLE_ACTIONS {
             self.action_set_enabled(action, model.editable);
+        }
+    }
+
+    fn show_preview(&self, model: &EqEditorModel) {
+        let imp = self.imp();
+        let available = model.preview.is_available();
+        imp.preview.set_visible(available);
+        let picked = model.preview == PreviewState::Picked;
+        let pick_ended = imp.picked.replace(picked) && !picked;
+        if pick_ended || !available {
+            imp.preview.set_active(false);
         }
     }
 

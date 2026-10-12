@@ -95,9 +95,11 @@ on the grid and inside the envelope, otherwise the file is not a preset file.
 
 ## Preview
 
-The header toggle sends `Intent::StartPreview(id)` and `Intent::EndPreview`; the page's `hidden` vfunc turns it
-off, so leaving the editor always ends the pick. `Companion` picks the path
-(`crates/core/src/companion/selection.rs::picked_path`) and ends previews on route changes.
+The header toggle sends `Intent::StartPreview(id)` and `Intent::EndPreview`; the page's `hidden` and `unmap` vfuncs
+turn it off, so leaving the editor or closing the window always ends the pick. `Companion` picks the path
+(`crates/core/src/companion/selection.rs::picked_path`) and ends every manual pick on route changes, ruled app
+changes and other picks. `crates/core/src/view/eq_editor.rs::PreviewState` says whether this preset is the manual
+pick of the picked path; when it stops being `Picked` the page turns the toggle off without an intent.
 
 ## Tests
 

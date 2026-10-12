@@ -1,4 +1,5 @@
 use super::text::{Arg, Text, preset_arg, preset_title, saturating_count};
+use crate::companion::selection::PresetReason;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::curve::MAX_FILTERS;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
@@ -45,7 +46,21 @@ pub struct EqEditorModel {
     pub bands: Vec<BandModel>,
     pub can_add_band: bool,
     pub graph: GraphModel,
-    pub preview_available: bool,
+    pub preview: PreviewState,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PreviewState {
+    Unavailable,
+    Available,
+    Picked,
+}
+
+impl PreviewState {
+    #[must_use]
+    pub const fn is_available(self) -> bool {
+        !matches!(self, Self::Unavailable)
+    }
 }
 
 #[must_use]
@@ -70,7 +85,19 @@ pub fn eq_editor_for(snapshot: &Snapshot, preset: &Preset) -> EqEditorModel {
             .collect(),
         can_add_band: filters.len() < MAX_FILTERS,
         graph: graph(preset),
-        preview_available: snapshot.picked_path().is_ok(),
+        preview: preview_state(snapshot, preset.id()),
+    }
+}
+
+fn preview_state(snapshot: &Snapshot, id: &PresetId) -> PreviewState {
+    let Ok(path) = snapshot.picked_path() else {
+        return PreviewState::Unavailable;
+    };
+    let active = snapshot.presets.active.get(path);
+    if active.preset == *id && matches!(active.reason, PresetReason::Manual(_)) {
+        PreviewState::Picked
+    } else {
+        PreviewState::Available
     }
 }
 

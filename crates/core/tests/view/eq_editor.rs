@@ -1,11 +1,12 @@
 use arctis_core::companion::routing::Route;
+use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::eq::FilterKind;
 use arctis_core::eq::preset::Preset;
 use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
 use arctis_core::view::eq_editor::{
-    GRAPH_POINTS, band_title, eq_editor, eq_editor_for, kind_at, kind_items, kind_position,
-    x_fraction, y_fraction,
+    GRAPH_POINTS, PreviewState, band_title, eq_editor, eq_editor_for, kind_at, kind_items,
+    kind_position, x_fraction, y_fraction,
 };
 
 use crate::support::{assert_close, custom_preset, filter, id, snapshot, with};
@@ -97,14 +98,33 @@ fn preview_is_offered_only_with_a_picked_path() {
     assert!(
         eq_editor(&snapshot(), &id("flat"))
             .expect("editor")
-            .preview_available
+            .preview
+            .is_available()
     );
     let alone = with(Phase::Absent, Route::None);
     assert!(
         !eq_editor(&alone, &id("flat"))
             .expect("editor")
-            .preview_available
+            .preview
+            .is_available()
     );
+}
+
+#[test]
+fn the_editor_knows_when_its_preset_is_the_manual_pick() {
+    let picked = |s: &arctis_core::companion::Snapshot, preset: &str| {
+        eq_editor(s, &id(preset)).expect("editor").preview == PreviewState::Picked
+    };
+    let mut s = snapshot();
+    assert!(!picked(&s, "flat"));
+    s.presets.active.dongle = ActivePreset {
+        preset: id("flat"),
+        reason: PresetReason::Manual(None),
+    };
+    assert!(picked(&s, "flat"));
+    assert!(!picked(&s, "bass-boost"));
+    s.audio.route = Route::Bluetooth;
+    assert!(!picked(&s, "flat"));
 }
 
 #[test]

@@ -1,7 +1,9 @@
 use std::rc::Rc;
 
 use adw::prelude::*;
+use arctis_core::companion::Snapshot;
 use arctis_core::companion::routing::Route;
+use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::eq::apo;
 use arctis_core::eq::library;
 use arctis_core::eq::preset::PresetKind;
@@ -13,9 +15,18 @@ use arctis_core::view::preset_files::export_text;
 use arctis_core::view::presets::deleted_toast;
 
 use crate::support::{
-    band_rows, click, named, one_peak, open_editor, rendered_window, saved, shown, shows_text,
-    standalone_editor, step_up, visible_tag, with_preset,
+    band_rows, click, drain, named, one_peak, open_editor, rendered_window, saved, shown,
+    shows_text, standalone_editor, step_up, visible_tag, with_preset,
 };
+
+fn picked(preset: &str) -> Snapshot {
+    let mut s = snapshot();
+    s.presets.active.dongle = ActivePreset {
+        preset: id(preset),
+        reason: PresetReason::Manual(None),
+    };
+    s
+}
 
 #[gtk::test]
 fn the_duplicate_button_saves_a_custom_copy_and_edits_it() {
@@ -215,4 +226,41 @@ fn duplicating_ends_the_preview_first() {
     assert_eq!(log[0], Intent::StartPreview(id("bass-boost")));
     assert_eq!(log[1], Intent::EndPreview);
     assert!(matches!(log[2], Intent::SavePreset(_)));
+}
+
+#[gtk::test]
+fn closing_the_window_ends_the_preview() {
+    let (window, log) = rendered_window(snapshot());
+    window.present();
+    let page = open_editor(&window, "flat");
+    named::<gtk::ToggleButton>(&page, "preview").set_active(true);
+    window.close();
+    drain();
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::StartPreview(id("flat")), Intent::EndPreview]
+    );
+}
+
+#[gtk::test]
+fn the_preview_turns_off_without_an_intent_when_the_companion_ends_it() {
+    let editor = standalone_editor(snapshot(), "flat");
+    let preview = named::<gtk::ToggleButton>(&editor.page, "preview");
+    preview.set_active(true);
+    editor.page.render(&Rc::new(picked("flat")));
+    assert!(preview.is_active());
+    editor
+        .page
+        .render(&Rc::new(with(Phase::Ready, Route::Bluetooth)));
+    assert!(!preview.is_active());
+    assert_eq!(*editor.log.borrow(), vec![Intent::StartPreview(id("flat"))]);
+}
+
+#[gtk::test]
+fn a_render_before_the_pick_lands_keeps_the_preview() {
+    let editor = standalone_editor(with_preset(&one_peak()), "mine");
+    let preview = named::<gtk::ToggleButton>(&editor.page, "preview");
+    preview.set_active(true);
+    editor.page.render(&Rc::new(with_preset(&one_peak())));
+    assert!(preview.is_active());
 }
