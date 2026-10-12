@@ -1,6 +1,13 @@
+use std::thread;
+use std::time::{Duration, Instant};
+
 use gtk::gio;
+use gtk::gio::prelude::*;
 use gtk::glib;
 
+use crate::fixtures::{INTERFACE, PATH};
+
+const PATIENCE: Duration = Duration::from_secs(5);
 const CALL_TIMEOUT_MS: i32 = 5_000;
 
 pub struct Bus {
@@ -41,6 +48,25 @@ impl Bus {
     }
 }
 
+pub fn wait_until(what: &str, done: impl Fn() -> bool) {
+    let context = glib::MainContext::default();
+    let deadline = Instant::now() + PATIENCE;
+    while !done() {
+        assert!(Instant::now() < deadline, "timed out waiting for {what}");
+        context.iteration(false);
+        thread::sleep(Duration::from_millis(2));
+    }
+}
+
+pub fn settle() {
+    let context = glib::MainContext::default();
+    let deadline = Instant::now() + Duration::from_millis(200);
+    while Instant::now() < deadline {
+        context.iteration(false);
+        thread::sleep(Duration::from_millis(2));
+    }
+}
+
 pub fn call(
     connection: &gio::DBusConnection,
     target: &Target,
@@ -58,4 +84,21 @@ pub fn call(
         CALL_TIMEOUT_MS,
     );
     glib::MainContext::default().block_on(reply)
+}
+
+pub fn property(connection: &gio::DBusConnection, name: &str, property: &str) -> glib::Variant {
+    let target = Target {
+        name,
+        path: PATH,
+        interface: "org.freedesktop.DBus.Properties",
+    };
+    let reply = call(
+        connection,
+        &target,
+        "Get",
+        Some(&(INTERFACE, property).to_variant()),
+    )
+    .expect("property read");
+    let (value,) = reply.get::<(glib::Variant,)>().expect("(v)");
+    value
 }

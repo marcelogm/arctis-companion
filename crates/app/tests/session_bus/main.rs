@@ -13,10 +13,24 @@ const CHILD: &str = "ARCTIS_SESSION_BUS_CHILD";
 
 type Scenario = (&'static str, fn(&Bus));
 
-const SCENARIOS: &[Scenario] = &[(
-    "Headset1 matches its contract",
-    headset::matches_the_contract,
-)];
+const SCENARIOS: &[Scenario] = &[
+    (
+        "Headset1 matches its contract",
+        headset::matches_the_contract,
+    ),
+    (
+        "properties follow the snapshot",
+        headset::follows_the_snapshot,
+    ),
+    (
+        "ActivatePreset follows the picked path",
+        headset::activate_preset_follows_the_picked_path,
+    ),
+    (
+        "AutomaticPresets is writable",
+        headset::automatic_presets_is_writable,
+    ),
+];
 
 fn main() {
     if env::var_os(CHILD).is_some() {
