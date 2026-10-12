@@ -1,0 +1,90 @@
+use std::cell::Cell;
+use std::fs;
+use std::path::{Path, PathBuf};
+
+use arctis_app::platform::preset_store::FilePresets;
+use arctis_core::eq::library;
+use arctis_core::eq::preset::{Preset, PresetId};
+use arctis_core::ports::PresetRepository;
+use arctis_core::testkit::repository_contracts::preset_repository_contract;
+use tempfile::TempDir;
+
+struct Scratch {
+    root: TempDir,
+    next: Cell<u32>,
+}
+
+impl Scratch {
+    fn new() -> Self {
+        Self {
+            root: tempfile::tempdir().expect("scratch dir"),
+            next: Cell::new(0),
+        }
+    }
+
+    fn fresh(&self) -> PathBuf {
+        self.next.set(self.next.get() + 1);
+        self.root.path().join(self.next.get().to_string())
+    }
+}
+
+fn custom(id: &str) -> Preset {
+    Preset::custom(
+        PresetId::new(id),
+        id.to_uppercase(),
+        library::flat().curve().clone(),
+    )
+}
+
+#[test]
+fn file_presets_pass_the_repository_contract() {
+    let scratch = Scratch::new();
+    preset_repository_contract(
+        || FilePresets::new(scratch.fresh()),
+        |store| FilePresets::new(store.path().to_owned()),
+    );
+}
+
+#[test]
+fn a_preset_is_one_json_file_named_after_its_id() {
+    let scratch = Scratch::new();
+    let dir = scratch.fresh();
+    let mut store = FilePresets::new(dir.clone());
+    store.save(&custom("bass-boost-mine")).expect("save");
+    let text = fs::read_to_string(dir.join("bass-boost-mine.json")).expect("preset file");
+    assert!(text.contains("\"format\": 1"));
+    assert!(text.contains("\"id\": \"bass-boost-mine\""));
+}
+
+#[test]
+fn an_unreadable_preset_file_is_skipped() {
+    let scratch = Scratch::new();
+    let dir = scratch.fresh();
+    let mut store = FilePresets::new(dir.clone());
+    store.save(&custom("good")).expect("save");
+    fs::write(dir.join("broken.json"), "{ not json").expect("broken file");
+    fs::write(dir.join("notes.txt"), "ignored").expect("other file");
+    assert_eq!(store.load().expect("load"), [custom("good")]);
+}
+
+#[test]
+fn an_id_that_is_not_a_slug_never_becomes_a_path() {
+    let scratch = Scratch::new();
+    let dir = scratch.fresh();
+    let mut store = FilePresets::new(dir.clone());
+    assert!(store.save(&custom("../escape")).is_err());
+    assert!(store.delete(&PresetId::new("../escape")).is_err());
+    assert!(
+        !dir.parent()
+            .map(Path::to_owned)
+            .expect("parent")
+            .join("escape.json")
+            .exists()
+    );
+}
+
+#[test]
+fn a_missing_directory_loads_as_empty() {
+    let scratch = Scratch::new();
+    assert_eq!(FilePresets::new(scratch.fresh()).load().expect("load"), []);
+}
