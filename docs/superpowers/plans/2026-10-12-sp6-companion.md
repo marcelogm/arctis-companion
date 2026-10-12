@@ -1614,7 +1614,7 @@ git push
 - Modify: `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/catalog.rs`, `crates/core/tests/companion/seen_apps.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod catalog;` and `mod seen_apps;` to `crates/core/tests/companion/main.rs`.
 
@@ -1831,12 +1831,12 @@ fn an_app_answers_to_any_identifier_in_any_case() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: FAIL to compile (`companion::catalog`, `companion::seen_apps` missing).
 
-- [ ] **Step 3: Implement `catalog`**
+- [x] **Step 3: Implement `catalog`**
 
 `crates/core/src/companion/catalog.rs`:
 
@@ -1959,7 +1959,7 @@ fn slug(name: &str) -> String {
 }
 ```
 
-- [ ] **Step 4: Implement `seen_apps`**
+- [x] **Step 4: Implement `seen_apps`**
 
 `crates/core/src/companion/seen_apps.rs`:
 
@@ -2035,12 +2035,12 @@ pub mod seen_apps;
 pub mod timing;
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS, 23 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
