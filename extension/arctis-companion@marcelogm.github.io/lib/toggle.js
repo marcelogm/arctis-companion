@@ -1,10 +1,12 @@
 import GObject from 'gi://GObject';
+import Shell from 'gi://Shell';
 
 import {gettext as _} from 'resource:///org/gnome/shell/extensions/extension.js';
 import * as Main from 'resource:///org/gnome/shell/ui/main.js';
 import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {QuickMenuToggle, QuickToggle} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
+import {DESKTOP_ID} from './client.js';
 import {reportFailure} from './failures.js';
 import {HEADSET_ICON, HIDDEN, automaticPresetsAfterClick} from './presentation.js';
 
@@ -71,6 +73,13 @@ class AppPresetsToggle extends QuickMenuToggle {
 
     _openSettings() {
         Main.panel.closeQuickSettings();
-        this._client.activateApplication().catch(reportFailure);
+        this._client.activateApplication(activationToken()).catch(reportFailure);
     }
 });
+
+function activationToken() {
+    const info = Shell.AppSystem.get_default().lookup_app(DESKTOP_ID)?.get_app_info() ?? null;
+    if (info === null)
+        return null;
+    return Shell.Global.get().create_app_launch_context(0, -1).get_startup_notify_id(info, []);
+}

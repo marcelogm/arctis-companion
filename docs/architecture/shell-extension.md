@@ -51,7 +51,8 @@ sequenceDiagram
     C->>A: Properties.Set AutomaticPresets
     A-->>C: PropertiesChanged AutomaticPresets
     T->>C: preset item: activatePreset(id)
-    T->>C: Headset Settings: activateApplication()
+    T->>C: Headset Settings: activateApplication(token from the Shell launch context)
+    C->>A: Application.Activate with activation-token, so mutter raises the window
 ```
 
 | `State` | Shown |
