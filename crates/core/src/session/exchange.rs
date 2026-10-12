@@ -1,6 +1,13 @@
 use super::timing::{COMMAND_SPACING, REPLY_TIMEOUT};
 use crate::protocol::{Command, Frame, Query, Reply, decode_reply, encode};
+use crate::settings::headset_settings::SettingChange;
 use crate::time::Millis;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub(crate) enum Outgoing {
+    Ask(Query),
+    Write(SettingChange),
+}
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Expiry {
@@ -37,8 +44,11 @@ impl Exchange {
         self.awaiting.map(|awaiting| awaiting.deadline)
     }
 
-    pub(crate) fn send(&mut self, query: Query, now: Millis) -> Frame {
-        self.ask(query, now, now)
+    pub(crate) fn send(&mut self, outgoing: Outgoing, now: Millis) -> Frame {
+        match outgoing {
+            Outgoing::Ask(query) => self.ask(query, now, now),
+            Outgoing::Write(change) => self.write(&Command::from(change), now),
+        }
     }
 
     pub(crate) fn answer(&mut self, bytes: &[u8]) -> Option<Reply> {

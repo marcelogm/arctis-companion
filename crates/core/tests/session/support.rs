@@ -2,9 +2,10 @@ use std::fs;
 use std::path::Path;
 
 use arctis_core::eq::{Filter, FilterKind};
-use arctis_core::messages::device::Phase;
+use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::session::timing::ENUMERATION_SETTLE;
-use arctis_core::settings::values::{Percent, Sidetone};
+use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::settings::values::{MicVolume, Percent, Sidetone};
 use arctis_core::testkit::{Behaviour, FakeHeadset, Simulation};
 
 pub const SETTLED: u64 = ENUMERATION_SETTLE + 1_000;
@@ -103,6 +104,25 @@ pub fn ready_with(headset: FakeHeadset) -> Simulation {
     simulation
 }
 
+pub fn observed(simulation: &Simulation) -> Option<HeadsetSettings> {
+    simulation
+        .updates()
+        .iter()
+        .rev()
+        .find_map(|(_, update)| match update {
+            DeviceUpdate::Observed(settings) => Some(settings.clone()),
+            _ => None,
+        })
+}
+
+pub fn published(simulation: &Simulation, wanted: impl Fn(&DeviceUpdate) -> bool) -> usize {
+    simulation
+        .updates()
+        .iter()
+        .filter(|(_, update)| wanted(update))
+        .count()
+}
+
 pub fn sent(simulation: &Simulation, id: u8) -> usize {
     simulation
         .writes()
@@ -111,8 +131,19 @@ pub fn sent(simulation: &Simulation, id: u8) -> usize {
         .count()
 }
 
+pub fn with_sidetone(settings: &HeadsetSettings, level: u8) -> HeadsetSettings {
+    HeadsetSettings {
+        sidetone: sidetone(level),
+        ..settings.clone()
+    }
+}
+
 pub fn sidetone(level: u8) -> Sidetone {
     Sidetone::try_from(level).expect("sidetone")
+}
+
+pub fn mic(level: u8) -> MicVolume {
+    MicVolume::try_from(level).expect("mic volume")
 }
 
 pub fn percent(value: u8) -> Percent {

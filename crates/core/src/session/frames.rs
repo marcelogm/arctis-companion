@@ -1,12 +1,14 @@
 use super::input::Interface;
 use super::phase::Stage;
+use super::reconcile::readings;
 use super::reducer::Session;
 use super::syncing::Readings;
+use super::verify::Progress;
 use crate::messages::device::DeviceUpdate;
 use crate::protocol::Reply;
 use crate::protocol::event::{DeviceEvent, decode_event};
 use crate::protocol::status::{Link, Status};
-use crate::settings::headset_settings::SettingChange;
+use crate::settings::headset_settings::{Setting, SettingChange};
 
 impl Session {
     pub(super) fn command_frame(&mut self, bytes: &[u8]) {
@@ -49,7 +51,9 @@ impl Session {
         {
             readings.absorb(reply.clone());
             self.after_read();
+            return;
         }
+        self.verify(reply);
     }
 
     fn after_read(&mut self) {
@@ -70,6 +74,33 @@ impl Session {
         self.publish_observed();
     }
 
+    fn verify(&mut self, reply: &Reply) {
+        let readings = readings(reply);
+        if let Some(observed) = &mut self.observed {
+            readings
+                .iter()
+                .cloned()
+                .for_each(|reading| observed.apply(reading));
+        }
+        let Some(transaction) = &mut self.transaction else {
+            return;
+        };
+        match transaction.check(&readings) {
+            Progress::Pending => {}
+            Progress::Done => self.finish_transaction(Vec::new()),
+            Progress::Failed(settings) => self.finish_transaction(settings),
+        }
+    }
+
+    fn finish_transaction(&mut self, failed: Vec<Setting>) {
+        self.transaction = None;
+        for setting in &failed {
+            self.publish(DeviceUpdate::WriteFailed(*setting));
+        }
+        self.failed.extend(failed);
+        self.publish_observed();
+    }
+
     fn on_event(&mut self, bytes: &[u8]) {
         match decode_event(bytes) {
             Some(DeviceEvent::Setting(change)) => self.on_setting_event(change),
@@ -86,6 +117,9 @@ impl Session {
     }
 
     fn on_setting_event(&mut self, change: SettingChange) {
+        if let Some(desired) = &mut self.desired {
+            desired.apply(change.clone());
+        }
         if let Some(observed) = &mut self.observed {
             observed.apply(change.clone());
         }
@@ -94,6 +128,9 @@ impl Session {
 
     fn on_link_event(&mut self, link: Link) {
         self.update_status(|status| status.link = link);
+        if let Some(transaction) = &mut self.transaction {
+            transaction.link(link.is_connected());
+        }
         if let Stage::HeadsetOff { next_poll } = &mut self.stage
             && link.is_connected()
         {
@@ -108,8 +145,16 @@ impl Session {
             (Stage::Probing | Stage::HeadsetOff { .. }, true) => {
                 self.enter(Stage::Syncing(Readings::default()));
             }
-            (Stage::Probing | Stage::Syncing(_) | Stage::Ready, false) => self.headset_off(),
+            (Stage::Probing, false) => self.headset_off(),
+            (Stage::Syncing(_) | Stage::Ready, false) => self.link_down(),
             _ => {}
+        }
+    }
+
+    fn link_down(&mut self) {
+        match &mut self.transaction {
+            Some(transaction) => transaction.link(false),
+            None => self.headset_off(),
         }
     }
 
