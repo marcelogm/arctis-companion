@@ -1,16 +1,10 @@
-use arctis_core::battery::sample::{Sample, UnixSeconds};
-use arctis_core::companion::action::Action;
-use arctis_core::companion::alerts::{AlertChange, BatteryWarning};
-use arctis_core::companion::battery_watch::BatteryWatch;
-use arctis_core::companion::deadlines::{Deadlines, earliest};
 use arctis_core::companion::engines::{Cause, Decision, EditorThrottle, Engines, Trigger};
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::companion::timing::EDITOR_THROTTLE;
 use arctis_core::messages::audio::SoundPath;
-use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::time::Millis;
 
-use crate::support::{discharging, id, percent, reading};
+use crate::support::id;
 
 const T: Millis = Millis(1_760_000_000_000);
 
@@ -123,83 +117,4 @@ fn a_cancelled_edit_is_not_written() {
     throttle.request();
     throttle.cancel();
     assert!(!throttle.take_due(T));
-}
-
-#[test]
-fn earliest_ignores_missing_deadlines() {
-    assert_eq!(earliest([None, Some(T.after(5)), Some(T)]), Some(T));
-    assert_eq!(earliest([None, None]), None);
-}
-
-#[test]
-fn a_deadline_is_scheduled_once_until_it_fires() {
-    let mut deadlines = Deadlines::default();
-    assert_eq!(deadlines.schedule(Some(T)), Some(Action::WakeAt(T)));
-    assert_eq!(deadlines.schedule(Some(T)), None);
-    deadlines.woke();
-    assert_eq!(deadlines.schedule(Some(T)), Some(Action::WakeAt(T)));
-    assert_eq!(deadlines.schedule(None), None);
-}
-
-#[test]
-fn the_battery_watch_records_changes_and_raises_alerts() {
-    let mut watch = BatteryWatch::new(Vec::new());
-    let first = watch.observe(discharging(15), T, percent(15));
-    assert_eq!(
-        first.sample.map(|s| s.at),
-        Some(UnixSeconds::from_millis(T))
-    );
-    assert!(matches!(first.alerts.as_slice(), [AlertChange::Notify(_)]));
-    let repeat = watch.observe(discharging(15), T.after(60_000), percent(15));
-    assert_eq!((repeat.sample, repeat.alerts.len()), (None, 0));
-    assert_eq!(watch.history().len(), 1);
-    assert_eq!(watch.warning(), BatteryWarning::Low);
-}
-
-#[test]
-fn the_battery_watch_drops_history_older_than_eight_days() {
-    let old = Sample {
-        at: UnixSeconds::from_millis(T).minus(9 * 24 * 60 * 60),
-        reading: discharging(90),
-    };
-    let mut watch = BatteryWatch::new(vec![old]);
-    let _ = watch.observe(discharging(80), T, percent(15));
-    assert_eq!(watch.history().len(), 1);
-}
-
-#[test]
-fn a_new_threshold_re_evaluates_the_last_reading() {
-    let mut watch = BatteryWatch::new(Vec::new());
-    assert!(watch.threshold_changed(percent(20)).is_empty());
-    let _ = watch.observe(discharging(18), T, percent(15));
-    assert!(matches!(
-        watch.threshold_changed(percent(20)).as_slice(),
-        [AlertChange::Notify(_)]
-    ));
-}
-
-#[test]
-fn a_disconnect_closes_the_line_once() {
-    let mut watch = BatteryWatch::new(Vec::new());
-    let _ = watch.observe(discharging(73), T, percent(15));
-    let gap = watch.disconnect(T.after(60_000)).expect("a closing row");
-    assert_eq!(gap.at, UnixSeconds::from_millis(T.after(60_000)));
-    assert_eq!(
-        (gap.reading.percent, gap.reading.link),
-        (percent(73), Link::HeadsetOff)
-    );
-    assert_eq!(watch.reading(), None);
-    assert_eq!(watch.disconnect(T.after(120_000)), None);
-    assert_eq!(watch.history().len(), 2);
-}
-
-#[test]
-fn a_reading_already_without_a_link_needs_no_closing_row() {
-    let mut watch = BatteryWatch::new(Vec::new());
-    let _ = watch.observe(
-        reading(0, Charging::Unknown, Link::HeadsetOff),
-        T,
-        percent(15),
-    );
-    assert_eq!(watch.disconnect(T.after(1_000)), None);
 }

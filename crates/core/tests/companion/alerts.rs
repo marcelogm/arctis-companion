@@ -71,7 +71,7 @@ fn low_battery_notifies_once_per_discharge() {
         ids(&alerts.update(discharging(15), percent(15))),
         [(true, AlertId::LowBattery)]
     );
-    for value in [14, 18, 15] {
+    for value in [14, 17, 15] {
         assert!(
             alerts.update(discharging(value), percent(15)).is_empty(),
             "{value} %"
@@ -118,4 +118,27 @@ fn alert_texts_name_the_level_and_the_percent() {
     };
     assert_eq!(english(&alert.title), "Headset Battery Low");
     assert_eq!(english(&alert.body), "14 % remaining");
+}
+
+#[test]
+fn a_recharge_the_app_did_not_see_starts_a_new_discharge() {
+    let mut alerts = Alerts::default();
+    let _ = alerts.update(discharging(14), percent(15));
+    assert_eq!(
+        ids(&alerts.update(discharging(90), percent(15))),
+        [(false, AlertId::LowBattery)]
+    );
+    assert_eq!(
+        ids(&alerts.update(discharging(14), percent(15))),
+        [(true, AlertId::LowBattery)]
+    );
+}
+
+#[test]
+fn a_reset_withdraws_what_was_sent_and_clears_the_warning() {
+    let mut alerts = Alerts::default();
+    let _ = alerts.update(discharging(14), percent(15));
+    assert_eq!(ids(&alerts.reset()), [(false, AlertId::LowBattery)]);
+    assert_eq!(alerts.warning(), BatteryWarning::None);
+    assert!(alerts.reset().is_empty());
 }

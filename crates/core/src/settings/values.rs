@@ -17,6 +17,27 @@ impl MuteLight {
     pub fn from_raw(raw: u8) -> Self {
         Self::try_from(raw).unwrap_or(Self::Medium)
     }
+
+    #[must_use]
+    pub fn step(self) -> u8 {
+        Self::steps()
+            .find(|(light, _)| *light == self)
+            .map_or(0, |(_, step)| step)
+    }
+
+    #[must_use]
+    pub fn from_step(step: u8) -> Option<Self> {
+        Self::ALL.get(usize::from(step)).copied()
+    }
+
+    #[must_use]
+    pub fn max_step() -> u8 {
+        Self::steps().last().map_or(0, |(_, step)| step)
+    }
+
+    fn steps() -> impl Iterator<Item = (Self, u8)> {
+        Self::ALL.into_iter().zip(0_u8..)
+    }
 }
 
 raw_enum!(WirelessMode {

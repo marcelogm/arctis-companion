@@ -50,7 +50,11 @@ fn saving_replaces_by_id_and_refuses_built_in_ids() {
     let mut catalog = Catalog::default();
     assert!(catalog.save(custom("mine", unique_curve())));
     assert!(catalog.save(custom("mine", curve_of("podcast"))));
-    assert_eq!(catalog.custom(), [custom("mine", curve_of("podcast"))]);
+    assert_eq!(
+        catalog.find(&id("mine")),
+        Some(&custom("mine", curve_of("podcast")))
+    );
+    assert_eq!(catalog.all().len(), library::library().len() + 1);
     assert!(!catalog.save(custom("flat", unique_curve())));
     assert!(!catalog.save(library::flat()));
 }

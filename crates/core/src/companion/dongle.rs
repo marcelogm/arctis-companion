@@ -38,7 +38,7 @@ impl DongleState {
 
     #[must_use]
     pub const fn is_present(&self) -> bool {
-        is_present(self.phase)
+        self.phase.is_present()
     }
 
     #[must_use]
@@ -56,7 +56,7 @@ impl DongleState {
     }
 
     pub fn set_phase(&mut self, phase: Phase) {
-        if !is_present(phase) {
+        if !phase.is_present() {
             self.forget();
         }
         self.phase = phase;
@@ -103,10 +103,6 @@ impl Default for DongleState {
     fn default() -> Self {
         Self::new()
     }
-}
-
-const fn is_present(phase: Phase) -> bool {
-    !matches!(phase, Phase::Absent | Phase::PermissionDenied)
 }
 
 fn same_value(observed: &HeadsetSettings, desired: &HeadsetSettings, setting: Setting) -> bool {

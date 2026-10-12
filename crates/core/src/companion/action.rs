@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use super::alerts::{Alert, AlertChange, AlertId};
 use super::app_settings::PersistedChange;
+use super::battery_watch::BatteryUpdate;
 use super::seen_apps::SeenApp;
 use super::snapshot::Snapshot;
 use crate::battery::sample::Sample;
@@ -37,5 +38,14 @@ impl From<AlertChange> for Action {
             AlertChange::Notify(alert) => Self::Notify(alert),
             AlertChange::Withdraw(id) => Self::Withdraw(id),
         }
+    }
+}
+
+impl Action {
+    pub fn from_battery(update: BatteryUpdate) -> impl Iterator<Item = Self> {
+        let sample = update.sample.map(Self::RecordBattery);
+        sample
+            .into_iter()
+            .chain(update.alerts.into_iter().map(Self::from))
     }
 }

@@ -183,6 +183,18 @@ impl Harness {
         self.send(Input::Device(update))
     }
 
+    pub fn audio(&mut self, event: AudioEvent) -> Vec<Action> {
+        self.send(Input::Audio(event))
+    }
+
+    pub fn intent(&mut self, intent: Intent) -> Vec<Action> {
+        self.send(Input::Intent(intent))
+    }
+
+    pub fn headset_holds(&mut self, preset: &str) -> Vec<Action> {
+        self.device(DeviceUpdate::Observed(observed_with(curve_of(preset))))
+    }
+
     pub fn connect_as(
         &mut self,
         uniq: Option<&str>,
@@ -254,12 +266,6 @@ pub fn persisted_changes(actions: &[Action]) -> Vec<PersistedChange> {
         .collect()
 }
 
-impl Harness {
-    pub fn audio(&mut self, event: AudioEvent) -> Vec<Action> {
-        self.send(Input::Audio(event))
-    }
-}
-
 pub fn audio_commands(actions: &[Action]) -> Vec<AudioCommand> {
     actions
         .iter()
@@ -312,18 +318,6 @@ pub fn chosen_for(preset: &str, app: &str) -> ActivePreset {
     ActivePreset {
         preset: id(preset),
         reason: PresetReason::App(app.to_owned()),
-    }
-}
-
-impl Harness {
-    pub fn headset_holds(&mut self, preset: &str) -> Vec<Action> {
-        self.device(DeviceUpdate::Observed(observed_with(curve_of(preset))))
-    }
-}
-
-impl Harness {
-    pub fn intent(&mut self, intent: Intent) -> Vec<Action> {
-        self.send(Input::Intent(intent))
     }
 }
 

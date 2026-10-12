@@ -87,14 +87,16 @@ impl Alerts {
 
     pub fn update(&mut self, reading: Reading, threshold: Percent) -> Vec<AlertChange> {
         self.warning = warning_for(self.warning, reading, threshold);
-        if reading.is_plugged() {
-            return self.withdraw_all();
-        }
         match self.warning {
             BatteryWarning::Critical => self.notify_critical(reading.percent),
             BatteryWarning::Low => self.notify_low(reading.percent),
-            BatteryWarning::None => Vec::new(),
+            BatteryWarning::None => self.withdraw_all(),
         }
+    }
+
+    pub fn reset(&mut self) -> Vec<AlertChange> {
+        self.warning = BatteryWarning::None;
+        self.withdraw_all()
     }
 
     fn withdraw_all(&mut self) -> Vec<AlertChange> {

@@ -1,20 +1,12 @@
 use super::text::{Arg, Text};
 use crate::companion::app_settings::HeadsetValues;
 use crate::companion::snapshot::DongleSnapshot;
-use crate::messages::device::Phase;
 use crate::protocol::firmware::{Firmware, Version};
 use crate::protocol::model::{Model, Support};
 use crate::settings::headset_settings::Setting;
 use crate::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
 
 pub const SIDETONE_MARKS: [(u8, &str); 4] = [(0, "Off"), (3, "Low"), (6, "Medium"), (10, "High")];
-const MUTE_LIGHT_STEPS: [(MuteLight, &str); 4] = [
-    (MuteLight::Off, "Off"),
-    (MuteLight::Low, "Low"),
-    (MuteLight::Medium, "Medium"),
-    (MuteLight::High, "High"),
-];
-const MUTE_LIGHT_MAX: u8 = 3;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Mark {
@@ -74,7 +66,7 @@ pub fn headset_groups(dongle: &DongleSnapshot) -> Option<HeadsetGroupsModel> {
     let model = dongle.model?;
     let rows = Rows { dongle, model };
     Some(HeadsetGroupsModel {
-        sensitive: dongle.observed.is_some() || !is_connecting(dongle.phase),
+        sensitive: dongle.observed.is_some() || !dongle.phase.is_connecting(),
         mic_volume: rows.row(Setting::MicVolume, mic_volume_row),
         sidetone: rows.row(Setting::Sidetone, sidetone_row),
         mute_light: rows.row(Setting::MuteLight, mute_light_row),
@@ -137,10 +129,6 @@ impl Rows<'_> {
     }
 }
 
-const fn is_connecting(phase: Phase) -> bool {
-    matches!(phase, Phase::Settling | Phase::Probing | Phase::Syncing)
-}
-
 fn step_of(value: u8, max: u8) -> Text {
     Text::format(
         "{value} of {max}",
@@ -185,27 +173,31 @@ fn sidetone_row(values: HeadsetValues, subtitle: Option<Text>) -> ScaleModel {
 }
 
 fn mute_light_row(values: HeadsetValues, subtitle: Option<Text>) -> ScaleModel {
-    let steps = MUTE_LIGHT_STEPS.iter().zip(0_u8..);
-    let marks = steps
-        .clone()
-        .map(|((_, label), value)| Mark {
-            value,
-            label: Text::plain(label),
+    let marks = MuteLight::ALL
+        .into_iter()
+        .map(|light| Mark {
+            value: light.step(),
+            label: mute_light_label(light),
         })
         .collect();
-    let (value, label) = steps
-        .clone()
-        .find(|((light, _), _)| *light == values.mute_light)
-        .map_or((0, "Off"), |((_, label), value)| (value, *label));
     ScaleModel {
         setting: Setting::MuteLight,
         title: Text::plain("Mute Light Brightness"),
-        value,
-        max: MUTE_LIGHT_MAX,
+        value: values.mute_light.step(),
+        max: MuteLight::max_step(),
         marks,
-        value_text: Text::plain(label),
+        value_text: mute_light_label(values.mute_light),
         subtitle,
     }
+}
+
+fn mute_light_label(light: MuteLight) -> Text {
+    Text::plain(match light {
+        MuteLight::Off => "Off",
+        MuteLight::Low => "Low",
+        MuteLight::Medium => "Medium",
+        MuteLight::High => "High",
+    })
 }
 
 fn volume_limiter_row(values: HeadsetValues, subtitle: Option<Text>) -> SwitchModel {

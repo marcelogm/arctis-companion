@@ -3,6 +3,7 @@ use arctis_core::companion::Snapshot;
 use arctis_core::companion::adoption::AdoptionStatus;
 use arctis_core::companion::alerts::BatteryWarning;
 use arctis_core::companion::app_settings::{AppRules, HeadsetValues, RoutePresets};
+use arctis_core::companion::per_path::PerPath;
 use arctis_core::companion::routing::{AudioService, Route};
 use arctis_core::companion::selection::ActivePreset;
 use arctis_core::companion::snapshot::{
@@ -113,8 +114,10 @@ fn presets() -> PresetsSnapshot {
             dongle: id("flat"),
             bluetooth: id("flat"),
         },
-        dongle: ActivePreset::route(id("flat")),
-        bluetooth: ActivePreset::route(id("flat")),
+        active: PerPath {
+            dongle: ActivePreset::route(id("flat")),
+            bluetooth: ActivePreset::route(id("flat")),
+        },
         rules: AppRules::default(),
         automatic: true,
         seen_apps: Vec::new(),

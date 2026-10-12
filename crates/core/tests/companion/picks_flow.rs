@@ -5,7 +5,6 @@ use arctis_core::intent::Intent;
 use arctis_core::messages::audio::{AudioCommand, AudioEvent, SinkKind, SoundPath};
 use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
 use arctis_core::protocol::status::{Charging, Link};
-use arctis_core::settings::headset_settings::Setting;
 use arctis_core::settings::values::{MicVolume, Sidetone};
 
 use crate::support::{
@@ -76,7 +75,7 @@ fn changes_queue_while_an_adopted_headset_is_off() {
 #[test]
 fn retry_sends_the_desired_settings_again() {
     let mut h = ready();
-    let actions = h.intent(Intent::RetryWrite(Setting::Sidetone));
+    let actions = h.intent(Intent::RetryWrite);
     assert_eq!(
         device_changes(&actions),
         [(observed(), SyncPolicy::Enforce)]
@@ -93,7 +92,7 @@ fn the_combo_sets_the_route_preset_when_no_ruled_app_plays() {
     );
     assert_eq!(device_curves(&actions), [curve_of("podcast")]);
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         ActivePreset::route(id("podcast"))
     );
 }
@@ -110,7 +109,7 @@ fn the_combo_with_a_ruled_app_playing_also_picks_by_hand() {
     );
     assert_eq!(device_curves(&actions), [curve_of("podcast")]);
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         picked_by_hand("podcast", Some("firefox"))
     );
 }
@@ -132,7 +131,7 @@ fn the_shell_with_a_ruled_app_playing_picks_without_persisting() {
     assert!(persisted_changes(&actions).is_empty());
     assert_eq!(device_curves(&actions), [curve_of("podcast")]);
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         picked_by_hand("podcast", Some("firefox"))
     );
 }
@@ -146,7 +145,7 @@ fn a_shell_pick_does_not_survive_a_restart() {
     let mut restarted = ruled(&[("firefox", "footsteps"), ("spotify", "bass-boost")]);
     firefox_joins(&mut restarted);
     assert_eq!(
-        restarted.snapshot().presets.dongle,
+        restarted.snapshot().presets.active.dongle,
         chosen_for("footsteps", "firefox")
     );
 }
@@ -166,12 +165,12 @@ fn a_combo_pick_survives_a_restart_only_as_the_route_preset() {
     let mut restarted = Harness::new(saved);
     let _ = restarted.connect(observed());
     assert_eq!(
-        restarted.snapshot().presets.dongle,
+        restarted.snapshot().presets.active.dongle,
         ActivePreset::route(id("podcast"))
     );
     firefox_joins(&mut restarted);
     assert_eq!(
-        restarted.snapshot().presets.dongle,
+        restarted.snapshot().presets.active.dongle,
         chosen_for("footsteps", "firefox")
     );
 }
@@ -188,7 +187,7 @@ fn a_new_ruled_app_ends_the_manual_pick() {
     let switched = h.at(32_000).send(Input::Woke);
     assert_eq!(device_curves(&switched), [curve_of("bass-boost")]);
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         chosen_for("bass-boost", "spotify")
     );
 }
@@ -201,7 +200,7 @@ fn the_now_playing_button_picks_the_route_preset() {
         .intent(Intent::UseRoutePreset(SoundPath::Dongle));
     assert_eq!(device_curves(&actions), [curve_of("flat")]);
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         picked_by_hand("flat", Some("firefox"))
     );
 }
@@ -283,7 +282,10 @@ fn preview_picks_the_edited_preset_until_the_page_closes() {
     let mut h = ready();
     let opened = h.intent(Intent::StartPreview(id("podcast")));
     assert_eq!(device_curves(&opened), [curve_of("podcast")]);
-    assert_eq!(h.snapshot().presets.dongle, picked_by_hand("podcast", None));
+    assert_eq!(
+        h.snapshot().presets.active.dongle,
+        picked_by_hand("podcast", None)
+    );
     let _ = h.headset_holds("podcast");
     assert_eq!(
         device_curves(&h.intent(Intent::EndPreview)),

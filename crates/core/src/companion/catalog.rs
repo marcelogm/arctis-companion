@@ -5,33 +5,31 @@ use crate::eq::preset::{Preset, PresetId, PresetKind};
 pub const HEADSET_CURVE_NAME: &str = "Headset Curve";
 const FALLBACK_SLUG: &str = "preset";
 
-#[derive(Clone, Debug, Default, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq)]
 pub struct Catalog {
-    custom: Vec<Preset>,
+    presets: Vec<Preset>,
 }
 
 impl Catalog {
     #[must_use]
-    pub const fn new(custom: Vec<Preset>) -> Self {
-        Self { custom }
+    pub fn new(custom: Vec<Preset>) -> Self {
+        let mut catalog = Self {
+            presets: library::library(),
+        };
+        for preset in custom {
+            catalog.save(preset);
+        }
+        catalog
     }
 
     #[must_use]
-    pub fn all(&self) -> Vec<Preset> {
-        library::library()
-            .into_iter()
-            .chain(self.custom.iter().cloned())
-            .collect()
+    pub fn all(&self) -> &[Preset] {
+        &self.presets
     }
 
     #[must_use]
-    pub fn custom(&self) -> &[Preset] {
-        &self.custom
-    }
-
-    #[must_use]
-    pub fn find(&self, id: &PresetId) -> Option<Preset> {
-        library::find(id).or_else(|| self.custom.iter().find(|preset| preset.id() == id).cloned())
+    pub fn find(&self, id: &PresetId) -> Option<&Preset> {
+        find_in(&self.presets, id)
     }
 
     #[must_use]
@@ -41,22 +39,18 @@ impl Catalog {
 
     #[must_use]
     pub fn resolve(&self, id: &PresetId) -> Preset {
-        self.find(id).unwrap_or_else(library::flat)
+        resolve_in(&self.presets, id)
     }
 
     #[must_use]
     pub fn resolve_id(&self, id: &PresetId) -> PresetId {
-        if self.contains(id) {
-            id.clone()
-        } else {
-            PresetId::new(FLAT_ID)
-        }
+        resolve_id_in(&self.presets, id)
     }
 
     #[must_use]
     pub fn matching(&self, curve: &Curve) -> Option<PresetId> {
-        self.all()
-            .into_iter()
+        self.presets
+            .iter()
             .find(|preset| equivalent(preset.curve(), curve))
             .map(|preset| preset.id().clone())
     }
@@ -66,25 +60,51 @@ impl Catalog {
             return false;
         }
         match self
-            .custom
+            .presets
             .iter_mut()
             .find(|known| known.id() == preset.id())
         {
             Some(known) => *known = preset,
-            None => self.custom.push(preset),
+            None => self.presets.push(preset),
         }
         true
     }
 
     pub fn delete(&mut self, id: &PresetId) -> bool {
-        let before = self.custom.len();
-        self.custom.retain(|preset| preset.id() != id);
-        self.custom.len() != before
+        let before = self.presets.len();
+        self.presets
+            .retain(|preset| preset.id() != id || preset.kind() == PresetKind::BuiltIn);
+        self.presets.len() != before
     }
 
     #[must_use]
     pub fn fresh_id(&self, name: &str) -> PresetId {
-        fresh_id(&self.all(), name)
+        fresh_id(&self.presets, name)
+    }
+}
+
+impl Default for Catalog {
+    fn default() -> Self {
+        Self::new(Vec::new())
+    }
+}
+
+#[must_use]
+pub fn find_in<'a>(presets: &'a [Preset], id: &PresetId) -> Option<&'a Preset> {
+    presets.iter().find(|preset| preset.id() == id)
+}
+
+#[must_use]
+pub fn resolve_in(presets: &[Preset], id: &PresetId) -> Preset {
+    find_in(presets, id).cloned().unwrap_or_else(library::flat)
+}
+
+#[must_use]
+pub fn resolve_id_in(presets: &[Preset], id: &PresetId) -> PresetId {
+    if find_in(presets, id).is_some() {
+        id.clone()
+    } else {
+        PresetId::new(FLAT_ID)
     }
 }
 

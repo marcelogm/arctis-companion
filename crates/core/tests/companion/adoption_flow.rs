@@ -87,7 +87,7 @@ fn an_unknown_headset_curve_is_saved_and_selected() {
     let selected = PersistedChange::RoutePreset(SoundPath::Dongle, id("headset-curve"));
     assert!(persisted_changes(&actions).contains(&selected));
     assert_eq!(
-        h.snapshot().presets.dongle,
+        h.snapshot().presets.active.dongle,
         ActivePreset::route(id("headset-curve"))
     );
 }

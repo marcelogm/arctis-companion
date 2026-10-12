@@ -1,24 +1,23 @@
-use super::action::Action;
-use super::action::PresetChange;
+use super::action::{Action, PresetChange};
 use super::adoption::AdoptionStatus;
 use super::app_settings::PersistedChange;
 use super::reducer::Companion;
-use super::selection::{ActivateError, ManualPick, PATHS, picked_path};
-use crate::eq::preset::Preset;
-use crate::eq::preset::PresetId;
+use super::selection::{ActivateError, ManualPick, picked_path};
+use crate::eq::preset::{Preset, PresetId};
 use crate::intent::Intent;
 use crate::messages::audio::SoundPath;
-use crate::settings::headset_settings::SettingChange;
 use crate::settings::values::Percent;
 
 impl Companion {
     pub(super) fn intent(&mut self, intent: Intent, out: &mut Vec<Action>) {
-        if let Some(change) = intent.setting_change() {
-            self.change_setting(&change, out);
-            return;
-        }
         match intent {
-            Intent::RetryWrite(_) => self.retry_writes(out),
+            setting @ (Intent::SetMicVolume(_)
+            | Intent::SetSidetone(_)
+            | Intent::SetMuteLight(_)
+            | Intent::SetVolumeLimiter(_)
+            | Intent::SetExtendedRange(_)
+            | Intent::SetAutoPowerOff(_)) => self.change_setting(&setting, out),
+            Intent::RetryWrite => self.retry_writes(out),
             Intent::SetRoutePreset(path, preset) => self.set_route_preset(path, preset, out),
             Intent::ActivatePreset(preset) => self.activate_preset(preset, out),
             Intent::UseRoutePreset(path) => self.use_route_preset(path),
@@ -34,13 +33,7 @@ impl Companion {
             }
             Intent::SavePreset(preset) => self.save_preset(preset, out),
             Intent::DeletePreset(preset) => self.delete_preset(&preset, out),
-            Intent::SetMicVolume(_)
-            | Intent::SetSidetone(_)
-            | Intent::SetMuteLight(_)
-            | Intent::SetVolumeLimiter(_)
-            | Intent::SetExtendedRange(_)
-            | Intent::SetAutoPowerOff(_)
-            | Intent::SetRunInBackground(_) => {}
+            Intent::SetRunInBackground(_) => {}
         }
     }
 
@@ -52,11 +45,14 @@ impl Companion {
         )
     }
 
-    fn change_setting(&mut self, change: &SettingChange, out: &mut Vec<Action>) {
+    fn change_setting(&mut self, intent: &Intent, out: &mut Vec<Action>) {
+        let Some(change) = intent.setting_change() else {
+            return;
+        };
         if self.adoption() != AdoptionStatus::Adopted {
             return;
         }
-        self.settings.headset.apply(change);
+        self.settings.headset.apply(&change);
         out.push(Action::Persist(PersistedChange::Headset(
             self.settings.headset,
         )));
@@ -78,14 +74,8 @@ impl Companion {
             path,
             preset.clone(),
         )));
-        if !self.selection.path(path).ruled.is_empty() {
-            self.pick(
-                path,
-                ManualPick {
-                    preset,
-                    preview: false,
-                },
-            );
+        if !self.selection.get(path).ruled.is_empty() {
+            self.pick(path, ManualPick::lasting(preset));
         }
     }
 
@@ -93,32 +83,20 @@ impl Companion {
         let Ok(path) = self.picked_path() else {
             return;
         };
-        if self.selection.path(path).ruled.is_empty() {
+        if self.selection.get(path).ruled.is_empty() {
             self.set_route_preset(path, preset, out);
         } else if self.catalog.contains(&preset) {
-            self.pick(
-                path,
-                ManualPick {
-                    preset,
-                    preview: false,
-                },
-            );
+            self.pick(path, ManualPick::lasting(preset));
         }
     }
 
     fn use_route_preset(&mut self, path: SoundPath) {
         let preset = self.route_preset(path);
-        self.pick(
-            path,
-            ManualPick {
-                preset,
-                preview: false,
-            },
-        );
+        self.pick(path, ManualPick::lasting(preset));
     }
 
     fn pick(&mut self, path: SoundPath, pick: ManualPick) {
-        self.selection.path_mut(path).manual = Some(pick);
+        self.selection.get_mut(path).manual = Some(pick);
     }
 
     fn set_automatic_presets(&mut self, on: bool, out: &mut Vec<Action>) {
@@ -149,20 +127,12 @@ impl Companion {
         if let Ok(path) = self.picked_path()
             && self.catalog.contains(&preset)
         {
-            self.pick(
-                path,
-                ManualPick {
-                    preset,
-                    preview: true,
-                },
-            );
+            self.pick(path, ManualPick::preview(preset));
         }
     }
 
     fn end_preview(&mut self) {
-        for path in PATHS {
-            self.selection.path_mut(path).end_preview();
-        }
+        self.selection.end_previews();
     }
 
     fn set_low_battery_threshold(&mut self, threshold: Percent, out: &mut Vec<Action>) {

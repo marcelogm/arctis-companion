@@ -1,10 +1,11 @@
 use arctis_core::companion::adoption::AdoptionStatus;
 use arctis_core::companion::app_settings::AppRules;
 use arctis_core::companion::catalog::Catalog;
+use arctis_core::companion::per_path::PATHS;
 use arctis_core::companion::routing::Route;
 use arctis_core::companion::selection::{
-    ActivateError, ActivePreset, Candidate, ManualPick, PATHS, PathSelection, PresetReason,
-    RuledSet, Selection, candidates, picked_path,
+    ActivateError, ActivePreset, Candidate, ManualPick, PathSelection, PresetReason, RuledSet,
+    Selection, candidates, picked_path,
 };
 use arctis_core::companion::timing::{RULE_ENTER, RULE_LEAVE};
 use arctis_core::messages::audio::SoundPath;
@@ -129,10 +130,7 @@ fn the_active_preset_is_a_pick_then_the_newest_app_then_the_route_preset() {
         reason: PresetReason::App("firefox".to_owned()),
     };
     assert_eq!(selection.active(&id("flat")), app);
-    selection.manual = Some(ManualPick {
-        preset: id("bass-boost"),
-        preview: false,
-    });
+    selection.manual = Some(ManualPick::lasting(id("bass-boost")));
     let manual = ActivePreset {
         preset: id("bass-boost"),
         reason: PresetReason::Manual(Some("firefox".to_owned())),
@@ -143,10 +141,7 @@ fn the_active_preset_is_a_pick_then_the_newest_app_then_the_route_preset() {
 #[test]
 fn a_ruled_set_change_ends_the_manual_pick() {
     let mut selection = PathSelection {
-        manual: Some(ManualPick {
-            preset: id("bass-boost"),
-            preview: false,
-        }),
+        manual: Some(ManualPick::lasting(id("bass-boost"))),
         ..PathSelection::default()
     };
     selection.observe(&[candidate("firefox", "footsteps")], T);
@@ -158,20 +153,14 @@ fn a_ruled_set_change_ends_the_manual_pick() {
 
 #[test]
 fn ending_a_preview_keeps_a_real_pick() {
-    let pick = ManualPick {
-        preset: id("bass-boost"),
-        preview: false,
-    };
+    let pick = ManualPick::lasting(id("bass-boost"));
     let mut selection = PathSelection {
         manual: Some(pick.clone()),
         ..PathSelection::default()
     };
     selection.end_preview();
     assert_eq!(selection.manual, Some(pick));
-    selection.manual = Some(ManualPick {
-        preset: id("podcast"),
-        preview: true,
-    });
+    selection.manual = Some(ManualPick::preview(id("podcast")));
     selection.end_preview();
     assert_eq!(selection.manual, None);
 }
@@ -180,10 +169,10 @@ fn ending_a_preview_keeps_a_real_pick() {
 fn the_selection_wakes_for_the_earliest_path() {
     let mut selection = Selection::default();
     selection
-        .path_mut(SoundPath::Bluetooth)
+        .get_mut(SoundPath::Bluetooth)
         .observe(&[candidate("spotify", "podcast")], T);
     selection
-        .path_mut(SoundPath::Dongle)
+        .get_mut(SoundPath::Dongle)
         .observe(&[candidate("firefox", "footsteps")], T.after(500));
     assert_eq!(selection.next_deadline(), Some(T.after(RULE_ENTER)));
 }
@@ -192,16 +181,13 @@ fn the_selection_wakes_for_the_earliest_path() {
 fn ending_manual_picks_ends_them_on_both_paths() {
     let mut selection = Selection::default();
     for path in PATHS {
-        selection.path_mut(path).manual = Some(ManualPick {
-            preset: id("podcast"),
-            preview: false,
-        });
+        selection.get_mut(path).manual = Some(ManualPick::lasting(id("podcast")));
     }
     selection.end_manual_picks();
     assert!(
         PATHS
             .iter()
-            .all(|path| selection.path(*path).manual.is_none())
+            .all(|path| selection.get(*path).manual.is_none())
     );
 }
 

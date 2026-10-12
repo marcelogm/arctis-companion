@@ -205,7 +205,7 @@ fn header(snapshot: &Snapshot) -> HeaderModel {
 
 fn connection_subtitle(snapshot: &Snapshot) -> Option<Text> {
     match snapshot.dongle.phase {
-        Phase::Settling | Phase::Probing | Phase::Syncing => Some(Text::plain("Connecting…")),
+        phase if phase.is_connecting() => Some(Text::plain("Connecting…")),
         Phase::Rebinding => Some(Text::plain("Reconnecting…")),
         _ => None,
     }
@@ -247,7 +247,7 @@ fn failure_toast(snapshot: &Snapshot) -> Option<ToastModel> {
     Some(ToastModel {
         serial: failure.serial,
         title: Text::plain(failure_msgid(failure.setting)),
-        retry: Intent::RetryWrite(failure.setting),
+        retry: Intent::RetryWrite,
     })
 }
 

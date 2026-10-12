@@ -7,5 +7,3 @@ pub mod headset_rows;
 pub mod presets;
 pub mod status_page;
 pub mod text;
-
-pub use headset_page::headset_page;

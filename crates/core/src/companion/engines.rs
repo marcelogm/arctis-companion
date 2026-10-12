@@ -1,3 +1,5 @@
+use super::deadlines::earliest;
+use super::per_path::PerPath;
 use super::selection::ActivePreset;
 use super::timing::{EDITOR_THROTTLE, auto_switch_min_interval};
 use crate::messages::audio::SoundPath;
@@ -89,20 +91,19 @@ impl EditorThrottle {
 
 #[derive(Clone, Debug, Default, PartialEq, Eq)]
 pub struct Engines {
-    dongle: PathEngine,
-    bluetooth: PathEngine,
+    paths: PerPath<PathEngine>,
     pub editor: EditorThrottle,
 }
 
 impl Engines {
     #[must_use]
     pub fn applied(&self, path: SoundPath) -> Option<&ActivePreset> {
-        self.engine(path).applied.as_ref()
+        self.paths.get(path).applied.as_ref()
     }
 
     pub fn decide(&mut self, path: SoundPath, target: &ActivePreset, trigger: Trigger) -> Decision {
         let interval = auto_switch_min_interval(path);
-        let engine = self.engine_mut(path);
+        let engine = self.paths.get_mut(path);
         let decision = engine.decision(target, trigger, interval);
         engine.held_until = if decision == Decision::Hold {
             engine.allowed_at(interval)
@@ -118,7 +119,7 @@ impl Engines {
         active: ActivePreset,
         budget_spent_at: Option<Millis>,
     ) {
-        let engine = self.engine_mut(path);
+        let engine = self.paths.get_mut(path);
         engine.applied = Some(active);
         if budget_spent_at.is_some() {
             engine.last_automatic = budget_spent_at;
@@ -127,27 +128,7 @@ impl Engines {
 
     #[must_use]
     pub fn next_deadline(&self) -> Option<Millis> {
-        [
-            self.dongle.held_until,
-            self.bluetooth.held_until,
-            self.editor.next_deadline(),
-        ]
-        .into_iter()
-        .flatten()
-        .min()
-    }
-
-    const fn engine(&self, path: SoundPath) -> &PathEngine {
-        match path {
-            SoundPath::Dongle => &self.dongle,
-            SoundPath::Bluetooth => &self.bluetooth,
-        }
-    }
-
-    fn engine_mut(&mut self, path: SoundPath) -> &mut PathEngine {
-        match path {
-            SoundPath::Dongle => &mut self.dongle,
-            SoundPath::Bluetooth => &mut self.bluetooth,
-        }
+        let held = self.paths.values().map(|engine| engine.held_until);
+        earliest(held.chain([self.editor.next_deadline()]))
     }
 }
