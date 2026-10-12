@@ -235,6 +235,9 @@ impl EqEditorPage {
     }
 
     fn undo(&self) {
+        if !self.is_published() {
+            return;
+        }
         let restored = self
             .imp()
             .working
@@ -282,6 +285,14 @@ impl EqEditorPage {
         if let Some(toast) = self.imp().undo_toast.take() {
             toast.dismiss();
         }
+    }
+
+    fn is_published(&self) -> bool {
+        let snapshot = self.imp().snapshot.borrow().clone();
+        let (Some(snapshot), Some(preset)) = (snapshot, self.preset()) else {
+            return false;
+        };
+        snapshot.presets.find(preset.id()).is_some()
     }
 
     fn preset(&self) -> Option<Preset> {
