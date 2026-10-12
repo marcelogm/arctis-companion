@@ -164,7 +164,7 @@ the evidence.
 | 40 | SP4 | SP5 reuses testkit | None | done |
 | 41 | SP4 | resend `Desired` after `Identity` | None | done; `crates/core/tests/end_to_end.rs` lists both `Enforce` |
 | 42 | SP4 | `mutants.toml` excludes testkit | None | matches "test code is not mutated" |
-| 43 | SP4 | check the first full nightly `cargo mutants` | Fix (verify) | Task 16 dispatches `nightly.yml`; survivors become issue G |
+| 43 | SP4 | check the first full nightly `cargo mutants` | Issue | nightly run 38285845221 dispatched; `mutants` was still running after 90 min, so its review is #28 (issue G) |
 | 44 | SP5 | sidetone write + 30 min soak with the headset on | Checklist | row H14 |
 | 45 | SP5 | plug the dongle in with the rule; no permission dialog flash | Checklist | row F3 |
 | 46 | SP5 | `check-doc-paths` learns `macro_rules` names | Issue | #21 |
@@ -187,6 +187,8 @@ the evidence.
 | 63 | SP8 | SP14 owns `setlocale`/`bindtextdomain`; D-Bus error strings English | Fix / None | Task 13; error strings travel on the wire and the extension only logs them (`lib/failures.js`) |
 | 64 | SP10 | header buttons are icon-only; re-measure 360 px if labels are added | None | conditional on a future label |
 | 65 | SP5 + SP14 §5 | 300 ms readback has no measurement in the soak output | Fix | Task 15A, then checklist row A1 |
+| 66 | SP14 CI | `crates/audio/tests/headless/equalizer.rs` `inserting_over_another_default_changes_nothing` failed twice on PR #26, passed on the third run and 3/3 locally | Issue | #27 |
+| 67 | SP14 nightly | `shell-smoke` aborted (headless gnome-shell core dump) | Issue | comment on #17 |
 
 Issue A (#16, offline Flatpak sources and Flathub metadata) comes from Deviation 1, not from the list.
 
