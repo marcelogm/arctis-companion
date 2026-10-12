@@ -129,7 +129,12 @@ pub fn open_page(window: &Window, tag: &str) {
 
 pub fn shown(widget: &gtk::Widget) -> bool {
     (is_toplevel(widget) || widget.get_visible() && widget.is_child_visible())
-        && widget.parent().is_none_or(|parent| shown(&parent))
+        && (has_floating_parent(widget) || widget.parent().is_none_or(|parent| shown(&parent)))
+}
+
+fn has_floating_parent(widget: &gtk::Widget) -> bool {
+    let parent = unsafe { gtk::ffi::gtk_widget_get_parent(widget.to_glib_none().0) };
+    !parent.is_null() && unsafe { glib::gobject_ffi::g_object_is_floating(parent.cast()) } != 0
 }
 
 fn is_toplevel(widget: &gtk::Widget) -> bool {

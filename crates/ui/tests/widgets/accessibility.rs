@@ -1,3 +1,6 @@
+use std::sync::Arc;
+use std::sync::atomic::{AtomicUsize, Ordering};
+
 use adw::prelude::*;
 use arctis_core::companion::routing::Route;
 use arctis_core::eq::FilterKind;
@@ -6,6 +9,7 @@ use arctis_core::testkit::english::english;
 use arctis_core::testkit::snapshots::{id, snapshot, with};
 use arctis_core::view::eq_editor::eq_editor;
 use arctis_ui::{BatteryChart, HeadsetStatus, PermissionDialog, ResponseGraph};
+use gtk::glib;
 use gtk::{AccessibleProperty, AccessibleRelation, AccessibleRole};
 
 use crate::add_rule_dialog::{rendered_dialog, spotify_seen};
@@ -88,12 +92,43 @@ fn every_control_of_the_banner_has_a_name() {
     assert_eq!(unnamed(&window), Vec::<String>::new());
 }
 
+fn criticals_during(run: impl FnOnce()) -> usize {
+    let count = Arc::new(AtomicUsize::new(0));
+    let handlers = ["Gtk", "GLib-GObject"].map(|domain| {
+        let count = Arc::clone(&count);
+        let handler = glib::log_set_handler(
+            Some(domain),
+            glib::LogLevels::LEVEL_CRITICAL,
+            false,
+            false,
+            move |_, _, _| {
+                count.fetch_add(1, Ordering::SeqCst);
+            },
+        );
+        (domain, handler)
+    });
+    run();
+    for (domain, handler) in handlers {
+        glib::log_remove_handler(Some(domain), handler);
+    }
+    count.load(Ordering::SeqCst)
+}
+
 #[gtk::test]
 fn every_control_of_the_dialogs_has_a_name() {
     init();
     let (window, _) = rendered_window(snapshot());
     assert_eq!(unnamed(&window.preferences_dialog()), Vec::<String>::new());
     assert_eq!(unnamed(&PermissionDialog::default()), Vec::<String>::new());
+}
+
+#[gtk::test]
+fn walking_the_dialogs_logs_no_criticals() {
+    let criticals = criticals_during(|| {
+        unnamed(&PermissionDialog::default());
+        unnamed(&rendered_dialog(&spotify_seen()).0);
+    });
+    assert_eq!(criticals, 0);
 }
 
 #[gtk::test]
