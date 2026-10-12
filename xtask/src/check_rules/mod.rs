@@ -1,6 +1,7 @@
 mod comments;
 mod generated;
 mod line_limit;
+mod unsafe_api;
 
 use std::fs;
 use std::path::Path;
@@ -42,6 +43,9 @@ fn check_text(path: &Path, text: &str) -> Report {
         report.warning(warning);
     }
     if let Some(error) = comments::check(path, text) {
+        report.error(error);
+    }
+    if let Some(error) = unsafe_api::check(path, text) {
         report.error(error);
     }
     report
