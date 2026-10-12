@@ -6,8 +6,8 @@ use arctis_core::protocol::Frame;
 use arctis_core::session::{Cadence, Effect, Input, Interface, Session};
 use arctis_core::time::Millis;
 
-use crate::discovery::{self, Node, SysfsRoot};
-use crate::open_dongle::{OpenDongle, Source};
+use crate::discovery::{self, Dongle, Node, SysfsRoot};
+use crate::open_dongle::{OpenDongle, PortKind};
 use crate::port::{OpenError, Opener, Port, PortGone, Received};
 use crate::rescan::Rescan;
 use crate::waiter::Waiter;
@@ -19,6 +19,12 @@ pub struct Wiring<O, W> {
     pub waiter: W,
     pub mailbox: Mailbox,
     pub updates: async_channel::Sender<DeviceUpdate>,
+}
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+enum Source {
+    Mailbox,
+    Port(PortKind),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -65,12 +71,10 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
     }
 
     pub fn turn(&mut self) -> Flow {
-        let ready = self.wait();
-        if ready
-            .into_iter()
-            .any(|source| self.serve(source) == Flow::Quit)
-        {
-            return Flow::Quit;
+        for source in self.wait() {
+            if self.serve(source) == Flow::Quit {
+                return Flow::Quit;
+            }
         }
         self.run_timers();
         Flow::Continue
@@ -82,7 +86,8 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
             .flatten()
             .min();
         let mut sources = vec![(Source::Mailbox, self.mailbox.as_fd())];
-        sources.extend(self.dongle.iter().flat_map(OpenDongle::fds));
+        let ports = self.dongle.iter().flat_map(OpenDongle::fds);
+        sources.extend(ports.map(|(kind, fd)| (Source::Port(kind), fd)));
         let fds: Vec<BorrowedFd<'_>> = sources.iter().map(|(_, fd)| *fd).collect();
         let ready = self.waiter.wait(&fds, deadline);
         sources
@@ -94,10 +99,16 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
     }
 
     fn serve(&mut self, source: Source) -> Flow {
-        if source != Source::Mailbox {
-            self.drain(source);
-            return Flow::Continue;
+        match source {
+            Source::Mailbox => self.read_mail(),
+            Source::Port(kind) => {
+                self.drain(kind);
+                Flow::Continue
+            }
         }
+    }
+
+    fn read_mail(&mut self) -> Flow {
         let mail = self.mailbox.take();
         for change in mail.changes {
             self.feed(Input::from(change));
@@ -109,33 +120,40 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
         }
     }
 
-    fn drain(&mut self, source: Source) {
-        while let Some(received) = self.port(source).map(Port::read) {
+    fn drain(&mut self, kind: PortKind) {
+        while let Some(received) = self.port(kind).map(Port::read) {
             match received {
-                Ok(Received::Frame(bytes)) => self.feed(frame_input(source, bytes)),
-                Ok(Received::Empty) => return,
-                Err(PortGone) => return self.port_gone(source),
+                Ok(Received::Report(bytes)) => self.feed(report_input(kind, bytes)),
+                Ok(Received::Empty) => break,
+                Err(PortGone) => {
+                    self.port_gone(kind);
+                    break;
+                }
             }
         }
     }
 
-    fn port(&self, source: Source) -> Option<&Port> {
+    fn port(&self, kind: PortKind) -> Option<&Port> {
         let dongle = self.dongle.as_ref()?;
-        match source {
-            Source::Events => Some(&dongle.events),
-            Source::Command => dongle.command.as_ref(),
-            Source::Mailbox => None,
+        match kind {
+            PortKind::Events => Some(&dongle.events),
+            PortKind::Command => dongle.command.as_ref(),
         }
     }
 
-    fn port_gone(&mut self, source: Source) {
-        if source == Source::Events {
-            return self.feed(Input::Lost);
-        }
+    fn port_gone(&mut self, kind: PortKind) {
+        let lost = match kind {
+            PortKind::Events => Input::Lost,
+            PortKind::Command => self.drop_command_port(),
+        };
+        self.feed(lost);
+    }
+
+    fn drop_command_port(&mut self) -> Input {
         if let Some(dongle) = self.dongle.as_mut() {
             dongle.command = None;
         }
-        self.feed(Input::CommandPortLost);
+        Input::CommandPortLost
     }
 
     fn run_timers(&mut self) {
@@ -159,9 +177,13 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
     }
 
     fn discover(&mut self, nodes: &[Node]) {
-        let Some(found) = discovery::first_dongle(nodes) else {
-            return self.forget_denied_dongle();
-        };
+        match discovery::first_dongle(nodes) {
+            Some(found) => self.open_dongle(found),
+            None => self.forget_denied_dongle(),
+        }
+    }
+
+    fn open_dongle(&mut self, found: Dongle) {
         match OpenDongle::open(&mut self.opener, &found) {
             Ok(open) => {
                 self.dongle = Some(open);
@@ -227,22 +249,20 @@ impl<O: Opener, W: Waiter> Worker<O, W> {
     }
 
     fn write(&mut self, frame: &Frame) -> Option<Input> {
-        let dongle = self.dongle.as_mut()?;
-        let written = dongle.command.as_ref()?.write(frame);
-        if written.is_ok() {
-            return None;
+        let command = self.dongle.as_ref()?.command.as_ref()?;
+        match command.write(frame) {
+            Ok(()) => None,
+            Err(PortGone) => Some(self.drop_command_port()),
         }
-        dongle.command = None;
-        Some(Input::CommandPortLost)
     }
 }
 
-fn frame_input(source: Source, bytes: Vec<u8>) -> Input {
-    match source {
-        Source::Events => Input::Unsolicited {
+fn report_input(kind: PortKind, bytes: Vec<u8>) -> Input {
+    match kind {
+        PortKind::Events => Input::Unsolicited {
             interface: Interface::Events,
             bytes,
         },
-        Source::Command | Source::Mailbox => Input::Reply(bytes),
+        PortKind::Command => Input::Reply(bytes),
     }
 }

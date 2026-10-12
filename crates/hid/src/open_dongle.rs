@@ -22,19 +22,18 @@ impl OpenDongle {
     }
 
     #[must_use]
-    pub fn fds(&self) -> Vec<(Source, BorrowedFd<'_>)> {
-        let events = (Source::Events, self.events.as_fd());
+    pub fn fds(&self) -> Vec<(PortKind, BorrowedFd<'_>)> {
+        let events = (PortKind::Events, self.events.as_fd());
         let command = self
             .command
             .as_ref()
-            .map(|port| (Source::Command, port.as_fd()));
+            .map(|port| (PortKind::Command, port.as_fd()));
         [Some(events), command].into_iter().flatten().collect()
     }
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum Source {
-    Mailbox,
+pub enum PortKind {
     Events,
     Command,
 }

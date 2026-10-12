@@ -23,7 +23,7 @@ pub struct Mail {
 #[derive(Clone)]
 pub struct DeviceChanges {
     sender: Sender<Message>,
-    bell: Arc<OwnedFd>,
+    wake_writer: Arc<OwnedFd>,
 }
 
 impl DeviceChanges {
@@ -38,20 +38,20 @@ impl DeviceChanges {
 
     fn post(&self, message: Message) -> bool {
         let sent = self.sender.send(message).is_ok();
-        ring(&self.bell);
+        wake(&self.wake_writer);
         sent
     }
 }
 
 pub struct Mailbox {
     receiver: Receiver<Message>,
-    doorbell: OwnedFd,
+    wake_reader: OwnedFd,
 }
 
 impl Mailbox {
     #[must_use]
     pub fn take(&self) -> Mail {
-        silence(&self.doorbell);
+        drain_wakes(&self.wake_reader);
         let mut mail = Mail::default();
         while !mail.quit {
             match self.receiver.try_recv() {
@@ -66,30 +66,33 @@ impl Mailbox {
 
 impl AsFd for Mailbox {
     fn as_fd(&self) -> BorrowedFd<'_> {
-        self.doorbell.as_fd()
+        self.wake_reader.as_fd()
     }
 }
 
 pub fn mailbox() -> io::Result<(DeviceChanges, Mailbox)> {
-    let (doorbell, bell) = rustix::pipe::pipe_with(PipeFlags::CLOEXEC | PipeFlags::NONBLOCK)?;
+    let (wake_reader, wake_writer) = rustix::pipe::pipe_with(PipeFlags::CLOEXEC | PipeFlags::NONBLOCK)?;
     let (sender, receiver) = mpsc::channel();
     Ok((
         DeviceChanges {
             sender,
-            bell: Arc::new(bell),
+            wake_writer: Arc::new(wake_writer),
         },
-        Mailbox { receiver, doorbell },
+        Mailbox {
+            receiver,
+            wake_reader,
+        },
     ))
 }
 
-fn ring(bell: &OwnedFd) {
-    let _ = rustix::io::write(bell, &[1]);
+fn wake(wake_writer: &OwnedFd) {
+    let _ = rustix::io::write(wake_writer, &[1]);
 }
 
-fn silence(doorbell: &OwnedFd) {
+fn drain_wakes(wake_reader: &OwnedFd) {
     let mut buffer = [0; DRAIN_CAPACITY];
     loop {
-        match rustix::io::read(doorbell, &mut buffer) {
+        match rustix::io::read(wake_reader, &mut buffer) {
             Ok(length) if length > 0 => {}
             Err(Errno::INTR) => {}
             _ => return,
