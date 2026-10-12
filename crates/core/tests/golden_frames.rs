@@ -2,7 +2,9 @@ mod support;
 
 use std::fs;
 
-use support::{golden, golden_dir};
+use arctis_core::eq::FilterKind;
+use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
+use support::{factory_flat, filter, golden, golden_dir};
 
 const GOLDEN_NAMES: [&str; 39] = [
     "cmd_27_00.hex",
@@ -71,4 +73,48 @@ fn every_golden_file_is_one_64_byte_frame() {
     for name in GOLDEN_NAMES {
         assert_eq!(golden(name).len(), 64, "{name}");
     }
+}
+
+#[test]
+fn captured_curve_writes_round_trip_bit_exact() {
+    for name in ["cmd_33_kinds.hex", "cmd_33_odd.hex"] {
+        let bytes = golden(name);
+        let curve = decode_curve(&bytes).expect("captured curve decodes");
+        assert_eq!(encode_curve(&curve).as_slice(), &bytes[1..61], "{name}");
+    }
+}
+
+#[test]
+fn the_kinds_curve_decodes_every_filter_kind() {
+    let curve = decode_curve(&golden("cmd_33_kinds.hex")).expect("kinds curve decodes");
+    let expected = [
+        filter(FilterKind::LowShelf, 80, 7, 707),
+        filter(FilterKind::HighPass, 30, 0, 707),
+        filter(FilterKind::Peaking, 1000, -5, 1414),
+        filter(FilterKind::LowPass, 18000, 0, 707),
+        filter(FilterKind::HighShelf, 8000, 2, 707),
+    ];
+    assert_eq!(curve.filters(), expected);
+}
+
+#[test]
+fn the_edges_curve_keeps_its_extremes_and_drops_its_disabled_band() {
+    let curve = decode_curve(&golden("cmd_33_edges.hex")).expect("edges curve decodes");
+    assert_eq!(curve.filters().len(), 9);
+    assert_eq!(
+        curve.filters()[0],
+        filter(FilterKind::Peaking, 20, -20, 200)
+    );
+    assert_eq!(
+        curve.filters()[1],
+        filter(FilterKind::Peaking, 20_000, 20, 10_000)
+    );
+}
+
+#[test]
+fn the_bluetooth_band_layout_is_the_factory_flat_curve() {
+    assert_eq!(
+        decode_curve(&golden("reply_22_flat_headset_off.hex")),
+        Ok(factory_flat())
+    );
 }
