@@ -1,5 +1,6 @@
 const METAINFO: &str = "/io/github/marcelogm/ArctisCompanion/ui/metainfo.xml";
 const SHORTCUTS: &str = "/io/github/marcelogm/ArctisCompanion/ui/shortcuts_dialog.ui";
+const SHORTCUTS_ID: &str = "shortcuts_dialog";
 
 #[must_use]
 pub fn about_dialog() -> adw::AboutDialog {
@@ -7,8 +8,13 @@ pub fn about_dialog() -> adw::AboutDialog {
 }
 
 #[must_use]
-pub fn shortcuts_dialog() -> adw::ShortcutsDialog {
+pub fn shortcuts_builder() -> gtk::Builder {
     gtk::Builder::from_resource(SHORTCUTS)
-        .object::<adw::ShortcutsDialog>("shortcuts_dialog")
-        .unwrap_or_default()
+}
+
+#[must_use]
+pub fn shortcuts_dialog() -> adw::ShortcutsDialog {
+    shortcuts_builder()
+        .object::<adw::ShortcutsDialog>(SHORTCUTS_ID)
+        .expect("the shortcuts resource defines its dialog")
 }

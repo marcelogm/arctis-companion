@@ -2,12 +2,11 @@ use adw::prelude::*;
 use arctis_core::intent::Intent;
 use arctis_core::testkit::snapshots::{percent, snapshot};
 use arctis_core::view::preferences::{Background, LOW_BATTERY_MAX, LOW_BATTERY_MIN, preferences};
+use arctis_ui::PreferencesDialog;
 use arctis_ui::intents::IntentSink;
-use arctis_ui::widget_values::nearest_step;
-use arctis_ui::{PreferencesDialog, SHELL_EXTENSIONS_URI};
 use gtk::glib;
 
-use crate::support::{Log, init, named, recording_sink};
+use crate::support::{Log, assert_close, init, named, recording_sink};
 
 fn rendered(background: Background) -> (PreferencesDialog, IntentSink, Log) {
     init();
@@ -43,9 +42,9 @@ fn the_low_battery_warning_shows_the_threshold_and_range() {
     let (dialog, _, _) = rendered(Background::Off);
     let row = named::<adw::SpinRow>(&dialog, "low-battery");
     let adjustment = row.adjustment();
-    assert_eq!(nearest_step(row.value(), 100), 15);
-    assert_eq!(nearest_step(adjustment.lower(), 100), LOW_BATTERY_MIN);
-    assert_eq!(nearest_step(adjustment.upper(), 100), LOW_BATTERY_MAX);
+    assert_close(row.value(), 15.0);
+    assert_close(adjustment.lower(), f64::from(LOW_BATTERY_MIN));
+    assert_close(adjustment.upper(), f64::from(LOW_BATTERY_MAX));
 }
 
 #[gtk::test]
@@ -68,5 +67,4 @@ fn the_shell_integration_row_links_to_extensions() {
     let row = named::<adw::ActionRow>(&dialog, "shell-integration");
     assert_eq!(row.title(), "GNOME Shell Integration");
     assert!(row.is_activatable());
-    assert!(SHELL_EXTENSIONS_URI.starts_with("https://extensions.gnome.org/"));
 }

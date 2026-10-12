@@ -25,7 +25,7 @@ flowchart TD
 | Widget | Code | Template |
 |---|---|---|
 | Window | `crates/ui/src/window.rs::Window`, `crates/ui/src/window.rs::status_action` | `crates/ui/resources/window.blp` |
-| Headset page | `crates/ui/src/headset_page.rs::HeadsetPage`, `crates/ui/src/headset_groups.rs::show_scale`, `crates/ui/src/headset_groups.rs::show_switch`, `crates/ui/src/headset_groups.rs::show_choice`, `crates/ui/src/headset_groups.rs::show_device` | `crates/ui/resources/headset_page.blp` |
+| Headset page | `crates/ui/src/headset_page.rs::HeadsetPage`, `crates/ui/src/headset_rows.rs::show_scale`, `crates/ui/src/headset_rows.rs::show_switch`, `crates/ui/src/headset_rows.rs::show_choice`, `crates/ui/src/headset_page.rs::HeadsetPage::render_device` | `crates/ui/resources/headset_page.blp` |
 | Header | `crates/ui/src/headset_status.rs::HeadsetStatus` | `crates/ui/resources/headset_status.blp` |
 | Equalizer group | `crates/ui/src/equalizer_group.rs::EqualizerGroup` | `crates/ui/resources/equalizer_group.blp` |
 | Scale row | `crates/ui/src/scale_row.rs::ScaleRow` | `crates/ui/resources/scale_row.blp` |
@@ -78,7 +78,7 @@ sequenceDiagram
 
 | Concern | Code |
 |---|---|
-| Intent callback and render guard | `crates/ui/src/intents.rs::IntentSink`, `crates/ui/src/window.rs::Window` (`connect_intent`) |
+| Intent callback and render guard | `crates/ui/src/intents.rs::IntentSink`, `crates/ui/src/window.rs::Window` (`on_intent`) |
 | Slider steps, list positions, combo items | `crates/ui/src/widget_values.rs::nearest_step`, `crates/ui/src/widget_values.rs::index`, `crates/ui/src/widget_values.rs::show_choices` |
 | `Text` to string | `crates/ui/src/text.rs::resolve`, `crates/ui/src/text.rs::Resolver`, `crates/ui/src/text.rs::NumberStyle` |
 

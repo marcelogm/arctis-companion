@@ -1,7 +1,7 @@
 use adw::prelude::*;
 use arctis_core::view::text::Text;
 
-use crate::text::optional;
+use crate::text::{optional, resolve};
 
 #[must_use]
 pub fn nearest_step(value: f64, max: u8) -> u8 {
@@ -22,6 +22,19 @@ pub fn position(index: usize) -> u32 {
     u32::try_from(index).unwrap_or(gtk::INVALID_LIST_POSITION)
 }
 
+pub fn show_if<W: IsA<gtk::Widget>, M>(
+    widget: &W,
+    model: Option<M>,
+    fill: impl FnOnce(&W, M),
+) -> bool {
+    widget.set_visible(model.is_some());
+    let shown = model.is_some();
+    if let Some(model) = model {
+        fill(widget, model);
+    }
+    shown
+}
+
 pub fn show_choices(row: &adw::ComboRow, items: &[String], selected: usize) {
     if !shows(row, items) {
         let names: Vec<&str> = items.iter().map(String::as_str).collect();
@@ -30,9 +43,20 @@ pub fn show_choices(row: &adw::ComboRow, items: &[String], selected: usize) {
     row.set_selected(position(selected));
 }
 
+pub fn show_combo_row<'a>(
+    row: &adw::ComboRow,
+    (title, subtitle): (&Text, Option<&Text>),
+    items: impl Iterator<Item = &'a Text>,
+    selected: usize,
+) {
+    row.set_title(&resolve(title));
+    row.set_subtitle(&optional(subtitle));
+    let items: Vec<String> = items.map(resolve).collect();
+    show_choices(row, &items, selected);
+}
+
 pub fn show_label(label: &gtk::Label, text: Option<&Text>) {
-    label.set_visible(text.is_some());
-    label.set_label(&optional(text));
+    show_if(label, text, |label, text| label.set_label(&resolve(text)));
 }
 
 fn distance(step: u8, value: f64) -> f64 {

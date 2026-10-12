@@ -3,16 +3,18 @@ use std::rc::Rc;
 use adw::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::companion::adoption::AdoptionStatus;
+use arctis_core::companion::dongle::WriteFailure;
 use arctis_core::companion::routing::Route;
 use arctis_core::intent::Intent;
 use arctis_core::messages::device::Phase;
+use arctis_core::settings::headset_settings::Setting;
 use arctis_core::settings::values::Sidetone;
 use arctis_core::testkit::snapshots::{id, snapshot, values, with};
 use arctis_core::view::preferences::Background;
 use arctis_ui::{ScaleRow, Window};
 use gtk::{gio, glib};
 
-use crate::support::{first, init, named, rendered_window};
+use crate::support::{descendants, first, init, named, rendered_window};
 
 const PHASES: [Phase; 8] = [
     Phase::Absent,
@@ -315,4 +317,35 @@ fn the_primary_menu_holds_preferences_shortcuts_and_about() {
         .filter_map(|value| value.get::<String>())
         .collect();
     assert_eq!(actions, ["win.preferences", "win.shortcuts", "win.about"]);
+}
+
+#[gtk::test]
+fn a_failure_already_resolved_raises_no_toast_in_a_new_window() {
+    let mut s = snapshot();
+    s.dongle.last_failure = Some(WriteFailure {
+        serial: 4,
+        setting: Setting::Sidetone,
+    });
+    s.dongle.not_applied = Vec::new();
+    let (window, _) = rendered_window(s);
+    assert!(!toast_shown(&window));
+}
+
+#[gtk::test]
+fn a_failure_still_pending_raises_a_toast_in_a_new_window() {
+    let mut s = snapshot();
+    s.dongle.last_failure = Some(WriteFailure {
+        serial: 4,
+        setting: Setting::Sidetone,
+    });
+    s.dongle.not_applied = vec![Setting::Sidetone];
+    let (window, _) = rendered_window(s);
+    assert!(toast_shown(&window));
+}
+
+fn toast_shown(window: &Window) -> bool {
+    descendants(window)
+        .into_iter()
+        .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
+        .any(|label| label.label() == "Could Not Change Sidetone")
 }

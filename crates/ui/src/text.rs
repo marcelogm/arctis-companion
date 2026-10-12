@@ -74,9 +74,26 @@ impl Resolver {
     }
 
     fn fill(self, template: &str, args: &[(&str, Arg)]) -> String {
-        args.iter().fold(template.to_owned(), |text, (name, arg)| {
-            text.replace(&format!("{{{name}}}"), &self.argument(arg))
-        })
+        let mut filled = String::with_capacity(template.len());
+        let mut rest = template;
+        while let Some(open) = rest.find('{') {
+            filled.push_str(&rest[..open]);
+            let tail = &rest[open..];
+            let (text, length) = self
+                .placeholder(tail, args)
+                .unwrap_or_else(|| ("{".to_owned(), 1));
+            filled.push_str(&text);
+            rest = &tail[length..];
+        }
+        filled.push_str(rest);
+        filled
+    }
+
+    fn placeholder(self, tail: &str, args: &[(&str, Arg)]) -> Option<(String, usize)> {
+        let close = tail.find('}')?;
+        let name = &tail[1..close];
+        let (_, arg) = args.iter().find(|(candidate, _)| *candidate == name)?;
+        Some((self.argument(arg), close + 1))
     }
 
     fn argument(self, arg: &Arg) -> String {

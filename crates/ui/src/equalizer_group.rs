@@ -7,8 +7,8 @@ use arctis_core::view::text::Text;
 use gtk::glib;
 
 use crate::intents::IntentSink;
-use crate::text::{optional, resolve};
-use crate::widget_values::{index, show_choices};
+use crate::text::resolve;
+use crate::widget_values::{index, show_combo_row, show_if};
 
 mod imp {
     use std::cell::RefCell;
@@ -119,11 +119,10 @@ impl EqualizerGroup {
 
     fn show_now_playing(&self, model: Option<&NowPlayingModel>) {
         let imp = self.imp();
-        imp.now_playing.set_visible(model.is_some());
-        if let Some(model) = model {
-            imp.now_playing.set_subtitle(&resolve(&model.subtitle));
+        show_if(&*imp.now_playing, model, |row, model| {
+            row.set_subtitle(&resolve(&model.subtitle));
             imp.use_route_preset.set_label(&resolve(&model.button));
-        }
+        });
     }
 
     fn show_warnings(&self, warnings: &[Text]) {
@@ -140,18 +139,14 @@ impl EqualizerGroup {
 }
 
 fn show_combo(row: &adw::ComboRow, model: Option<&PresetComboModel>) {
-    row.set_visible(model.is_some());
-    let Some(model) = model else {
-        return;
-    };
-    row.set_title(&resolve(&model.title));
-    row.set_subtitle(&optional(model.subtitle.as_ref()));
-    let items: Vec<String> = model
-        .items
-        .iter()
-        .map(|item| resolve(&item.title))
-        .collect();
-    show_choices(row, &items, model.selected);
+    show_if(row, model, |row, model| {
+        show_combo_row(
+            row,
+            (&model.title, model.subtitle.as_ref()),
+            model.items.iter().map(|item| &item.title),
+            model.selected,
+        );
+    });
 }
 
 fn warning_row(text: &Text) -> adw::ActionRow {

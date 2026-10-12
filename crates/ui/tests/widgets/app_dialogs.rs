@@ -1,9 +1,7 @@
 use adw::prelude::*;
-use arctis_ui::app_dialogs::about_dialog;
+use arctis_ui::app_dialogs::{about_dialog, shortcuts_builder, shortcuts_dialog};
 
 use crate::support::init;
-
-const SHORTCUTS: &str = "/io/github/marcelogm/ArctisCompanion/ui/shortcuts_dialog.ui";
 
 #[gtk::test]
 fn about_comes_from_the_metainfo() {
@@ -21,12 +19,8 @@ fn about_comes_from_the_metainfo() {
 #[gtk::test]
 fn the_shortcuts_dialog_lists_three_shortcuts() {
     init();
-    let builder = gtk::Builder::from_resource(SHORTCUTS);
-    assert!(
-        builder
-            .object::<adw::ShortcutsDialog>("shortcuts_dialog")
-            .is_some()
-    );
+    let _ = shortcuts_dialog();
+    let builder = shortcuts_builder();
     let mut accelerators: Vec<String> = builder
         .objects()
         .into_iter()

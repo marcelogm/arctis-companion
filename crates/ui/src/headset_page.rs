@@ -6,9 +6,9 @@ use arctis_core::view::headset_page::{HeadsetModel, SettingsArea};
 use arctis_core::view::headset_rows::HeadsetGroupsModel;
 use gtk::glib;
 
-use crate::headset_groups::{DeviceRows, show_choice, show_device, show_scale, show_switch};
+use crate::headset_rows::{show_choice, show_scale, show_switch};
 use crate::intents::IntentSink;
-use crate::text::resolve;
+use crate::text::{optional, resolve};
 use crate::widget_values::index;
 
 mod imp {
@@ -110,16 +110,13 @@ impl HeadsetPage {
 
     fn render_area(&self, area: &SettingsArea) {
         let imp = self.imp();
-        let note = match area {
-            SettingsArea::BluetoothOnly(text) => Some(resolve(text)),
-            SettingsArea::Groups(_) | SettingsArea::Hidden => None,
+        let (note, groups) = match area {
+            SettingsArea::BluetoothOnly(text) => (Some(resolve(text)), None),
+            SettingsArea::Groups(groups) => (None, Some(groups.as_ref())),
+            SettingsArea::Hidden => (None, None),
         };
         imp.bluetooth_only_group.set_visible(note.is_some());
         imp.bluetooth_only_group.set_description(note.as_deref());
-        let groups = match area {
-            SettingsArea::Groups(groups) => Some(groups.as_ref()),
-            SettingsArea::BluetoothOnly(_) | SettingsArea::Hidden => None,
-        };
         self.render_groups(groups);
     }
 
@@ -148,13 +145,12 @@ impl HeadsetPage {
     fn render_device(&self, groups: Option<&HeadsetGroupsModel>) {
         let imp = self.imp();
         imp.device_group.set_visible(groups.is_some());
-        let rows = DeviceRows {
-            model: &imp.model_row,
-            support: &imp.support_row,
-            firmware: &imp.firmware_row,
-        };
-        if let Some(groups) = groups {
-            show_device(&rows, &groups.device);
+        if let Some(device) = groups.map(|g| &g.device) {
+            imp.model_row.set_subtitle(&resolve(&device.model));
+            imp.support_row.set_visible(device.support.is_some());
+            imp.support_row
+                .set_title(&optional(device.support.as_ref()));
+            imp.firmware_row.set_subtitle(&resolve(&device.firmware));
         }
     }
 

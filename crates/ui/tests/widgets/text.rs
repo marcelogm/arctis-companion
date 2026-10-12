@@ -68,6 +68,24 @@ fn formats_fill_named_arguments() {
 }
 
 #[test]
+fn argument_values_are_never_expanded_again() {
+    let text = Text::format(
+        "{preset}, chosen for {app}",
+        vec![
+            ("preset", Arg::Str("{app}".to_owned())),
+            ("app", Arg::Str("Firefox".to_owned())),
+        ],
+    );
+    assert_eq!(american().resolve(&text), "{app}, chosen for Firefox");
+}
+
+#[test]
+fn unknown_and_unclosed_placeholders_stay_as_written() {
+    let text = Text::format("{missing} and {open", vec![("app", Arg::Number(1))]);
+    assert_eq!(american().resolve(&text), "{missing} and {open");
+}
+
+#[test]
 fn verbatim_text_is_never_translated_or_filled() {
     assert_eq!(american().resolve(&Text::verbatim("{x} & y")), "{x} & y");
 }

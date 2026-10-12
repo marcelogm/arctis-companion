@@ -10,7 +10,7 @@ dialog, the About and Keyboard Shortcuts dialogs and `text.rs`, all rendering `c
 **Architecture:** `Window::render(&Rc<Snapshot>)` calls `core::view::headset_page` and
 `core::view::preferences::preferences` and hands each model to one widget (`HeadsetPage`, `StatusView`,
 `PreferencesDialog`, the banner, `ToastFeed`). Widgets are Blueprint templates, one `.blp` and one `.rs` each.
-User input leaves the crate through one `IntentSink` callback (`Window::connect_intent`); every render runs inside
+User input leaves the crate through one `IntentSink` callback (`Window::on_intent`); every render runs inside
 `IntentSink::rendering`, so programmatic updates never emit intents. `text::resolve` is the only place that turns a
 `Text` into a string (gettext, ngettext, locale-aware numbers).
 
@@ -149,7 +149,7 @@ docs/architecture/README.md                    one new row, crates/ui entry poin
 
 Dependency direction inside `crates/ui`: `text` → `intents`, `widget_values` → `scale_row`, `headset_status`,
 `status_pages`, `equalizer_group`, `toasts`, `permission_dialog`, `preferences_dialog`, `app_dialogs` →
-`headset_groups` → `headset_page` → `window`.
+`headset_rows` → `headset_page` → `window`.
 
 ## Deviations
 
@@ -157,8 +157,8 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 
 | # | Decision | Why |
 |---|---|---|
-| 1 | Extra files beyond the module tree: `intents.rs`, `widget_values.rs`, `equalizer_group.rs` (+ `.blp`), `headset_groups.rs`, `toasts.rs`, `app_dialogs.rs`, `shortcuts_dialog.blp`; in core `view/preferences.rs` and `testkit/snapshots.rs` | one responsibility per file, every file well under 400 lines; the spec's tree lists the floor |
-| 2 | Intents leave the crate through `Window::connect_intent(impl Fn(Intent))`, backed by a cloneable `IntentSink`; no GObject signal, no channel | ui §1 forbids channels in `crates/ui`; a Rust callback needs no boxed `GType` for `Intent`. SP8's bridge passes a closure that feeds `Companion` |
+| 1 | Extra files beyond the module tree: `intents.rs`, `widget_values.rs`, `equalizer_group.rs` (+ `.blp`), `headset_rows.rs`, `toasts.rs`, `app_dialogs.rs`, `shortcuts_dialog.blp`; in core `view/preferences.rs` and `testkit/snapshots.rs` | one responsibility per file, every file well under 400 lines; the spec's tree lists the floor |
+| 2 | Intents leave the crate through `Window::on_intent(impl Fn(Intent))`, backed by a cloneable `IntentSink`; no GObject signal, no channel | ui §1 forbids channels in `crates/ui`; a Rust callback needs no boxed `GType` for `Intent`. SP8's bridge passes a closure that feeds `Companion` |
 | 3 | Every render runs inside `IntentSink::rendering`, which drops emissions; a re-entrant handler is safe because the handler is cloned out of its `RefCell` before the call | setting a combo, switch or scale from a model fires the same notify signals as a user change |
 | 4 | `Window::render(&Rc<Snapshot>)` takes the published snapshot (SP6 Deviation 4) and computes the page models itself; it keeps the latest snapshot for the preferences dialog and for SP10–SP12 pages | one entry point for SP8's `WindowPort`; models stay derived from one snapshot |
 | 5 | The single banner sits in the main navigation page's `AdwToolbarView`, below its header bar; the `AdwToastOverlay` wraps the whole `AdwNavigationView` | with an `AdwNavigationView`, each page owns its header bar; a banner above the header bar is not a libadwaita pattern. Still one banner, chosen by `core::view::headset_page::banner` |
@@ -172,10 +172,10 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 13 | gettext-rs 0.7 with `gettext-system`. `setlocale`, `bindtextdomain` and `textdomain` are called by the binary at startup (SP8/SP14); until then every msgid resolves to its English text | `crates/ui` has no `main`; tests run untranslated |
 | 14 | Keyboard Shortcuts is a window action `win.shortcuts` (Ctrl+?) presenting an `AdwShortcutsDialog` built from `shortcuts_dialog.ui` (Preferences Ctrl+comma, Keyboard Shortcuts Ctrl+?, Close Window Ctrl+W); the window binds Ctrl+comma to `win.preferences` and Ctrl+W to `window.close`. No Quit item | ui §1 primary menu; `app.quit` and its accelerator belong to SP8's application |
 | 15 | About uses `adw::AboutDialog::from_appdata` over `data/io.github.marcelogm.ArctisCompanion.metainfo.xml`, bundled into the ui gresource as `metainfo.xml` by `crates/ui/build.rs` | the metainfo stays the single source of name, developer, version, license and links |
-| 16 | Accessibility walk rule: every widget that is focusable, can take focus, is shown (visible and child-visible up the tree) and has an interactive role (Button, ToggleButton, Switch, Slider, ComboBox, SpinButton, CheckBox, Link) has the `Label` property or a `LabelledBy` relation; the inner toggle of a `GtkMenuButton` counts as named when the menu button has a `Label`. Icon-only buttons get an explicit accessible label. Every shown `GtkScale` has `ValueText`; `HeadsetStatus` has one `Description` for the whole header | GTK 4.22 exposes only `gtk::test_accessible_has_property`/`has_relation`; a spike showed libadwaita rows and labelled buttons carry `LabelledBy`, the menu button's inner toggle carries nothing, and the header's text parts are labels a screen reader already reads |
+| 16 | Accessibility walk rule: every widget that is focusable, can take focus, is shown (visible and child-visible up the tree) and has an interactive role (Button, ToggleButton, Switch, Slider, ComboBox, SpinButton, CheckBox, Link) has the `Label` property or a `LabelledBy` relation; the inner toggle of a `GtkMenuButton` counts as named when the menu button has a `Label`. Icon-only buttons get an explicit accessible label. Every shown `GtkScale` has `ValueText`; `HeadsetStatus` has one `Description` for the whole header | GTK 4.22 exposes in safe Rust only `gtk::test_accessible_has_property`/`has_relation` (values are checked through `gtk::ffi::gtk_test_accessible_check_property` in `tests/widgets/support.rs`); a spike showed libadwaita rows and labelled buttons carry `LabelledBy`, the menu button's inner toggle carries nothing, and the header's text parts are labels a screen reader already reads |
 | 17 | "360 px with no horizontal scroll" is checked as: the window content's, the status view's and both dialogs' minimum widths are at most 360, and every shown `GtkScrolledWindow` has `hscrollbar-policy` Never, with the richest English snapshot | pt_BR catalogs come with SP14; minimum width is what decides horizontal scrolling |
 | 18 | Snapshot fixtures move from `crates/core/tests/view/support.rs` into `arctis_core::testkit::snapshots`, which that file re-exports; `crates/ui` dev-depends on `arctis-core` with `testkit` | one set of fixtures for core view tests and widget tests |
-| 19 | The failure toast is de-duplicated by `ToastFeed` on `WriteFailure.serial` (SP6 Deviation 21); its button label is the msgid "Retry" | the snapshot repeats the last failure on every publish |
+| 19 | The failure toast is de-duplicated by `ToastFeed` on `WriteFailure.serial` (SP6 Deviation 21) and only offered while its setting is still in `not_applied`; its button label is the msgid "Retry" | the snapshot repeats the last failure on every publish, and a window built later must not show a failure already resolved |
 | 20 | Quiet and loud end icons (`microphone-sensitivity-low-symbolic`, `microphone-sensitivity-high-symbolic`) only on the microphone Volume row; marks are drawn below the scale with their labels | ui §2 lists end icons only for that row |
 | 21 | Known gap carried from SP6 Deviation 36: after a restart with the headset off the page shows banner 2 until the session publishes `Identity`; SP9 renders whatever the model says | rendering cannot invent adoption |
 | 22 | The existing `crates/ui/tests/window.rs` moves into the `widgets` binary as `widgets/window.rs` | one GTK initialisation, one test binary |
@@ -187,6 +187,8 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 28 | `support::collect` also walks `adw::Dialog::child`, and `support::shown` treats a `gtk::Window` or `adw::Dialog` as shown whatever its own visibility | dialog content is not in the widget tree until presented, and the test windows are never mapped |
 | 29 | Executed with small clippy-driven rewrites of plan code (`Resolver` helpers take `self`, `WidgetExt::get_visible` instead of closures, `WidgetExt::activate_action` disambiguated, `owned` returns a tuple, `AccessibleRole::Checkbox`); no behaviour change | pedantic clippy policy |
 | 30 | `cargo llvm-cov` was not run: `llvm-tools-preview` is not installed in the toolbox; the core additions are two small fully tested modules | no sudo-free way to add it here |
+| 31 | Review fixes applied: single-pass placeholder filling in `text.rs` (argument values are never re-expanded), `show_if` and `show_combo_row` in `widget_values.rs`, `headset_groups.rs` renamed `headset_rows.rs` without `DeviceRows`, one match in `render_area`, `ScaleRow::render` takes the previous model first, `shortcuts_builder` shared with the test, the banner action set from `PERMISSION_ACTION`, `connect_intent` renamed `on_intent`, `ToastFeed::next` renamed `toast_for_new_failure`, the spin range set in `constructed`, the test-only accessibility mirrors removed, tautological tests removed | all review findings were verified as real |
+| 32 | `shortcuts_dialog()` now panics with an explicit message when the resource lacks its dialog, instead of returning an empty one | a drifted resource id must fail loudly; the test builds the same lookup |
 
 ---
 

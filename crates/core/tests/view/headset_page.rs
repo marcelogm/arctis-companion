@@ -297,10 +297,22 @@ fn a_write_failure_offers_a_retry_toast() {
         serial: 3,
         setting: Setting::Sidetone,
     });
+    s.dongle.not_applied = vec![Setting::Sidetone];
     let toast = headset(headset_page(&s)).failure_toast.expect("toast");
     assert_eq!(toast.serial, 3);
     assert_eq!(english(&toast.title), "Could Not Change Sidetone");
     assert_eq!(toast.retry, Intent::RetryWrite);
+}
+
+#[test]
+fn a_failure_already_resolved_offers_no_toast() {
+    let mut s = snapshot();
+    s.dongle.last_failure = Some(WriteFailure {
+        serial: 3,
+        setting: Setting::Sidetone,
+    });
+    s.dongle.not_applied = Vec::new();
+    assert_eq!(headset(headset_page(&s)).failure_toast, None);
 }
 
 #[test]
@@ -338,6 +350,7 @@ fn every_setting_has_its_failure_title() {
     for (setting, expected) in cases {
         let mut s = snapshot();
         s.dongle.last_failure = Some(WriteFailure { serial: 1, setting });
+        s.dongle.not_applied = vec![setting];
         let toast = headset(headset_page(&s)).failure_toast.expect("toast");
         assert_eq!(english(&toast.title), expected);
     }

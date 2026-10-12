@@ -8,8 +8,6 @@ use crate::text::{optional, resolve};
 use crate::widget_values::show_label;
 
 mod imp {
-    use std::cell::RefCell;
-
     use adw::subclass::prelude::*;
     use gtk::glib;
 
@@ -28,7 +26,6 @@ mod imp {
         pub spinner: TemplateChild<adw::Spinner>,
         #[template_child]
         pub subtitle_label: TemplateChild<gtk::Label>,
-        pub description: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -70,13 +67,7 @@ impl HeadsetStatus {
         self.describe(&resolve(&model.description));
     }
 
-    #[must_use]
-    pub fn description(&self) -> String {
-        self.imp().description.borrow().clone()
-    }
-
     fn describe(&self, description: &str) {
         self.update_property(&[Property::Description(description)]);
-        self.imp().description.replace(description.to_owned());
     }
 }

@@ -36,7 +36,6 @@ mod imp {
         #[template_child]
         pub scale: TemplateChild<gtk::Scale>,
         pub model: RefCell<Option<ScaleModel>>,
-        pub value_text: RefCell<String>,
     }
 
     #[glib::object_subclass]
@@ -69,17 +68,20 @@ glib::wrapper! {
 impl ScaleRow {
     pub fn render(&self, model: &ScaleModel) {
         let imp = self.imp();
+        let previous = imp.model.replace(Some(model.clone()));
         let title = resolve(&model.title);
         self.set_title(&title);
         imp.title_label.set_label(&title);
         show_label(&imp.subtitle_label, model.subtitle.as_ref());
         self.show_icons(model.setting);
-        self.show_marks(&model.marks);
+        self.show_marks(
+            previous.as_ref().map(|shown| shown.marks.as_slice()),
+            &model.marks,
+        );
         let adjustment = imp.scale.adjustment();
         adjustment.set_upper(f64::from(model.max));
         adjustment.set_value(f64::from(model.value));
         self.announce(&title, &resolve(&model.value_text));
-        imp.model.replace(Some(model.clone()));
     }
 
     pub fn connect_intents(&self, sink: &IntentSink) {
@@ -90,11 +92,6 @@ impl ScaleRow {
             sink,
             move |scale| sink.emit_some(row.intent_for(scale.value()))
         ));
-    }
-
-    #[must_use]
-    pub fn value_text(&self) -> String {
-        self.imp().value_text.borrow().clone()
     }
 
     fn intent_for(&self, value: f64) -> Option<Intent> {
@@ -114,14 +111,9 @@ impl ScaleRow {
         }
     }
 
-    fn show_marks(&self, marks: &[Mark]) {
+    fn show_marks(&self, shown: Option<&[Mark]>, marks: &[Mark]) {
         let imp = self.imp();
-        if imp
-            .model
-            .borrow()
-            .as_ref()
-            .is_some_and(|shown| shown.marks == marks)
-        {
+        if shown == Some(marks) {
             return;
         }
         imp.scale.clear_marks();
@@ -139,6 +131,5 @@ impl ScaleRow {
         let imp = self.imp();
         imp.scale
             .update_property(&[Property::Label(title), Property::ValueText(value_text)]);
-        imp.value_text.replace(value_text.to_owned());
     }
 }
