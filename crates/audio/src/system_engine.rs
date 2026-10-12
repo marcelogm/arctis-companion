@@ -14,7 +14,8 @@ use crate::volume::{VolumeChange, VolumeMirror, props_pod};
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Inserted {
     Created,
-    NotCreated,
+    Retargeted,
+    Failed,
 }
 
 pub struct SystemEngine {
@@ -43,9 +44,9 @@ impl SystemEngine {
             InsertStep::Create { replaced } => self.create(curve, replaced),
             InsertStep::Retarget => {
                 self.retarget(curve);
-                Inserted::NotCreated
+                Inserted::Retargeted
             }
-            InsertStep::Skip => Inserted::NotCreated,
+            InsertStep::Skip => Inserted::Failed,
         }
     }
 
@@ -61,7 +62,7 @@ impl SystemEngine {
             volume,
         };
         let Ok(sink) = EqSink::create(&self.core, curve, target, forwarder) else {
-            return Inserted::NotCreated;
+            return Inserted::Failed;
         };
         *self.sink.borrow_mut() = Some(sink);
         self.insertion.borrow_mut().commit(replaced);

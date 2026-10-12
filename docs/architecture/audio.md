@@ -103,6 +103,7 @@ sequenceDiagram
     E->>O: commit(bluez), only once both streams exist
     E->>P: default.configured.audio.sink = arctis_companion_eq
     E-->>W: Created
+    Note over E,W: no bluez default or a stream fails: Failed, and W-->>C: EqualizerNotInserted
     Note over W: hold DefaultSink until it reads bluez via the equalizer, at most 1 s
     Note over W: 1 s later: ConfirmManager
     W->>E: manager_denied()

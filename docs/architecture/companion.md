@@ -37,6 +37,7 @@ flowchart LR
 | Dongle state | `crates/core/src/companion/dongle.rs::DongleState`, `crates/core/src/companion/dongle.rs::WriteFailure` |
 | Presets known to the app | `crates/core/src/companion/catalog.rs::Catalog`, `crates/core/src/companion/catalog.rs::resolve_in`, `crates/core/src/companion/catalog.rs::fresh_id` |
 | Route and the system equalizer | `crates/core/src/companion/routing.rs::route`, `crates/core/src/companion/routing.rs::needs_equalizer`, `crates/core/src/companion/routing.rs::AudioState` |
+| An equalizer the worker reports as not inserted is forgotten and asked for again on the next audio event | `crates/core/src/companion/audio_inputs.rs::Companion::audio_event`, `crates/core/src/companion/routing.rs::AudioState::apply` |
 | Per-app selection | `crates/core/src/companion/selection.rs::candidates`, `crates/core/src/companion/selection.rs::RuledSet`, `crates/core/src/companion/selection.rs::PathSelection`, `crates/core/src/companion/selection.rs::ActivePreset`, `crates/core/src/companion/selection.rs::picked_path` |
 | Budgets and the editor throttle | `crates/core/src/companion/engines.rs::Engines`, `crates/core/src/companion/engines.rs::decide`, `crates/core/src/companion/engines.rs::EditorThrottle`, `crates/core/src/companion/timing.rs::auto_switch_min_interval` |
 | Seen apps | `crates/core/src/companion/seen_apps.rs::SeenApp`, `crates/core/src/companion/seen_apps.rs::remember`, `crates/core/src/companion/seen_apps.rs::newly_playing` |

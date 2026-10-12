@@ -91,6 +91,7 @@ impl AudioState {
             AudioEvent::DefaultSink(sink) => self.default_sink = Some(*sink),
             AudioEvent::Streams(streams) => self.streams.clone_from(streams),
             AudioEvent::ManagerDenied => self.manager_denied = true,
+            AudioEvent::EqualizerNotInserted => self.equalizer = None,
             AudioEvent::BluetoothNodeSeen => {}
         }
     }

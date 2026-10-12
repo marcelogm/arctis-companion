@@ -36,6 +36,21 @@ fn the_equalizer_is_inserted_once() {
 }
 
 #[test]
+fn an_equalizer_that_was_not_inserted_is_retried_on_the_next_audio_event() {
+    let mut saved = persisted();
+    saved.settings.route_presets.bluetooth = id("podcast");
+    let mut h = Harness::new(saved);
+    let _ = h.audio(default_sink(SinkKind::NovaBluetooth));
+    let failed = h.audio(AudioEvent::EqualizerNotInserted);
+    assert!(audio_commands(&failed).is_empty());
+    let retried = h.audio(AudioEvent::Streams(Vec::new()));
+    assert_eq!(
+        audio_commands(&retried),
+        [AudioCommand::InsertEqualizer(curve_of("podcast"))]
+    );
+}
+
+#[test]
 fn leaving_bluetooth_removes_the_equalizer() {
     let mut h = Harness::new(persisted());
     let _ = h.audio(default_sink(SinkKind::NovaBluetooth));
