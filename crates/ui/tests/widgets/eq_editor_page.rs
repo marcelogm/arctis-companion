@@ -13,9 +13,9 @@ use arctis_ui::{EqBandRow, ResponseGraph};
 use gtk::AccessibleProperty;
 
 use crate::support::{
-    Mounted, band_rows, click, count_text, custom_preset, dismiss_toast, drain, filter, first,
-    has_accessible_text, named, one_peak, open_editor, rendered_window, saved, shows_text,
-    standalone_editor, step_up, with_preset,
+    Mounted, assert_close, band_rows, click, count_text, custom_preset, dismiss_toast, drain,
+    filter, first, has_accessible_text, named, one_peak, open_editor, rendered_window, saved,
+    shows_text, standalone_editor, step_up, with_preset,
 };
 
 const EDIT_CONTROLS: [&str; 6] = [
@@ -271,4 +271,13 @@ fn intents_are_only_saves() {
         editor.log.borrow().as_slice(),
         [Intent::SavePreset(_)]
     ));
+}
+
+#[gtk::test]
+fn an_off_grid_gain_that_saves_nothing_shows_the_saved_value() {
+    let editor = standalone_editor(with_preset(&one_peak()), "mine");
+    let gain = spin(&band_rows(&editor.page)[0], "band-gain");
+    gain.set_value(2.2);
+    assert_close(gain.value(), 2.0);
+    assert!(editor.log.borrow().is_empty());
 }
