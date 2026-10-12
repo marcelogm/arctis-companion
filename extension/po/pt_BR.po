@@ -1,0 +1,56 @@
+# Portuguese translations for arctis-companion-extension package
+# Traduções em português brasileiro para o pacote arctis-companion-extension.
+# Copyright (C) 2026 THE arctis-companion-extension'S COPYRIGHT HOLDER
+# This file is distributed under the same license as the arctis-companion-extension package.
+# Automatically generated, 2026.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: arctis-companion-extension\n"
+"Report-Msgid-Bugs-To: \n"
+"POT-Creation-Date: 2026-10-12 02:46-0300\n"
+"PO-Revision-Date: 2026-10-12 02:46-0300\n"
+"Last-Translator: Automatically generated\n"
+"Language-Team: none\n"
+"Language: pt_BR\n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+#: arctis-companion@marcelogm.github.io/lib/toggle.js
+msgid "App Presets"
+msgstr "Predefinições de Apps"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "No app rules"
+msgstr "Nenhuma regra de app"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "{preset} · {app}"
+msgstr "{preset} · {app}"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "{preset} · Until {app} stops"
+msgstr "{preset} · Até {app} parar"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "Headset"
+msgstr "Headset"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "Charging"
+msgstr "Carregando"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "Charging · {percent} %"
+msgstr "Carregando · {percent} %"
+
+#: arctis-companion@marcelogm.github.io/lib/presentation.js
+msgid "{percent} %"
+msgstr "{percent} %"
+
+#: arctis-companion@marcelogm.github.io/lib/toggle.js
+msgid "Headset Settings"
+msgstr "Configurações do Headset"

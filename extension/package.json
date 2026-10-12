@@ -4,7 +4,12 @@
   "type": "module",
   "scripts": {
     "lint": "eslint .",
-    "test": "GIO_USE_VFS=local dbus-run-session --config-file=tests/support/session-bus.xml -- gjs -m tests/run.js"
+    "test": "GIO_USE_VFS=local dbus-run-session --config-file=tests/support/session-bus.xml -- gjs -m tests/run.js",
+    "pack": "mkdir -p dist && gnome-extensions pack arctis-companion@marcelogm.github.io --extra-source=lib --extra-source=dbus --podir=../po --out-dir=dist --force",
+    "pot": "sh po/extract.sh",
+    "check-po": "sh po/check.sh",
+    "smoke": "sh tests/nested-shell.sh smoke",
+    "devkit": "sh tests/nested-shell.sh devkit"
   },
   "devDependencies": {
     "eslint": "9.39.5"
