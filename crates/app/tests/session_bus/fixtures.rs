@@ -6,6 +6,7 @@ use std::rc::Rc;
 use arctis_app::alarm::{GlibAlarm, SystemClock};
 use arctis_app::bridge::Bridge;
 use arctis_app::ports::{AudioPort, DevicePort, Lifetime, Notifier, Ports, SettingsStore, Stores};
+use arctis_app::threads::Threads;
 use arctis_core::battery::sample::{Sample, UnixSeconds};
 use arctis_core::companion::app_settings::{
     AppRules, AppSettings, Persisted, PersistedChange, RoutePresets,
@@ -15,6 +16,7 @@ use arctis_core::companion::{Companion, Input};
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::intent::Intent;
 use arctis_core::messages::audio::AudioCommand;
+use arctis_core::messages::audio::AudioEvent;
 use arctis_core::messages::device::{Change, DeviceUpdate};
 use arctis_core::ports::{BatteryRepository, PresetRepository, SeenAppsRepository, StoreError};
 use arctis_core::protocol::status::{Charging, Link};
@@ -137,4 +139,27 @@ pub fn status(level: u8, charging: Charging) -> Input {
         charging,
         link: Link::Connected,
     })
+}
+
+pub struct Silent<T> {
+    _open: async_channel::Sender<T>,
+}
+
+impl DevicePort for Silent<DeviceUpdate> {
+    fn send(&self, _change: Change) {}
+}
+
+impl AudioPort for Silent<AudioEvent> {
+    fn send(&self, _command: AudioCommand) {}
+}
+
+pub fn silent_threads() -> Threads {
+    let (device_open, device_updates) = async_channel::unbounded();
+    let (audio_open, audio_events) = async_channel::unbounded();
+    Threads {
+        device: Box::new(Silent { _open: device_open }),
+        device_updates,
+        audio: Box::new(Silent { _open: audio_open }),
+        audio_events,
+    }
 }
