@@ -2189,3 +2189,13 @@ then `git -C /home/marcelo/Desenvolvimento/arctis-companion branch -D sp14-packa
 - Names used across tasks: `arctis_core::l10n::{msgid, forms}` (Task 3, used in 5, 18), `po/extract.sh` /
   `po/check.sh` (4, 11, 14, 18), `crates/app/src/locale.rs::{init, locale_dir_beside, GETTEXT_PACKAGE}` (13, 18),
   `crates/app/tests/packaging.rs` (7–10, 18), `.github/workflows/release.yml` (7, 10, 18, 21).
+
+## Local install
+
+2026-10-12: `flatpak run org.flatpak.Builder --user --install --force-clean` built and installed
+`io.github.marcelogm.ArctisCompanion` 0.1.0 (commit `bd418139de05`) with its `.Locale` extension; the four meson tests
+inside the build passed (check-pt_BR, validate-desktop, validate-schema, validate-metainfo). Permissions:
+`devices=all;`, `filesystems=xdg-run/pipewire-0;`. No preview instance was running. `gapplication launch` failed
+with `ServiceUnknown` (the session bus had not reloaded the exported service file), so the app was started with
+`flatpak run`. Over D-Bus, `Headset1.State` returned `connected` and `Route` returned `dongle`; the run log has no
+CRITICAL line. The extension zip was installed with `gnome-extensions install --force` and is not enabled.
