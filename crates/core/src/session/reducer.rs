@@ -7,10 +7,16 @@ use super::rebind::Rebinding;
 use super::timing::{ENUMERATION_SETTLE, HEADSET_OFF_POLL};
 use super::verify::Transaction;
 use crate::messages::device::{DeviceUpdate, Phase, SyncPolicy};
+use crate::protocol::firmware::Firmware;
 use crate::protocol::model::{Model, ModelLookup};
 use crate::protocol::status::Status;
 use crate::settings::headset_settings::{HeadsetSettings, Setting};
 use crate::time::Millis;
+
+const UNREAD_FIRMWARE: Firmware = Firmware {
+    receiver: None,
+    headset: None,
+};
 
 #[derive(Clone, Debug)]
 pub(super) struct Dongle {
@@ -103,6 +109,7 @@ impl Session {
         self.outbox.push(Effect::Rescan(Cadence::Off));
         let until = self.now.after(ENUMERATION_SETTLE);
         self.enter(Stage::Settling { until });
+        self.publish_identity(UNREAD_FIRMWARE);
     }
 
     fn denied(&mut self) {
@@ -175,6 +182,16 @@ impl Session {
     pub(super) fn publish_phase(&mut self, phase: Phase) {
         self.published = phase;
         self.publish(DeviceUpdate::Phase(phase));
+    }
+
+    pub(super) fn publish_identity(&mut self, firmware: Firmware) {
+        if let Some(dongle) = self.dongle.clone() {
+            self.publish(DeviceUpdate::Identity {
+                model: dongle.model,
+                uniq: dongle.uniq,
+                firmware,
+            });
+        }
     }
 
     pub(super) fn publish_observed(&mut self) {

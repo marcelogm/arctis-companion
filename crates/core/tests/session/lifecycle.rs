@@ -1,6 +1,6 @@
 use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::protocol::firmware::{Firmware, Version};
-use arctis_core::protocol::model::{Model, ModelLookup};
+use arctis_core::protocol::model::{Model, ModelLookup, Support};
 use arctis_core::session::timing::{
     COMMAND_SPACING, ENUMERATION_SETTLE, HEADSET_OFF_POLL, REPLY_TIMEOUT, STATUS_SAFETY_POLL,
 };
@@ -10,7 +10,12 @@ use arctis_core::time::Millis;
 
 use crate::support::{
     Arrow, SETTLED, absent, arrow, assert_arrows, headset_off, percent, plugged, probing,
-    probing_silent, ready, settling, silent, syncing, syncing_silent,
+    probing_silent, ready, ready_with, settling, silent, syncing, syncing_silent,
+};
+
+const UNREAD_FIRMWARE: Firmware = Firmware {
+    receiver: None,
+    headset: None,
 };
 
 const ARROWS: [Arrow; 16] = [
@@ -188,17 +193,44 @@ fn lost_from_every_present_phase_reaches_absent() {
 #[test]
 fn a_command_frame_during_the_enumeration_settle_is_dropped() {
     let mut simulation = settling();
+    simulation.clear_logs();
     simulation.emit(vec![Emission {
         at: Millis(0),
         interface: Interface::Command,
         bytes: vec![0x39, 0x05],
     }]);
     simulation.run_for(1);
-    let only_phases = simulation
+    assert!(simulation.updates().is_empty());
+}
+
+#[test]
+fn a_dongle_is_identified_while_the_headset_is_off() {
+    let identities = identities(&headset_off());
+    assert_eq!(identities, [(0x2232, Support::Verified, UNREAD_FIRMWARE)]);
+}
+
+#[test]
+fn an_untested_model_is_opened_and_identified_as_untested() {
+    let identities = identities(&ready_with(FakeHeadset::nova_5().with_pid(0x2255)));
+    assert!(!identities.is_empty());
+    assert!(
+        identities
+            .iter()
+            .all(|&(pid, support, _)| pid == 0x2255 && support == Support::Untested)
+    );
+}
+
+fn identities(simulation: &Simulation) -> Vec<(u16, Support, Firmware)> {
+    simulation
         .updates()
         .iter()
-        .all(|(_, update)| matches!(update, DeviceUpdate::Phase(_)));
-    assert!(only_phases);
+        .filter_map(|(_, update)| match update {
+            DeviceUpdate::Identity {
+                model, firmware, ..
+            } => Some((model.pid, model.support, *firmware)),
+            _ => None,
+        })
+        .collect()
 }
 
 fn permission_denied() -> Simulation {
