@@ -2,9 +2,14 @@ use std::fs;
 use std::path::Path;
 
 use crate::cli::MessageSource;
-use crate::commit_message::{above_scissors, attribution_problem, subject_of, subject_problem};
+use crate::commit_message::{
+    above_scissors, attribution_problem, subject_of, subject_problem, without_template,
+};
 use crate::git;
 use crate::report::Report;
+
+const DEFAULT_COMMENT: &str = "#";
+const COMMENT_KEYS: [&str; 2] = ["core.commentString", "core.commentChar"];
 
 pub fn run(root: &Path, sources: &[MessageSource]) -> Report {
     if sources.is_empty() {
@@ -18,18 +23,32 @@ pub fn run(root: &Path, sources: &[MessageSource]) -> Report {
 
 fn check_source(root: &Path, source: &MessageSource) -> Report {
     match source {
-        MessageSource::File(path) => check_file(path),
+        MessageSource::File(path) => check_file(root, path),
         MessageSource::Range(range) => check_range(root, range),
         MessageSource::PrTitle(title) => check_message("PR title", title),
         MessageSource::PrBody(body) => check_text("PR body", body),
     }
 }
 
-fn check_file(path: &Path) -> Report {
+fn check_file(root: &Path, path: &Path) -> Report {
     match fs::read_to_string(path) {
-        Ok(raw) => check_message("commit message", &above_scissors(&raw)),
+        Ok(raw) => {
+            let message = without_template(&above_scissors(&raw), &comment_prefixes(root));
+            check_message("commit message", &message)
+        }
         Err(error) => Report::failed(format!("{}: {error}", path.display())),
     }
+}
+
+fn comment_prefixes(root: &Path) -> Vec<String> {
+    let configured = COMMENT_KEYS
+        .iter()
+        .find_map(|key| git::run(root, &["config", "--get", key]).ok())
+        .map(|value| value.trim_end_matches('\n').to_owned())
+        .filter(|value| !value.is_empty() && value != "auto");
+    std::iter::once(DEFAULT_COMMENT.to_owned())
+        .chain(configured)
+        .collect()
 }
 
 fn check_range(root: &Path, range: &str) -> Report {
