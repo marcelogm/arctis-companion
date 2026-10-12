@@ -1,5 +1,6 @@
 mod graph;
 mod header;
+mod overlays;
 
 use std::rc::Rc;
 
@@ -8,7 +9,7 @@ use adw::subclass::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::intent::Intent;
-use arctis_core::view::eq_editor::{EqEditorModel, PreviewState, eq_editor_for};
+use arctis_core::view::eq_editor::{EqEditorModel, PreviewState, eq_editor_with};
 use arctis_core::view::preset_edits::{
     BandEdit, WorkingCopy, apply_edit, remove_band, saved_toast,
 };
@@ -29,12 +30,13 @@ mod imp {
 
     use adw::subclass::prelude::*;
     use arctis_core::companion::Snapshot;
+    use arctis_core::eq::reference::Overlays;
     use arctis_core::view::preset_edits::{WorkingCopy, add_band};
-    use gtk::glib;
     use gtk::glib::prelude::StaticTypeExt;
+    use gtk::{gio, glib};
 
     use crate::eq_band_row::EqBandRow;
-    use crate::eq_graph::EqGraph;
+    use crate::eq_graph::{EqGraph, EqLegend};
     use crate::services::Services;
 
     #[derive(Default, gtk::CompositeTemplate)]
@@ -46,6 +48,8 @@ mod imp {
         pub duplicate: TemplateChild<gtk::Button>,
         #[template_child]
         pub preview: TemplateChild<gtk::ToggleButton>,
+        #[template_child]
+        pub legend: TemplateChild<EqLegend>,
         #[template_child]
         pub graph: TemplateChild<EqGraph>,
         #[template_child]
@@ -60,6 +64,8 @@ mod imp {
         pub undo_toast: RefCell<Option<adw::Toast>>,
         pub rendering: Cell<bool>,
         pub picked: Cell<bool>,
+        pub overlays: Cell<Overlays>,
+        pub overlay_actions: RefCell<Option<gio::SimpleActionGroup>>,
     }
 
     #[glib::object_subclass]
@@ -70,6 +76,7 @@ mod imp {
 
         fn class_init(klass: &mut Self::Class) {
             EqGraph::ensure_type();
+            EqLegend::ensure_type();
             klass.bind_template();
             klass.install_action("editor.add-band", None, |page, _, _| {
                 page.save_change(add_band);
@@ -92,6 +99,7 @@ mod imp {
             self.parent_constructed();
             self.obj().connect_preview();
             self.obj().connect_graph();
+            self.obj().connect_overlays();
         }
     }
 
@@ -146,6 +154,7 @@ impl EqEditorPage {
     pub fn render(&self, snapshot: &Rc<Snapshot>) {
         let imp = self.imp();
         imp.snapshot.replace(Some(Rc::clone(snapshot)));
+        imp.overlays.set(snapshot.presets.overlays);
         if let Some(working) = imp.working.borrow_mut().as_mut() {
             working.published(snapshot);
         }
@@ -159,10 +168,11 @@ impl EqEditorPage {
         let (Some(snapshot), Some(preset)) = (snapshot, preset) else {
             return;
         };
-        let model = eq_editor_for(&snapshot, &preset);
+        let model = eq_editor_with(&snapshot, &preset, self.overlays());
         while_rendering(&imp.rendering, || {
             self.set_title(&resolve(&model.title));
             self.show_header(&model);
+            self.show_overlays(&model);
             imp.graph.render(&model.graph, model.editable);
             self.show_bands(&model);
         });

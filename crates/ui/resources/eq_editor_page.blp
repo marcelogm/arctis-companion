@@ -57,12 +57,44 @@ template $ArctisEqEditorPage: Adw.NavigationPage {
           maximum-size: 720;
           tightening-threshold: 600;
 
-          child: $ArctisEqGraph graph {
-            name: "eq-graph";
-            height-request: 300;
+          child: Box {
+            orientation: vertical;
             margin-start: 12;
             margin-end: 12;
-            margin-top: 12;
+            margin-top: 6;
+            spacing: 6;
+
+            Box {
+              spacing: 12;
+
+              $ArctisEqLegend legend {
+                name: "eq-legend";
+                hexpand: true;
+                valign: center;
+              }
+
+              MenuButton {
+                name: "reference-menu";
+                label: _("Reference");
+                always-show-arrow: true;
+                menu-model: reference_menu;
+                valign: start;
+                tooltip-text: _("Curves to Compare");
+
+                styles [
+                  "flat",
+                ]
+
+                accessibility {
+                  label: _("Reference");
+                }
+              }
+            }
+
+            $ArctisEqGraph graph {
+              name: "eq-graph";
+              height-request: 300;
+            }
           };
         }
 
@@ -137,6 +169,37 @@ menu editor_menu {
     item {
       label: _("_Delete");
       action: "editor.delete";
+    }
+  }
+}
+
+menu reference_menu {
+  section {
+    item {
+      label: _("Headset Response");
+      action: "reference.headset";
+    }
+  }
+
+  section {
+    label: _("Target");
+
+    item {
+      label: _("None");
+      action: "reference.target";
+      target: "none";
+    }
+
+    item {
+      label: _("Harman (B&K 5128)");
+      action: "reference.target";
+      target: "harman";
+    }
+
+    item {
+      label: _("Diffuse field (B&K 5128)");
+      action: "reference.target";
+      target: "diffuse-field";
     }
   }
 }

@@ -38,6 +38,7 @@ flowchart LR
 | Harman target preset, id `harman` | `crates/core/src/eq/library.rs::library`, data `crates/core/data/nova5_autoeq_parametric_eq.txt` |
 | Measured and target responses | `crates/core/src/eq/frequency_response.rs::FrequencyResponse`, `crates/core/src/eq/frequency_response.rs::ParseError` |
 | Graph series | `crates/core/src/eq/reference.rs::plot`, `crates/core/src/eq/reference.rs::Series`, `crates/core/src/eq/reference.rs::SeriesId`, `crates/core/src/eq/reference.rs::Target` |
+| Which references the editor graph shows, and their setting nicks | `crates/core/src/eq/reference.rs::Overlays`, `crates/core/src/eq/reference.rs::Target::setting`, `crates/core/src/eq/reference.rs::Target::from_setting` |
 | Custom preset files | `crates/core/src/eq/preset.rs::Preset`, `crates/core/src/eq/preset.rs::PresetFormatError` |
 | APO import and export | `crates/core/src/eq/apo.rs::parse`, `crates/core/src/eq/apo.rs::render`, `crates/core/src/eq/apo.rs::Import` |
 | Exact decimals | `crates/core/src/eq/decimal.rs::parse_thousandths`, `crates/core/src/eq/decimal.rs::render_thousandths` |
@@ -139,6 +140,11 @@ the AutoEq file. Like every built-in it carries no preamp: the headset
 applies the filters as given, and the system equalizer cancels the loudest point with its own preamp. Its RMS
 error against the target from 20 Hz to 10 kHz is 1.54 dB, against 4.43 dB with no equalizer.
 
+The editor graph draws these series over the equalizer curve when the person asks for them; `Overlays` holds the
+choice (headset response on or off, one target or none), defaults to the headset and Harman, and maps each target to
+the nick stored in the `graph-target` GSettings key. How the graph lays them out is in the presets document
+(`docs/architecture/presets.md`, "Reference curves").
+
 ## Presets in and out
 
 ```mermaid
@@ -164,5 +170,5 @@ Numbers in both formats pass through `crates/core/src/eq/decimal.rs::thousandths
 | What | Where |
 |---|---|
 | Envelope, tolerance table, library, JSON, APO, response, magnitudes per kind, poles, identity, crossfade, silence | `crates/core/tests/eq/main.rs` and its modules |
-| Parsing, interpolation, level, embedded grid, plot ids, Harman residual | `crates/core/tests/eq/frequency_response.rs`, `crates/core/tests/eq/reference.rs`, `crates/core/tests/eq/library.rs` |
+| Parsing, interpolation, level, embedded grid, plot ids, Harman residual, overlay choices and nicks | `crates/core/tests/eq/frequency_response.rs`, `crates/core/tests/eq/reference.rs`, `crates/core/tests/eq/library.rs` |
 | No allocation in `process` and `retarget` | `crates/core/tests/eq_allocations.rs` |

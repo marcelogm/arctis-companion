@@ -1,5 +1,7 @@
 mod draw;
+pub(crate) mod ink;
 mod input;
+mod legend;
 
 use std::rc::Rc;
 
@@ -13,6 +15,8 @@ use gtk::{glib, graphene, gsk};
 
 use crate::eq_handle::{EqHandle, HANDLE_SIZE, pixels};
 use crate::text::resolve;
+
+pub use legend::EqLegend;
 
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub enum GraphAction {

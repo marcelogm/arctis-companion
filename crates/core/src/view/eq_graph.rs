@@ -1,7 +1,10 @@
 use super::eq_editor::kind_name;
+use super::eq_legend::{LegendEntry, legend};
+use super::eq_overlays::{level_range, overlay_series, summary};
 use super::text::{Arg, Text, preset_arg, saturating_count};
 use crate::eq::filter::Filter;
 use crate::eq::preset::Preset;
+use crate::eq::reference::{Overlays, SeriesId};
 use crate::eq::response::response;
 use crate::l10n::{forms, msgid};
 
@@ -27,13 +30,22 @@ pub enum ColorRole {
     Foreground,
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum Weight {
+    Regular,
+    Faint,
+    Bold,
+}
+
 #[derive(Clone, Debug, PartialEq)]
 pub struct Series {
     pub points: Vec<GraphPoint>,
     pub style: LineStyle,
     pub role: ColorRole,
+    pub weight: Weight,
     pub filled: bool,
     pub label: Option<Text>,
+    pub reference: Option<SeriesId>,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq)]
@@ -71,21 +83,30 @@ pub struct GraphModel {
     pub series: Vec<Series>,
     pub levels: LevelRange,
     pub handles: Vec<Handle>,
+    pub legend: Vec<LegendEntry>,
     pub description: Text,
 }
 
 #[must_use]
 pub fn graph(preset: &Preset) -> GraphModel {
+    graph_with(preset, Overlays::NONE)
+}
+
+#[must_use]
+pub fn graph_with(preset: &Preset, overlays: Overlays) -> GraphModel {
     let filters = preset.curve().filters();
+    let mut series = overlay_series(preset.curve(), overlays);
+    series.push(response_series(preset, overlays));
     GraphModel {
-        series: vec![response_series(preset)],
-        levels: LevelRange::RELATIVE,
+        legend: legend(&series),
+        series,
+        levels: level_range(overlays),
         handles: filters
             .iter()
             .zip(0_usize..)
             .map(|(filter, index)| handle(*filter, index))
             .collect(),
-        description: description(preset),
+        description: description(preset, overlays),
     }
 }
 
@@ -134,7 +155,7 @@ fn handle(filter: Filter, index: usize) -> Handle {
     }
 }
 
-fn response_series(preset: &Preset) -> Series {
+fn response_series(preset: &Preset, overlays: Overlays) -> Series {
     let frequencies = graph_frequencies();
     let levels = response(preset.curve(), &frequencies);
     Series {
@@ -145,24 +166,42 @@ fn response_series(preset: &Preset) -> Series {
             .collect(),
         style: LineStyle::Solid,
         role: ColorRole::Accent,
+        weight: if overlays.any() {
+            Weight::Faint
+        } else {
+            Weight::Regular
+        },
         filled: true,
-        label: None,
+        label: overlays.any().then(|| Text::plain(msgid("Equalizer"))),
+        reference: None,
     }
 }
 
-fn description(preset: &Preset) -> Text {
+fn description(preset: &Preset, overlays: Overlays) -> Text {
     let active = preset
         .curve()
         .filters()
         .iter()
         .filter(|filter| filter.is_enabled())
         .count();
+    let mut args = vec![("preset", preset_arg(preset))];
+    let Some(shown) = summary(overlays) else {
+        return Text::plural(
+            forms(
+                "Nominal frequency response of {preset}, with {n} active band",
+                "Nominal frequency response of {preset}, with {n} active bands",
+            ),
+            saturating_count(active),
+            args,
+        );
+    };
+    args.push(("overlays", Arg::Msgid(shown.to_owned())));
     Text::plural(
         forms(
-            "Nominal frequency response of {preset}, with {n} active band",
-            "Nominal frequency response of {preset}, with {n} active bands",
+            "Nominal frequency response of {preset}, with {n} active band. {overlays}",
+            "Nominal frequency response of {preset}, with {n} active bands. {overlays}",
         ),
         saturating_count(active),
-        vec![("preset", preset_arg(preset))],
+        args,
     )
 }

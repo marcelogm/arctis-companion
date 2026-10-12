@@ -5,6 +5,8 @@ mod battery_chart;
 mod catalogue;
 mod eq_editor;
 mod eq_graph;
+mod eq_legend;
+mod eq_overlays;
 mod eq_plot;
 mod equalizer_rows;
 mod headset_page;

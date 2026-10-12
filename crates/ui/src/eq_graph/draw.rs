@@ -1,6 +1,6 @@
 use adw::prelude::*;
 use adw::subclass::prelude::*;
-use arctis_core::view::eq_graph::{ColorRole, GraphPoint, LevelRange, LineStyle, Series};
+use arctis_core::view::eq_graph::{GraphPoint, LevelRange, Series};
 use arctis_core::view::eq_plot::{
     Emphasis, GUTTER_RIGHT, Plot, Tick, frequency_ticks, level_ticks, zone_label_centre,
     zone_label_rows, zones,
@@ -8,6 +8,7 @@ use arctis_core::view::eq_plot::{
 use gtk::{gdk, graphene, gsk, pango};
 
 use super::EqGraph;
+use super::ink::{Ink, stroke};
 use crate::eq_handle::{pixels, with_alpha};
 use crate::text::resolve;
 
@@ -17,27 +18,10 @@ const ZERO_ALPHA: f32 = 0.4;
 const ZONE_ALPHA: f32 = 0.035;
 const LABEL_ALPHA: f32 = 0.6;
 const ZONE_LABEL_ALPHA: f32 = 0.45;
-const FILL_ALPHA: f32 = 0.18;
 const GRID_WIDTH: f32 = 1.0;
-const CURVE_WIDTH: f32 = 2.0;
-const DASH: [f32; 2] = [6.0, 4.0];
 const LABEL_SPACE: f32 = 4.0;
 const AXIS_LABEL_SPACE: f32 = 8.0;
 const ZONE_LABEL_ROW: f32 = 14.0;
-
-struct Ink {
-    fg: gdk::RGBA,
-    accent: gdk::RGBA,
-}
-
-impl Ink {
-    const fn of(&self, role: ColorRole) -> gdk::RGBA {
-        match role {
-            ColorRole::Accent => self.accent,
-            ColorRole::Foreground => self.fg,
-        }
-    }
-}
 
 impl EqGraph {
     pub fn draw(&self, snapshot: &gtk::Snapshot, width: i32, height: i32) {
@@ -48,10 +32,7 @@ impl EqGraph {
             pixels(height),
             levels.unwrap_or(LevelRange::RELATIVE),
         );
-        let ink = Ink {
-            fg: self.color(),
-            accent: adw::StyleManager::default().accent_color_rgba(),
-        };
+        let ink = Ink::of(self);
         self.draw_zones(snapshot, &plot, &ink.fg);
         draw_grid(snapshot, &plot, &ink.fg);
         self.draw_axis_labels(snapshot, &plot, &ink.fg);
@@ -119,13 +100,17 @@ impl EqGraph {
     }
 
     fn small_layout(&self, text: &str) -> pango::Layout {
-        let layout = self.create_pango_layout(Some(text));
-        let attributes = pango::AttrList::new();
-        attributes.insert(pango::AttrFloat::new_scale(pango::SCALE_SMALL));
-        attributes.insert(pango::AttrFontFeatures::new("tnum=1"));
-        layout.set_attributes(Some(&attributes));
-        layout
+        small_layout(self, text)
     }
+}
+
+pub(super) fn small_layout(widget: &impl IsA<gtk::Widget>, text: &str) -> pango::Layout {
+    let layout = widget.create_pango_layout(Some(text));
+    let attributes = pango::AttrList::new();
+    attributes.insert(pango::AttrFloat::new_scale(pango::SCALE_SMALL));
+    attributes.insert(pango::AttrFontFeatures::new("tnum=1"));
+    layout.set_attributes(Some(&attributes));
+    layout
 }
 
 fn labelled(ticks: Vec<Tick>) -> impl Iterator<Item = Tick> {
@@ -154,26 +139,18 @@ const fn alpha_of(emphasis: Emphasis) -> f32 {
 }
 
 fn draw_series(snapshot: &gtk::Snapshot, plot: &Plot, series: &Series, ink: &Ink) {
-    let color = ink.of(series.role);
+    let color = ink.line(series.role, series.weight);
     let place = |point: &GraphPoint| (plot.x_of(point.hz), plot.y_of(point.db));
     let points: Vec<(f32, f32)> = series.points.iter().map(place).collect();
     if series.filled
         && let Some(area) = filled_path(&points, plot.y_of(0.0))
     {
-        snapshot.append_fill(
-            &area,
-            gsk::FillRule::Winding,
-            &with_alpha(&color, FILL_ALPHA),
-        );
+        snapshot.append_fill(&area, gsk::FillRule::Winding, &ink.fill(series.role));
     }
     let Some(line) = line_path(&points) else {
         return;
     };
-    let stroke = gsk::Stroke::new(CURVE_WIDTH);
-    if series.style == LineStyle::Dashed {
-        stroke.set_dash(&DASH);
-    }
-    snapshot.append_stroke(&line, &stroke, &color);
+    snapshot.append_stroke(&line, &stroke(series.style, series.weight), &color);
 }
 
 fn line_path(points: &[(f32, f32)]) -> Option<gsk::Path> {
@@ -202,25 +179,30 @@ fn stroke_line(snapshot: &gtk::Snapshot, line: &gsk::Path, color: &gdk::RGBA) {
     snapshot.append_stroke(line, &gsk::Stroke::new(GRID_WIDTH), color);
 }
 
-fn segment(from: (f32, f32), to: (f32, f32)) -> gsk::Path {
+pub(super) fn segment(from: (f32, f32), to: (f32, f32)) -> gsk::Path {
     let builder = gsk::PathBuilder::new();
     builder.move_to(from.0, from.1);
     builder.line_to(to.0, to.1);
     builder.to_path()
 }
 
-fn draw_layout(snapshot: &gtk::Snapshot, layout: &pango::Layout, at: (f32, f32), ink: &gdk::RGBA) {
+pub(super) fn draw_layout(
+    snapshot: &gtk::Snapshot,
+    layout: &pango::Layout,
+    at: (f32, f32),
+    ink: &gdk::RGBA,
+) {
     snapshot.save();
     snapshot.translate(&graphene::Point::new(at.0, at.1));
     snapshot.append_layout(layout, ink);
     snapshot.restore();
 }
 
-fn size_of(layout: &pango::Layout) -> (f32, f32) {
+pub(super) fn size_of(layout: &pango::Layout) -> (f32, f32) {
     let (width, height) = layout.pixel_size();
     (pixels(width), pixels(height))
 }
 
-fn rect(x: f32, y: f32, width: f32, height: f32) -> graphene::Rect {
+pub(super) fn rect(x: f32, y: f32, width: f32, height: f32) -> graphene::Rect {
     graphene::Rect::new(x, y, width.max(0.0), height.max(0.0))
 }
