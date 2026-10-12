@@ -6,7 +6,10 @@ use std::time::Duration;
 use arctis_core::battery::sample::Sample;
 use arctis_core::companion::seen_apps::SeenApp;
 use arctis_core::companion::{Action, Companion, Input, PresetChange, Snapshot};
+use arctis_core::messages::audio::AudioEvent;
+use arctis_core::messages::device::DeviceUpdate;
 use arctis_core::time::Millis;
+use gtk::glib;
 
 use crate::logging::report;
 use crate::ports::{Ports, SnapshotView, Stores};
@@ -123,5 +126,41 @@ impl Bridge {
 fn wake(bridge: &Weak<Bridge>) {
     if let Some(bridge) = bridge.upgrade() {
         bridge.submit(Input::Woke);
+    }
+}
+
+impl Bridge {
+    #[must_use]
+    pub fn pump_device(
+        &self,
+        updates: async_channel::Receiver<DeviceUpdate>,
+    ) -> glib::JoinHandle<()> {
+        self.pump(updates, Input::Device)
+    }
+
+    #[must_use]
+    pub fn pump_audio(&self, events: async_channel::Receiver<AudioEvent>) -> glib::JoinHandle<()> {
+        self.pump(events, Input::Audio)
+    }
+
+    fn pump<T: 'static>(
+        &self,
+        receiver: async_channel::Receiver<T>,
+        wrap: fn(T) -> Input,
+    ) -> glib::JoinHandle<()> {
+        glib::spawn_future_local(forward(receiver, self.myself.clone(), wrap))
+    }
+}
+
+async fn forward<T>(
+    receiver: async_channel::Receiver<T>,
+    bridge: Weak<Bridge>,
+    wrap: fn(T) -> Input,
+) {
+    while let Ok(item) = receiver.recv().await {
+        let Some(bridge) = bridge.upgrade() else {
+            break;
+        };
+        bridge.submit(wrap(item));
     }
 }
