@@ -6,6 +6,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | Page | Area |
 |---|---|
 | [rules.md](rules.md) | engineering rules and how `xtask/` enforces them |
+| [audio.md](audio.md) | audio adapter: PipeWire graph mirror, route input, per-app streams, system equalizer sink |
 | [eq.md](eq.md) | equalizer core: envelope, curves, presets, APO, response, real-time filter |
 | [protocol.md](protocol.md) | protocol codec, headset settings, thread messages |
 | [shell-extension.md](shell-extension.md) | GNOME Shell Quick Settings extension and its tests |
@@ -27,7 +28,7 @@ flowchart BT
 |---|---|
 | `crates/core/` | `crates/core/src/lib.rs`, `crates/core/src/time.rs::Millis`, `crates/core/src/protocol/mod.rs`, `crates/core/src/messages/mod.rs` |
 | `crates/hid/` | `crates/hid/src/lib.rs` |
-| `crates/audio/` | `crates/audio/src/lib.rs::init` |
+| `crates/audio/` | `crates/audio/src/lib.rs::init`, `crates/audio/src/handle.rs::AudioHandle` |
 | `crates/ui/` | `crates/ui/src/lib.rs::register_resources`, `crates/ui/src/window.rs::Window` |
 | `crates/app/` | `crates/app/src/main.rs::main`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::build` |
 | `xtask/` | `xtask/src/main.rs::run` |
@@ -87,6 +88,7 @@ flowchart LR
     R --> G["ui: weston headless, cargo test -p arctis-ui"]
     R --> X["extension: eslint, gjs tests,<br/>catalogue check, pack"]
     T --> F["flatpak: flatpak-builder"]
+    T --> A["audio-integration: private PipeWire + WirePlumber,<br/>crates/audio/tests/headless/run.sh"]
     N["nightly"] --> M["cargo mutants, proptest x10,<br/>optional shell smoke"]
 ```
 
