@@ -1,15 +1,23 @@
 use arctis_core::battery::sample::Reading;
+use arctis_core::companion::adoption::DongleIdentity;
+use arctis_core::companion::app_settings::{
+    AppRules, AppSettings, HeadsetValues, Persisted, RoutePresets,
+};
+use arctis_core::companion::{Action, Companion, Input, Snapshot};
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
+use arctis_core::messages::device::{DeviceUpdate, Phase};
 use arctis_core::protocol::firmware::{Firmware, Version};
 use arctis_core::protocol::model::{Model, ModelLookup};
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::headset_settings::HeadsetSettings;
 use arctis_core::settings::values::Percent;
 use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
+use arctis_core::time::Millis;
+use std::rc::Rc;
 
 pub fn sink(terminal: SinkKind, via_equalizer: bool, via_easy_effects: bool) -> DefaultSink {
     DefaultSink {
@@ -98,4 +106,123 @@ pub const fn firmware(minor: u8) -> Firmware {
         }),
         headset: None,
     }
+}
+
+pub const START: Millis = Millis(1_760_000_000_000);
+
+pub fn defaults() -> HeadsetValues {
+    HeadsetValues {
+        mic_volume: MicVolume::try_from(10).expect("mic volume"),
+        sidetone: Sidetone::try_from(0).expect("sidetone"),
+        mute_light: MuteLight::Medium,
+        volume_limiter: true,
+        wireless_mode: WirelessMode::Standard,
+        auto_power_off: AutoPowerOff::try_from(30).expect("auto power off"),
+    }
+}
+
+pub fn settings() -> AppSettings {
+    AppSettings {
+        headset: defaults(),
+        route_presets: RoutePresets {
+            dongle: id("flat"),
+            bluetooth: id("flat"),
+        },
+        app_rules: AppRules::default(),
+        automatic_presets: true,
+        adopted_identity: None,
+        bluetooth_sink_seen: false,
+        low_battery_threshold: percent(15),
+    }
+}
+
+pub fn persisted() -> Persisted {
+    Persisted {
+        settings: settings(),
+        custom_presets: Vec::new(),
+        seen_apps: Vec::new(),
+        battery: Vec::new(),
+    }
+}
+
+pub fn adopted() -> Persisted {
+    let mut saved = persisted();
+    saved.settings.adopted_identity = Some(DongleIdentity::new(NOVA_5, None));
+    saved.settings.headset = HeadsetValues::from_settings(&observed());
+    saved
+}
+
+pub struct Harness {
+    pub companion: Companion,
+    pub now: Millis,
+}
+
+impl Harness {
+    pub fn new(persisted: Persisted) -> Self {
+        Self {
+            companion: Companion::new(persisted),
+            now: START,
+        }
+    }
+
+    pub fn at(&mut self, offset: u64) -> &mut Self {
+        self.now = START.after(offset);
+        self
+    }
+
+    pub fn send(&mut self, input: Input) -> Vec<Action> {
+        self.companion.handle(input, self.now)
+    }
+
+    pub fn device(&mut self, update: DeviceUpdate) -> Vec<Action> {
+        self.send(Input::Device(update))
+    }
+
+    pub fn connect_as(
+        &mut self,
+        uniq: Option<&str>,
+        minor: u8,
+        observed: HeadsetSettings,
+    ) -> Vec<Action> {
+        let identity = DeviceUpdate::Identity {
+            model: nova_5(),
+            uniq: uniq.map(str::to_owned),
+            firmware: firmware(minor),
+        };
+        [
+            DeviceUpdate::Phase(Phase::Settling),
+            identity,
+            DeviceUpdate::Phase(Phase::Syncing),
+            DeviceUpdate::Observed(observed),
+            DeviceUpdate::Phase(Phase::Ready),
+        ]
+        .into_iter()
+        .flat_map(|update| self.device(update))
+        .collect()
+    }
+
+    pub fn connect(&mut self, observed: HeadsetSettings) -> Vec<Action> {
+        self.connect_as(None, 16, observed)
+    }
+
+    pub fn snapshot(&self) -> Rc<Snapshot> {
+        self.companion.snapshot()
+    }
+}
+
+pub fn published(actions: &[Action]) -> Option<Rc<Snapshot>> {
+    actions.iter().rev().find_map(|action| match action {
+        Action::Publish(snapshot) => Some(Rc::clone(snapshot)),
+        _ => None,
+    })
+}
+
+pub fn wakes(actions: &[Action]) -> Vec<Millis> {
+    actions
+        .iter()
+        .filter_map(|action| match action {
+            Action::WakeAt(at) => Some(*at),
+            _ => None,
+        })
+        .collect()
 }
