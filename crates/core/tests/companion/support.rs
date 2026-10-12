@@ -4,6 +4,7 @@ use arctis_core::companion::app_settings::PersistedChange;
 use arctis_core::companion::app_settings::{
     AppRules, AppSettings, HeadsetValues, Persisted, RoutePresets,
 };
+use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::companion::{Action, Companion, Input, Snapshot};
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
@@ -270,4 +271,51 @@ pub fn audio_commands(actions: &[Action]) -> Vec<AudioCommand> {
 
 pub fn default_sink(terminal: SinkKind) -> AudioEvent {
     AudioEvent::DefaultSink(sink(terminal, false, false))
+}
+
+pub fn device_curves(actions: &[Action]) -> Vec<Curve> {
+    device_changes(actions)
+        .into_iter()
+        .map(|(settings, _)| settings.equalizer)
+        .collect()
+}
+
+pub fn rules(entries: &[(&str, &str)]) -> AppRules {
+    entries
+        .iter()
+        .map(|(app, preset)| ((*app).to_owned(), id(preset)))
+        .collect()
+}
+
+pub fn with_rules(entries: &[(&str, &str)]) -> Persisted {
+    let mut saved = adopted();
+    saved.settings.app_rules = rules(entries);
+    saved
+}
+
+pub fn ruled(entries: &[(&str, &str)]) -> Harness {
+    let mut h = Harness::new(with_rules(entries));
+    let _ = h.connect(observed());
+    h
+}
+
+pub fn playing(apps: &[&str], path: SoundPath) -> AudioEvent {
+    AudioEvent::Streams(
+        apps.iter()
+            .map(|app| stream(app, Some(path), true))
+            .collect(),
+    )
+}
+
+pub fn chosen_for(preset: &str, app: &str) -> ActivePreset {
+    ActivePreset {
+        preset: id(preset),
+        reason: PresetReason::App(app.to_owned()),
+    }
+}
+
+impl Harness {
+    pub fn headset_holds(&mut self, preset: &str) -> Vec<Action> {
+        self.device(DeviceUpdate::Observed(observed_with(curve_of(preset))))
+    }
 }

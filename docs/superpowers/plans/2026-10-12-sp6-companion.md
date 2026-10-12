@@ -6031,7 +6031,7 @@ git push
 - Modify: `crates/core/src/companion/reducer.rs`
 - Test: `crates/core/tests/companion/selection_flow.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod selection_flow;` to `crates/core/tests/companion/main.rs`.
 
@@ -6221,12 +6221,12 @@ fn a_rule_applies_only_on_its_path() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion selection_flow`
 Expected: FAIL (no ruled sets, no switches).
 
-- [ ] **Step 3: Settle each path in `reducer.rs`**
+- [x] **Step 3: Settle each path in `reducer.rs`**
 
 Add to the imports:
 
@@ -6327,13 +6327,13 @@ the session and reports whether a `0x33` write follows (Deviation 10):
     }
 ```
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS (the earlier `adoption_flow`, `routing_flow` and `lifecycle` tests still pass: before adoption the
 first settle records the route preset without writing).
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
