@@ -10025,7 +10025,7 @@ git push
 
 **Files:** none new (fixes only).
 
-- [ ] **Step 1: Rebase on main**
+- [x] **Step 1: Rebase on main**
 
 ```bash
 git fetch origin
@@ -10035,14 +10035,14 @@ git push --force-with-lease
 
 Resolve `lib.rs`, `testkit/mod.rs` and `Cargo.toml` by keeping both sides.
 
-- [ ] **Step 2: Run every check**
+- [x] **Step 2: Run every check**
 
 Run (toolbox):
 `cargo fmt --all --check && cargo clippy --workspace --all-targets --features arctis-core/testkit -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure`
 Expected: PASS. Line-limit warnings for a file above about 400 lines are a prompt to split that file (one more
 `impl Companion` block or one more view module), recorded under "Deviations taken during execution".
 
-- [ ] **Step 3: Coverage**
+- [x] **Step 3: Coverage**
 
 Run (toolbox):
 `export PATH="$HOME/.cargo/bin:$PATH" && cargo llvm-cov -p arctis-core --summary-only`
@@ -10051,7 +10051,7 @@ Expected: total line coverage of `arctis-core` at least 90 % (the CI gate) and e
 `crates/core/src/ports.rs` at or above 95 %. Add a test for any uncovered branch (test first, then keep or delete
 the branch).
 
-- [ ] **Step 4: Mutation check on the reducer**
+- [x] **Step 4: Mutation check on the reducer**
 
 Run (toolbox):
 `export PATH="$HOME/.cargo/bin:$PATH" && cargo mutants -p arctis-core --features testkit --file 'crates/core/src/companion/*.rs' --jobs 4 --timeout 120 --cargo-test-arg=--test=companion --cargo-test-arg=--test=view`
@@ -10061,7 +10061,7 @@ skipped to keep the run near 20 minutes. For each survivor, add the missing tabl
 `crates/core/tests/companion/*.rs` or `crates/core/tests/view/*.rs` file and rerun. `cargo-mutants` and
 `cargo-llvm-cov` are already in `~/.cargo/bin` of the toolbox.
 
-- [ ] **Step 5: Commit any fixes**
+- [x] **Step 5: Commit any fixes**
 
 ```bash
 git add -A crates/core docs
@@ -10075,7 +10075,7 @@ git push
 
 ### Task 31: Pull request
 
-- [ ] **Step 1: Open the PR**
+- [x] **Step 1: Open the PR**
 
 ```bash
 gh pr create --base main --head sp6-companion \
@@ -10083,7 +10083,7 @@ gh pr create --base main --head sp6-companion \
   --body "Adds the pure Companion reducer, battery history, repository ports with memory adapters, intents and the view models of every page to arctis-core."
 ```
 
-- [ ] **Step 2: Wait for CI**
+- [x] **Step 2: Wait for CI**
 
 Run: `gh pr checks --watch`
 Expected: `rules`, `test`, `ui`, `extension`, `flatpak` green. Fix failures with new commits on the branch, never
