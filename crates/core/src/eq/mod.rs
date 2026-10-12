@@ -1,3 +1,4 @@
+pub mod apo;
 pub mod biquad;
 pub mod coefficients;
 pub mod curve;
