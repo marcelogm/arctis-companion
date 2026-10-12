@@ -1,11 +1,13 @@
 #![forbid(unsafe_code)]
 
+mod headset_status;
 pub mod intents;
 mod scale_row;
 pub mod text;
 pub mod widget_values;
 mod window;
 
+pub use headset_status::HeadsetStatus;
 pub use scale_row::ScaleRow;
 pub use window::Window;
 

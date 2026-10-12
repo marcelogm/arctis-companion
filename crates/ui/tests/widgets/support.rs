@@ -1,4 +1,6 @@
 use adw::prelude::*;
+use arctis_core::companion::Snapshot;
+use arctis_core::view::headset_page::{HeadsetModel, HeadsetPageModel, headset_page};
 use std::cell::RefCell;
 use std::rc::Rc;
 use std::sync::Once;
@@ -50,5 +52,12 @@ fn collect(widget: &gtk::Widget, found: &mut Vec<gtk::Widget>) {
         found.push(current.clone());
         collect(&current, found);
         child = current.next_sibling();
+    }
+}
+
+pub fn headset_model(snapshot: &Snapshot) -> HeadsetModel {
+    match headset_page(snapshot) {
+        HeadsetPageModel::Headset(model) => *model,
+        HeadsetPageModel::Status(kind, _) => panic!("expected the headset page, got {kind:?}"),
     }
 }
