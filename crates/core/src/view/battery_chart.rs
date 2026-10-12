@@ -132,9 +132,9 @@ fn chart_description(series: &Series, window: Window) -> Text {
     }
 }
 
-fn range_text(msgid: &str, (low, high): (Percent, Percent)) -> Text {
+fn range_text(template: &str, (low, high): (Percent, Percent)) -> Text {
     Text::format(
-        msgid,
+        template,
         vec![("low", Arg::Percent(low)), ("high", Arg::Percent(high))],
     )
 }
