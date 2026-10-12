@@ -6350,7 +6350,7 @@ git push
 - Modify: `crates/core/src/companion/reducer.rs`, `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/picks_flow.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod picks_flow;` to `crates/core/tests/companion/main.rs`.
 
@@ -6618,12 +6618,12 @@ fn the_bluetooth_combo_retargets_the_system_equalizer() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion picks_flow`
 Expected: FAIL (intents are ignored).
 
-- [ ] **Step 3: Implement `intents.rs`**
+- [x] **Step 3: Implement `intents.rs`**
 
 `crates/core/src/companion/intents.rs`:
 
@@ -6755,7 +6755,7 @@ impl Companion {
 
 Add `mod intents;` to `crates/core/src/companion/mod.rs` (after `mod reducer;`).
 
-- [ ] **Step 4: Route intents in `reducer.rs`**
+- [x] **Step 4: Route intents in `reducer.rs`**
 
 Replace `dispatch`:
 
@@ -6775,12 +6775,12 @@ Replace `dispatch`:
     }
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
