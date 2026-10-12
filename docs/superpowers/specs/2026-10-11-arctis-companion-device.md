@@ -91,7 +91,7 @@ pending transaction), except Ready, which keeps its snapshot and flushes the wri
 | Ports | Both iface 3 (commands) and iface 5 (events) stay open while the dongle is present. One device thread runs a `poll(2)` loop over both fds and a wake pipe; the timeout is the next `WakeAt`. No busy polling |
 | Discovery | `hid::discovery` reads `/sys/class/hidraw/*/device/uevent` (`HID_ID` vendor/product, `HID_PHYS` suffix `/input3` or `/input5`, `HID_UNIQ`) and groups nodes by physical path. sysfs reads touch no device, so they cannot glitch audio. No inotify, no libudev, no netlink ([ADR 0005](../../adr/0005-long-lived-ports-and-silent-rebinding.md)) |
 | Rescan cadence | `RESCAN_ABSENT` 2 s in Absent and PermissionDenied, `RESCAN_REBINDING` 250 ms in Rebinding, none in any other phase: there, removal shows up as an iface 5 error |
-| The ~20 s iface 3 flap | caused by fwupd's SteelSeries "fizz" plugin, which unbinds and rebinds usbhid on iface 3 to poll the headset (SP0 confirms by stopping fwupd), so every host with fwupd sees it. `Rebinding` keeps the last snapshot, sends **no queries**, queues desired changes, and resumes the interrupted phase after the node returns and `REBIND_SETTLE` passes. The UI reads `Phase::Rebinding` as connected; only after `REBIND_NOTICE` it shows "Reconnecting…" |
+| The ~20 s iface 3 flap | caused by fwupd's SteelSeries "fizz" plugin, which unbinds and rebinds usbhid on iface 3 to poll the headset (confirmed by SP0, `docs/research/hardware-findings.md` §4), so every host with fwupd sees it. `Rebinding` keeps the last snapshot, sends **no queries**, queues desired changes, and resumes the interrupted phase after the node returns and `REBIND_SETTLE` passes. The UI reads `Phase::Rebinding` as connected; only after `REBIND_NOTICE` it shows "Reconnecting…" |
 | EACCES while Rebinding | a recreated node is `root 0600` until udev applies the `uaccess` ACL a few ms later. An EACCES open in Rebinding is treated like a missing node and retried on the next rescan. PermissionDenied is only entered from Absent; a node that stays unreadable ends in Absent after `REBIND_GIVE_UP` and then in PermissionDenied on the next discovery |
 | Frames during a settle | frames read on iface 3 during `ENUMERATION_SETTLE` or `REBIND_SETTLE` are drained and dropped, so stale tails left by another claimant (fwupd) never decode as replies or events |
 | In-flight write during a flap | the write is redone after reopen, then verified. Safe because every `Command` sets an absolute value, never a toggle |
@@ -100,19 +100,19 @@ pending transaction), except Ready, which keeps its snapshot and flushes the wri
 
 Timing constants, all in `crates/core/src/session/timing.rs`. `Session` never sleeps; it returns `WakeAt`.
 
-| Constant | Default | SP0 measures |
+| Constant | Default | SP0 result (`docs/research/hardware-findings.md` §9) |
 |---|---|---|
 | `COMMAND_SPACING` | 50 ms | – |
 | `ENUMERATION_SETTLE` | 3 s, only after Absent → found | – |
-| `REBIND_SETTLE` | 100 ms | shortest wait after a rebind with no EIO and no stale frame |
+| `REBIND_SETTLE` | 100 ms | 0 ms was safe in 24 of 24; the node reopens about 60 ms after the `EIO`; default kept |
 | `REBIND_NOTICE` | 5 s | – |
 | `REBIND_GIVE_UP` | 30 s | – |
 | `REPLY_TIMEOUT` | 500 ms | – |
-| `VERIFY_BACKOFF` | readbacks at 50, 150, 400 ms after a write | time from each setter to the readback showing it |
-| `ECHO_WINDOW` | 1 s after the last write of a transaction | whether a host write produces an event, on which interface, and how late |
-| `WIRELESS_MODE_GRACE` | 5 s after `35` | link events and readback behaviour after `35 0/1` |
+| `VERIFY_BACKOFF` | readbacks at 50, 150, 400 ms after a write | headset off: the first readback shows the value; headset on is an SP14 checklist item; default kept |
+| `ECHO_WINDOW` | 1 s after the last write of a transaction | headset off: no echo on any interface; headset on is an SP14 checklist item; default kept |
+| `WIRELESS_MODE_GRACE` | 5 s after `35` | headset off: readback at once, no link change; headset on is an SP14 checklist item; default kept |
 | `HEADSET_OFF_POLL` | 10 s, only in HeadsetOff | – |
-| `STATUS_SAFETY_POLL` | 5 min, only in Ready, floor 60 s | glitch test of `B0` at 2 s and 60 s |
+| `STATUS_SAFETY_POLL` | 5 min, only in Ready, floor 60 s | glitch test is an SP14 checklist item (fwupd itself sends `B0` every 20 s); default kept |
 | `RESCAN_ABSENT`, `RESCAN_REBINDING` | 2 s, 250 ms | – |
 
 ## 3. Events versus polling
