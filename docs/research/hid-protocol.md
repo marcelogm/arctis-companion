@@ -241,6 +241,8 @@ Only iface 3 flaps; ifaces 4 and 5 stay bound. 195 such lines in the last 3 hour
 - Treat command failures as retryable; re-send idempotent settings, never blindly retry toggles.
 - Verify the cause on a clean boot with no other tools before shipping.
 
+Review note (2026-10-12, not yet confirmed by stopping the service): the likely cause is fwupd's SteelSeries "fizz" plugin. `udevadm monitor` shows usbhid unbound from `1-5.2.1:1.3` and rebound 5 ms later with no USB reset in `journalctl -k`; the period is exactly 20.000 s; the dongle's usbfs node is touched about 6 ms before each new hidraw node; `fwupdmgr get-devices` lists "Arctis Nova 5 USB Receiver" and "Arctis Nova 5 Headset via USB Receiver" under plugin `steelseries`, protocol `com.steelseries.fizz`. SP0 confirms with `systemctl stop fwupd` for 2 minutes. If confirmed, every host with fwupd sees the flap, and no re-enumeration settle is needed after it.
+
 ## 8. Diagrams
 
 ### 8.1 Query and response
@@ -326,6 +328,6 @@ Spot-checked against the cloned primary sources: HC pid list (`steelseries_arcti
 3. Exact sidetone Off/Low/Medium/High to byte mapping used by the official app.
 4. Which interface carries unsolicited events, and whether the mute button produces one.
 5. Meaning of the three version slots of `0x10`.
-6. Cause of the 20 s iface 3 re-bind.
+6. Cause of the 20 s iface 3 re-bind (likely fwupd, see 7.4).
 7. Whether PIDs `0x2255` and `0x2264` use the same protocol (taken from LAM and ASM only).
 8. Whether a BT-specific channel (`0x22`, `0x34`, `0xA5` with conn 1) does anything on the Nova 5.
