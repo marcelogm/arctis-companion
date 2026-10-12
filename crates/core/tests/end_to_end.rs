@@ -394,15 +394,22 @@ fn reconnect(run: &mut EndToEnd, factory: HeadsetValues) {
         connect_reads(),
         "no drift, so nothing is written"
     );
-    let sent = policies(&again.actions);
+    assert_reconnected(&again.actions);
+    let settings = run.simulation.headset().settings();
+    assert_eq!(HeadsetValues::from_settings(settings), factory);
+    assert!(equivalent(&settings.equalizer, &curve("footsteps")));
+}
+
+fn assert_reconnected(actions: &[Action]) {
+    let sent = policies(actions);
     assert!(!sent.contains(&SyncPolicy::Adopt));
     assert_eq!(sent.last(), Some(&SyncPolicy::Enforce));
     assert_eq!(
-        alerts(&again.actions),
+        alerts(actions),
         [(false, AlertId::LowBattery), (true, AlertId::LowBattery)]
     );
     assert_only(
-        &again.actions,
+        actions,
         &[
             "SendDevice",
             "RecordBattery",
@@ -411,9 +418,6 @@ fn reconnect(run: &mut EndToEnd, factory: HeadsetValues) {
             "Publish",
         ],
     );
-    let settings = run.simulation.headset().settings();
-    assert_eq!(HeadsetValues::from_settings(settings), factory);
-    assert!(equivalent(&settings.equalizer, &curve("footsteps")));
 }
 
 #[test]
