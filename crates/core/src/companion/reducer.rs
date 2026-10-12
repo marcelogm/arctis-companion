@@ -13,6 +13,7 @@ use super::dongle::DongleState;
 use super::engines::Engines;
 use super::engines::{Cause, Decision, Trigger};
 use super::input::Input;
+use super::quitting::Quit;
 use super::routing::AudioState;
 use super::routing::{Route, needs_equalizer};
 use super::seen_apps::SeenApp;
@@ -42,6 +43,7 @@ pub struct Companion {
     pub(super) selection: Selection,
     pub(super) engines: Engines,
     pub(super) battery: BatteryWatch,
+    pub(super) quit: Quit,
     deadlines: Deadlines,
     published: Option<Rc<Snapshot>>,
 }
@@ -58,6 +60,7 @@ impl Companion {
             selection: Selection::default(),
             engines: Engines::default(),
             battery: BatteryWatch::new(persisted.battery),
+            quit: Quit::Running,
             deadlines: Deadlines::default(),
             published: None,
         }
@@ -76,11 +79,15 @@ impl Companion {
             Input::Device(update) => self.device(update, now, out),
             Input::Audio(event) => self.audio_event(&event, out),
             Input::Woke => self.deadlines.woke(),
+            Input::SettingsChanged(settings) => self.settings_changed(settings, out),
             Input::Intent(intent) => {
                 self.intent(intent, out);
                 return Cause::User;
             }
-            Input::SettingsChanged(_) | Input::Quitting => {}
+            Input::Quitting => {
+                self.start_quit(now, out);
+                return Cause::User;
+            }
         }
         Cause::Automatic
     }
@@ -163,12 +170,19 @@ impl Companion {
     }
 
     fn target(&self, path: SoundPath) -> ActivePreset {
+        if path == SoundPath::Dongle && self.quit != Quit::Running {
+            return ActivePreset::route(self.route_preset(path));
+        }
         self.selection.path(path).active(&self.route_preset(path))
     }
 
     fn finish(&mut self, out: &mut Vec<Action>) {
-        let next = earliest([self.selection.next_deadline(), self.engines.next_deadline()]);
-        out.extend(self.deadlines.schedule(next));
+        let deadlines = [
+            self.selection.next_deadline(),
+            self.engines.next_deadline(),
+            self.quit.deadline(),
+        ];
+        out.extend(self.deadlines.schedule(earliest(deadlines)));
         let snapshot = self.snapshot();
         if self.published.as_ref() != Some(&snapshot) {
             self.published = Some(Rc::clone(&snapshot));
@@ -185,6 +199,7 @@ impl Companion {
         if self.engines.editor.take_due(trigger.now) {
             self.write_active_headset_curve(out);
         }
+        self.finish_quit(trigger.now, out);
     }
 
     pub(super) fn sync_policy(&self) -> Action {
@@ -272,7 +287,8 @@ impl Companion {
     }
 
     fn place_equalizer(&mut self, out: &mut Vec<Action>) {
-        let wanted = self.audio.default_sink.is_some_and(needs_equalizer);
+        let wanted =
+            self.audio.default_sink.is_some_and(needs_equalizer) && self.quit == Quit::Running;
         if wanted && self.audio.equalizer.is_none() {
             let curve = self.active_curve(SoundPath::Bluetooth);
             self.audio.equalizer = Some(curve.clone());
@@ -282,7 +298,7 @@ impl Companion {
         }
     }
 
-    fn remove_equalizer(&mut self, out: &mut Vec<Action>) {
+    pub(super) fn remove_equalizer(&mut self, out: &mut Vec<Action>) {
         if self.audio.equalizer.take().is_some() {
             out.push(Action::SendAudio(AudioCommand::RemoveEqualizer));
         }
@@ -336,7 +352,7 @@ impl Companion {
         !on_headset
     }
 
-    fn on_headset(&self, curve: &Curve) -> bool {
+    pub(super) fn on_headset(&self, curve: &Curve) -> bool {
         self.dongle
             .observed
             .as_ref()
@@ -356,5 +372,21 @@ impl Companion {
     fn write_active_headset_curve(&mut self, out: &mut Vec<Action>) {
         let curve = self.active_curve(SoundPath::Dongle);
         self.write_headset_curve(curve, out);
+    }
+
+    fn settings_changed(&mut self, settings: AppSettings, out: &mut Vec<Action>) {
+        let headset_changed = settings.headset != self.settings.headset;
+        let threshold_changed =
+            settings.low_battery_threshold != self.settings.low_battery_threshold;
+        self.settings = settings;
+        if headset_changed && self.adoption() == AdoptionStatus::Adopted {
+            out.push(self.sync_policy());
+        }
+        if threshold_changed {
+            let alerts = self
+                .battery
+                .threshold_changed(self.settings.low_battery_threshold);
+            out.extend(alerts.into_iter().map(Action::from));
+        }
     }
 }

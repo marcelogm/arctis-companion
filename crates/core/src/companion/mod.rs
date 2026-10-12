@@ -9,6 +9,7 @@ pub mod dongle;
 pub mod engines;
 pub mod input;
 mod intents;
+mod quitting;
 mod reducer;
 pub mod routing;
 pub mod seen_apps;
