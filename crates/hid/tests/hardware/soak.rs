@@ -59,13 +59,13 @@ impl Soak {
     }
 
     fn write_toggle(&mut self) {
-        if let Some(desired) = self.log.toggle_request() {
+        if let Some(desired) = self.log.toggle_request(self.started.elapsed()) {
             self.desire(desired);
         }
     }
 
     fn restore(&mut self) {
-        if let Some(original) = self.log.restore_request() {
+        if let Some(original) = self.log.restore_request(self.started.elapsed()) {
             self.desire(original);
             self.run_for(RESTORE_WITHIN);
         }
@@ -128,8 +128,13 @@ fn the_worker_rides_through_fwupd_rebinds_on_the_real_dongle() {
 
 fn print_summary(minutes: u64, rebinds: usize, log: &SoakLog) {
     eprintln!(
-        "soak: {minutes} min, {rebinds} rebinds ridden, phases {:?}, writes requested {}, confirmed {}, failed {}, interrupted by the headset turning off {}",
-        log.phases, log.requested, log.confirmed, log.failed, log.interrupted
+        "soak: {minutes} min, {rebinds} rebinds ridden, phases {:?}, writes requested {}, confirmed {}, failed {}, interrupted by the headset turning off {}, slowest confirmation {:?}",
+        log.phases,
+        log.requested,
+        log.confirmed,
+        log.failed,
+        log.interrupted,
+        log.slowest_confirmation()
     );
     if log.requested == 0 {
         eprintln!("soak: the headset never reached Ready, so no write was exercised");
