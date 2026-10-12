@@ -1,8 +1,7 @@
-use arctis_core::eq::{Coefficients, Curve, Equalizer, FilterKind, library};
+use arctis_core::eq::{Coefficients, Curve, Equalizer, FilterKind, PresetId, library};
 
-use crate::support::{filter, peaking, processed, sine, stereo};
+use crate::support::{RATE, filter, peaking, processed, sine, stereo};
 
-const RATE: u32 = 48_000;
 const TEN_SECONDS: usize = 480_000;
 
 fn harsh_curve() -> Curve {
@@ -22,7 +21,7 @@ fn clean(samples: &[f32]) -> bool {
 }
 
 fn loud_then_silent(equalizer: &mut Equalizer) -> Vec<f32> {
-    processed(equalizer, &stereo(&sine(1_000.0, 48_000.0, 4_800)));
+    processed(equalizer, &stereo(&sine(1_000.0, RATE, 4_800)));
     processed(equalizer, &vec![0.0; 2 * TEN_SECONDS])
 }
 
@@ -35,12 +34,9 @@ fn ten_seconds_of_silence_leave_no_nan_or_subnormal() {
 #[test]
 fn a_fade_into_silence_leaves_no_nan_or_subnormal() {
     let mut equalizer = Equalizer::new(&Coefficients::design(&harsh_curve(), RATE), 2);
-    processed(&mut equalizer, &stereo(&sine(1_000.0, 48_000.0, 4_800)));
-    let v_shape = library::library()
-        .into_iter()
-        .find(|preset| preset.id().as_str() == "v-shape");
-    let target = v_shape.expect("built-in").curve().clone();
-    equalizer.retarget(&Coefficients::design(&target, RATE));
+    processed(&mut equalizer, &stereo(&sine(1_000.0, RATE, 4_800)));
+    let v_shape = library::find(&PresetId::new("v-shape")).expect("built-in");
+    equalizer.retarget(&Coefficients::design(v_shape.curve(), RATE));
     assert!(clean(&processed(
         &mut equalizer,
         &vec![0.0; 2 * TEN_SECONDS]

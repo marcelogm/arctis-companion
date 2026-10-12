@@ -90,9 +90,17 @@ impl Equalizer {
     fn finish_fade(&mut self) {
         self.current = self.target;
         std::mem::swap(&mut self.current_states, &mut self.target_states);
+        self.silence_unused_sections();
         self.fade = None;
         if let Some(pending) = self.pending.take() {
             self.start_fade(pending);
+        }
+    }
+
+    fn silence_unused_sections(&mut self) {
+        let used = self.current.sections().len();
+        for state in &mut self.current_states {
+            state[used..].fill(SectionState::default());
         }
     }
 }
