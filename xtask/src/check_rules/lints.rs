@@ -1,8 +1,7 @@
-use std::fs;
-use std::path::Path;
-
+use super::snapshot::Snapshot;
 use crate::report::Report;
 
+const ROOT_MANIFEST: &str = "Cargo.toml";
 const GUARDED: [&str; 5] = [
     "missing_errors_doc",
     "missing_panics_doc",
@@ -11,36 +10,37 @@ const GUARDED: [&str; 5] = [
     "doc_markdown",
 ];
 
-pub fn check(root: &Path, files: &[String]) -> Report {
+pub fn check(snapshot: Snapshot, files: &[String]) -> Report {
     let members = files.iter().filter(|file| file.ends_with("/Cargo.toml"));
     members
-        .map(|file| check_member(root, file))
-        .fold(check_root(root), Report::merged)
+        .map(|file| with_manifest(snapshot, file, |manifest| check_member(file, manifest)))
+        .fold(
+            with_manifest(snapshot, ROOT_MANIFEST, check_workspace),
+            Report::merged,
+        )
 }
 
-fn check_root(root: &Path) -> Report {
-    match read_manifest(&root.join("Cargo.toml")) {
-        Some(Ok(manifest)) => check_workspace(&manifest),
-        Some(Err(error)) => Report::failed(format!("Cargo.toml: {error}")),
-        None => Report::default(),
+fn with_manifest(
+    snapshot: Snapshot,
+    file: &str,
+    policy: impl FnOnce(&toml::Table) -> Report,
+) -> Report {
+    let Some(text) = snapshot.read(file) else {
+        return Report::default();
+    };
+    match text.parse::<toml::Table>() {
+        Ok(manifest) => policy(&manifest),
+        Err(error) => Report::failed(format!("{file}: {error}")),
     }
 }
 
-fn check_member(root: &Path, file: &str) -> Report {
-    match read_manifest(&root.join(file)) {
-        Some(Ok(manifest)) if inherits_lints(&manifest) => Report::default(),
-        Some(Ok(_)) => Report::failed(format!(
-            "{file}: add [lints] workspace = true so the lint policy applies"
-        )),
-        Some(Err(error)) => Report::failed(format!("{file}: {error}")),
-        None => Report::default(),
+fn check_member(file: &str, manifest: &toml::Table) -> Report {
+    if inherits_lints(manifest) {
+        return Report::default();
     }
-}
-
-fn read_manifest(path: &Path) -> Option<Result<toml::Table, toml::de::Error>> {
-    fs::read_to_string(path)
-        .ok()
-        .map(|text| text.parse::<toml::Table>())
+    Report::failed(format!(
+        "{file}: add [lints] workspace = true so the lint policy applies"
+    ))
 }
 
 fn inherits_lints(manifest: &toml::Table) -> bool {

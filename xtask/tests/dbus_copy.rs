@@ -30,3 +30,26 @@ fn copy_without_a_source_fails() {
     fixture.write(COPY, CONTRACT);
     assert!(!fixture.xtask(&["check-rules"]).succeeded());
 }
+
+#[test]
+fn staged_source_change_checks_every_copy() {
+    let fixture = Fixture::init();
+    fixture
+        .write(SOURCE, CONTRACT)
+        .write(COPY, CONTRACT)
+        .commit("feat: add contract")
+        .write(SOURCE, "<node/>\n");
+    let outcome = fixture.xtask(&["check-rules", "--staged"]);
+    assert!(!outcome.succeeded());
+    assert!(outcome.stderr.contains(COPY), "{}", outcome.stderr);
+}
+
+#[test]
+fn staged_mode_compares_the_staged_copy() {
+    let fixture = Fixture::init();
+    fixture
+        .write(SOURCE, CONTRACT)
+        .write(COPY, "<node/>\n")
+        .edit_unstaged(COPY, CONTRACT);
+    assert!(!fixture.xtask(&["check-rules", "--staged"]).succeeded());
+}

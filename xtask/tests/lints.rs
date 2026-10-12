@@ -45,6 +45,16 @@ fn turning_an_allow_into_warn_fails() {
     assert!(!check_rules_with(&manifest).succeeded());
 }
 
+#[test]
+fn staged_mode_reads_the_manifest_from_the_index() {
+    let manifest = repository_manifest().replace("doc_markdown = \"allow\"\n", "");
+    let fixture = Fixture::init();
+    fixture
+        .write("Cargo.toml", &manifest)
+        .edit_unstaged("Cargo.toml", &repository_manifest());
+    assert!(!fixture.xtask(&["check-rules", "--staged"]).succeeded());
+}
+
 const MEMBER: &str = "crates/core/Cargo.toml";
 const PACKAGE: &str =
     "[package]\nname = \"arctis-core\"\nversion = \"0.1.0\"\nedition = \"2024\"\n";
