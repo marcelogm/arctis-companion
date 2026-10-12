@@ -38,6 +38,23 @@ fn the_duplicate_button_saves_a_custom_copy_and_edits_it() {
 }
 
 #[gtk::test]
+fn duplicating_twice_before_the_snapshot_returns_saves_one_copy() {
+    let editor = standalone_editor(snapshot(), "bass-boost");
+    editor
+        .page
+        .activate_action("editor.duplicate", None)
+        .expect("the action exists");
+    editor.page.activate_action("editor.duplicate", None).ok();
+    let log = editor.log.borrow();
+    let copies: Vec<_> = log
+        .iter()
+        .filter(|intent| matches!(intent, Intent::SavePreset(_)))
+        .collect();
+    assert_eq!(copies.len(), 1);
+    assert_eq!(editor.page.title(), "Bass Boost (Copy)");
+}
+
+#[gtk::test]
 fn custom_presets_cannot_be_duplicated_and_built_ins_cannot_be_deleted() {
     let custom = standalone_editor(with_preset(&one_peak()), "mine");
     custom.page.activate_action("editor.duplicate", None).ok();
