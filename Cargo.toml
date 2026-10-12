@@ -1,6 +1,6 @@
 [workspace]
 resolver = "3"
-members = ["crates/core", "crates/hid", "xtask"]
+members = ["crates/core", "crates/hid", "crates/audio", "xtask"]
 
 [workspace.package]
 version = "0.1.0"
@@ -9,7 +9,9 @@ license = "GPL-3.0-or-later"
 publish = false
 
 [workspace.dependencies]
+arctis-audio = { path = "crates/audio" }
 arctis-core = { path = "crates/core" }
+pipewire = "0.10"
 
 [workspace.lints.rust]
 unsafe_op_in_unsafe_fn = "deny"
