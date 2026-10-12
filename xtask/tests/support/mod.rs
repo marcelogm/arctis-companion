@@ -8,7 +8,6 @@ use tempfile::TempDir;
 
 pub struct Outcome {
     pub code: Option<i32>,
-    pub stdout: String,
     pub stderr: String,
 }
 
@@ -85,26 +84,20 @@ pub fn git(dir: &Path, args: &[&str]) -> String {
     String::from_utf8_lossy(&output.stdout).into_owned()
 }
 
-pub fn git_succeeds(dir: &Path, args: &[&str]) -> bool {
-    let status = Command::new("git")
-        .arg("-C")
-        .arg(dir)
-        .args(args)
-        .status()
-        .expect("git runs");
-    status.success()
+pub fn xtask_in(root: &Path, args: &[&str]) -> Outcome {
+    xtask_with_env(root, args, &[])
 }
 
-pub fn xtask_in(root: &Path, args: &[&str]) -> Outcome {
+pub fn xtask_with_env(root: &Path, args: &[&str], env: &[(&str, &Path)]) -> Outcome {
     let output = Command::new(env!("CARGO_BIN_EXE_xtask"))
         .args(args)
         .arg("--root")
         .arg(root)
+        .envs(env.iter().copied())
         .output()
         .expect("xtask runs");
     Outcome {
         code: output.status.code(),
-        stdout: String::from_utf8_lossy(&output.stdout).into_owned(),
         stderr: String::from_utf8_lossy(&output.stderr).into_owned(),
     }
 }
