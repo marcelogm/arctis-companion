@@ -14,6 +14,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [session.md](session.md) | device session reducer, lifecycle, write-then-verify, testkit |
 | [ui.md](ui.md) | main window, headset page, status pages, dialogs, text resolver |
 | [app-presets.md](app-presets.md) | app presets page, rule rows, add-rule dialog |
+| [hid.md](hid.md) | HID adapter: sysfs discovery, hidraw ports, the device thread |
 
 ## Workspace
 
@@ -31,7 +32,7 @@ flowchart BT
 | Crate | Entry points |
 |---|---|
 | `crates/core/` | `crates/core/src/lib.rs`, `crates/core/src/time.rs::Millis`, `crates/core/src/protocol/mod.rs`, `crates/core/src/messages/mod.rs`, `crates/core/src/companion/mod.rs`, `crates/core/src/view/mod.rs`, `crates/core/src/session/mod.rs`, `crates/core/src/testkit/mod.rs` |
-| `crates/hid/` | `crates/hid/src/lib.rs` |
+| `crates/hid/` | `crates/hid/src/lib.rs`, `crates/hid/src/handle.rs::DeviceHandle`, `crates/hid/src/worker.rs::Worker` |
 | `crates/audio/` | `crates/audio/src/lib.rs::init`, `crates/audio/src/handle.rs::AudioHandle` |
 | `crates/ui/` | `crates/ui/src/lib.rs::register_resources`, `crates/ui/src/window.rs::Window`, `crates/ui/src/text.rs::resolve`, `crates/ui/src/intents.rs::IntentSink` |
 | `crates/app/` | `crates/app/src/main.rs::main`, `crates/app/src/application.rs::run`, `crates/app/src/application.rs::build` |
