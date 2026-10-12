@@ -55,7 +55,7 @@ fn check_document(root: &Path, document: &Path) -> Report {
     let problems = doc_refs(&text).into_iter().filter_map(|doc_ref| {
         problem(root, &doc_ref).map(|problem| format!("{label}:{}: {problem}", doc_ref.line))
     });
-    Report::errors(problems)
+    Report::from_errors(problems)
 }
 
 fn problem(root: &Path, doc_ref: &DocRef) -> Option<String> {

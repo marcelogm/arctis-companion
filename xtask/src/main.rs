@@ -9,6 +9,7 @@ mod commit_message;
 mod doc_refs;
 mod git;
 mod install_hooks;
+mod markdown;
 mod report;
 mod rust_tokens;
 mod text;

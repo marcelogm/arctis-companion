@@ -29,19 +29,15 @@ pub fn attribution_problem(text: &str) -> Option<String> {
         .map(|word| format!("mentions \"{word}\"; attribution and tool mentions are not allowed"))
 }
 
-pub fn editor_message(raw: &str) -> String {
-    let kept: Vec<&str> = raw
-        .lines()
-        .take_while(|line| !is_scissors(line))
-        .filter(|line| !line.starts_with('#'))
-        .collect();
+pub fn above_scissors(raw: &str) -> String {
+    let kept: Vec<&str> = raw.lines().take_while(|line| !is_scissors(line)).collect();
     kept.join("\n")
 }
 
 pub fn subject_of(message: &str) -> &str {
     message
         .lines()
-        .find(|line| !line.trim().is_empty())
+        .find(|line| !line.trim().is_empty() && !line.starts_with('#'))
         .unwrap_or_default()
 }
 

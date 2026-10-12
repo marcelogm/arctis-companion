@@ -1,6 +1,13 @@
 use std::path::PathBuf;
 
-const USAGE: &str = "usage: cargo xtask <command> [--root DIR]\n  check-rules [--staged]\n  check-commits [--message FILE] [--range RANGE] [--pr-title TEXT] [--pr-body TEXT]\n  check-doc-paths\n  check-pure\n  install-hooks";
+const USAGE: &str = concat!(
+    "usage: cargo xtask <command> [--root DIR]\n",
+    "  check-rules [--staged]\n",
+    "  check-commits [--message FILE] [--range RANGE] [--pr-title TEXT] [--pr-body TEXT]\n",
+    "  check-doc-paths\n",
+    "  check-pure\n",
+    "  install-hooks",
+);
 
 pub enum Invocation {
     CheckRules {
@@ -37,17 +44,34 @@ struct Options {
 
 pub fn parse(mut args: impl Iterator<Item = String>) -> Result<Invocation, String> {
     let command = args.next().ok_or(USAGE)?;
-    let options = parse_options(args)?;
+    let accepted = accepted_flags(&command).ok_or_else(|| unknown_command(&command))?;
+    let options = parse_options(&command, accepted, args)?;
     build(&command, options)
 }
 
-fn parse_options(mut args: impl Iterator<Item = String>) -> Result<Options, String> {
+fn accepted_flags(command: &str) -> Option<&'static [&'static str]> {
+    match command {
+        "check-rules" => Some(&["--root", "--staged"]),
+        "check-commits" => Some(&["--root", "--message", "--range", "--pr-title", "--pr-body"]),
+        "check-doc-paths" | "check-pure" | "install-hooks" => Some(&["--root"]),
+        _ => None,
+    }
+}
+
+fn parse_options(
+    command: &str,
+    accepted: &[&str],
+    mut args: impl Iterator<Item = String>,
+) -> Result<Options, String> {
     let mut options = Options {
         root: default_root(),
         staged: false,
         sources: Vec::new(),
     };
     while let Some(flag) = args.next() {
+        if !accepted.contains(&flag.as_str()) {
+            return Err(format!("unknown flag {flag} for {command}\n{USAGE}"));
+        }
         apply_flag(&mut options, &flag, &mut args)?;
     }
     Ok(options)
@@ -72,8 +96,7 @@ fn apply_flag(
             .push(MessageSource::File(PathBuf::from(value))),
         "--range" => options.sources.push(MessageSource::Range(value)),
         "--pr-title" => options.sources.push(MessageSource::PrTitle(value)),
-        "--pr-body" => options.sources.push(MessageSource::PrBody(value)),
-        _ => return Err(format!("unknown flag {flag}\n{USAGE}")),
+        _ => options.sources.push(MessageSource::PrBody(value)),
     }
     Ok(())
 }
@@ -90,8 +113,12 @@ fn build(command: &str, options: Options) -> Result<Invocation, String> {
         "check-doc-paths" => Ok(Invocation::CheckDocPaths { root }),
         "check-pure" => Ok(Invocation::CheckPure { root }),
         "install-hooks" => Ok(Invocation::InstallHooks { root }),
-        _ => Err(format!("unknown command {command}\n{USAGE}")),
+        _ => Err(unknown_command(command)),
     }
+}
+
+fn unknown_command(command: &str) -> String {
+    format!("unknown command {command}\n{USAGE}")
 }
 
 fn default_root() -> PathBuf {

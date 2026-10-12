@@ -1,10 +1,16 @@
 use crate::text::line_at;
 
-pub fn first_comment_line(text: &str) -> Option<usize> {
-    comment_start(text.as_bytes()).map(|offset| line_at(text, offset))
+#[derive(Clone, Copy)]
+pub enum Markers {
+    LineAndBlock,
+    BlockOnly,
 }
 
-fn comment_start(bytes: &[u8]) -> Option<usize> {
+pub fn first_comment_line(text: &str, markers: Markers) -> Option<usize> {
+    comment_start(text.as_bytes(), markers).map(|offset| line_at(text, offset))
+}
+
+fn comment_start(bytes: &[u8], markers: Markers) -> Option<usize> {
     let mut quote: Option<u8> = None;
     let mut index = 0;
     while index < bytes.len() {
@@ -12,7 +18,7 @@ fn comment_start(bytes: &[u8]) -> Option<usize> {
             (Some(_), b'\\') => index += 1,
             (Some(open), byte) if byte == open => quote = None,
             (None, byte @ (b'"' | b'\'' | b'`')) => quote = Some(byte),
-            (None, b'/') if opens_comment(bytes.get(index + 1)) => return Some(index),
+            (None, b'/') if opens_comment(bytes.get(index + 1), markers) => return Some(index),
             _ => {}
         }
         index += 1;
@@ -20,6 +26,10 @@ fn comment_start(bytes: &[u8]) -> Option<usize> {
     None
 }
 
-fn opens_comment(next: Option<&u8>) -> bool {
-    matches!(next, Some(b'/' | b'*'))
+fn opens_comment(next: Option<&u8>, markers: Markers) -> bool {
+    match next {
+        Some(b'*') => true,
+        Some(b'/') => matches!(markers, Markers::LineAndBlock),
+        _ => false,
+    }
 }

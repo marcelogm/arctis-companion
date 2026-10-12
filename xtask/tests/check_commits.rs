@@ -108,10 +108,20 @@ fn clean_pr_title_and_body_pass() {
 }
 
 #[test]
-fn message_file_ignores_git_comment_lines() {
-    let outcome =
-        message_file_outcome("feat: add time\n\n# Lines with Co-Authored-By here are git hints\n");
+fn message_file_skips_git_comment_lines_for_the_subject() {
+    let outcome = message_file_outcome("# Please enter the commit message\nfeat: add time\n");
     assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
+fn hash_prefixed_co_author_in_a_message_file_fails() {
+    let outcome = message_file_outcome(&format!("feat: add time\n\n#{TRAILER}\n"));
+    assert!(!outcome.succeeded());
+    assert!(
+        outcome.stderr.contains("co-authored-by"),
+        "{}",
+        outcome.stderr
+    );
 }
 
 #[test]

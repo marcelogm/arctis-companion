@@ -43,7 +43,7 @@ fn check_metadata(metadata: &Value) -> Report {
     let Some(core) = packages.find(|package| package["name"] == CORE) else {
         return Report::failed(format!("package {CORE} not found"));
     };
-    Report::errors(forbidden_dependencies(core).map(|name| {
+    Report::from_errors(forbidden_dependencies(core).map(|name| {
         format!(
             "{CORE} may depend only on {} (found {name})",
             ALLOWED.join(" and ")

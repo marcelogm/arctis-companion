@@ -35,25 +35,10 @@ fn the_staged_mode_warns_too() {
     assert!(outcome.stderr.contains("401 lines"), "{}", outcome.stderr);
 }
 
-const GENERATED: [&str; 10] = [
-    "Cargo.lock",
-    "build-aux/cargo-sources.json",
-    "extension/package-lock.json",
-    "LICENSE",
-    "po/pt_BR.po",
-    "po/arctis-companion.pot",
-    "po/LINGUAS",
-    "po/POTFILES.in",
-    "data/icons/app.svg",
-    "data/screenshots/main.png",
-];
-
 #[test]
-fn every_entry_of_the_generated_list_is_exempt() {
+fn plans_are_exempt_from_the_line_limit() {
     let fixture = Fixture::init();
-    for path in GENERATED {
-        fixture.write(path, &"line\n".repeat(900));
-    }
+    fixture.write("docs/superpowers/plans/plan.md", &"line\n".repeat(900));
     let outcome = fixture.xtask(&["check-rules"]);
     assert!(outcome.succeeded(), "{}", outcome.stderr);
     assert!(!outcome.stderr.contains("warning"), "{}", outcome.stderr);
