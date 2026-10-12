@@ -17,7 +17,8 @@ export default class ArctisCompanionExtension extends Extension {
         this._indicator = new CompanionIndicator(this._toggle);
         Main.panel.statusArea.quickSettings.addExternalIndicator(this._indicator);
         this._client.onChange(() => this._render());
-        this._client.start(this._cancellable).then(() => this._render()).catch(reportFailure);
+        const client = this._client;
+        client.start(this._cancellable).then(() => this._renderIfCurrent(client)).catch(reportFailure);
     }
 
     disable() {
@@ -30,9 +31,12 @@ export default class ArctisCompanionExtension extends Extension {
         this._indicator = null;
     }
 
+    _renderIfCurrent(client) {
+        if (client === this._client)
+            this._render();
+    }
+
     _render() {
-        if (this._client === null)
-            return;
         const presentation = present(this._client.properties(), _);
         this._toggle.render(presentation);
         this._indicator.render(presentation);

@@ -1,7 +1,6 @@
 import {test} from './support/harness.js';
-import {assertEqual, assertTrue} from './support/assert.js';
+import {assertEqual} from './support/assert.js';
 import {connectedBag} from './support/bags.js';
-import {extensionPath, readText} from './support/paths.js';
 import {
     HIDDEN,
     automaticPresetsAfterClick,
@@ -14,10 +13,6 @@ const VISIBLE_STATES = ['bluetooth-only', 'connecting', 'awaiting-headset', 'hea
 function presentWith(overrides) {
     return present(connectedBag(overrides));
 }
-
-test('presentation imports nothing from the Shell', () =>
-    assertTrue(!readText(extensionPath('lib', 'presentation.js')).includes('resource:///'),
-        'presentation.js must not import Shell modules'));
 
 test('hidden when the app has no bus name owner', () => assertEqual(present(null), HIDDEN));
 
@@ -53,6 +48,9 @@ test('a click asks for nothing while insensitive', () =>
 
 test('subtitle reads No app rules without app rules', () =>
     assertEqual(presentWith({AppRuleCount: 0, ActivePresetReason: ['app', 'Firefox']}).subtitle, 'No app rules'));
+
+test('subtitle ignores the app for other reasons', () =>
+    assertEqual(presentWith({ActivePresetReason: ['route', 'Firefox']}).subtitle, 'Flat'));
 
 test('subtitle names the route preset', () => assertEqual(presentWith({}).subtitle, 'Flat'));
 

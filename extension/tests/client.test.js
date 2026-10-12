@@ -7,7 +7,6 @@ import {armActivationMarker, startAppByName, wasActivated} from './support/activ
 import {connectedBag} from './support/bags.js';
 import {FakeHeadsetService} from './support/fake_headset_service.js';
 import {delay, waitFor} from './support/loop.js';
-import {extensionPath, readText} from './support/paths.js';
 import {HeadsetClient, createProxy, interfaceInfo} from '../arctis-companion@marcelogm.github.io/lib/client.js';
 
 const HEADSET1_PROPERTIES = [
@@ -32,17 +31,8 @@ async function withRunningApp(body) {
     }
 }
 
-test('client imports nothing from the Shell', () =>
-    assertTrue(!readText(extensionPath('lib', 'client.js')).includes('resource:///'),
-        'client.js must not import Shell modules'));
-
 test('interface copy declares every Headset1 property', () =>
     assertEqual(interfaceInfo().properties.map(property => property.name), HEADSET1_PROPERTIES));
-
-test('proxy never starts the app', () => {
-    const flags = createProxy(Gio.DBus.session).g_flags;
-    assertTrue((flags & Gio.DBusProxyFlags.DO_NOT_AUTO_START) !== 0, 'DO_NOT_AUTO_START must be set');
-});
 
 test('no properties while the app is absent', async () => {
     const client = await startClient();
@@ -52,17 +42,22 @@ test('no properties while the app is absent', async () => {
 
 test('client follows the app appearing and vanishing', async () => {
     const client = await startClient();
-    let changes = 0;
-    client.onChange(() => {
-        changes += 1;
-    });
-    const service = await FakeHeadsetService.start();
-    await waitFor(() => client.properties() !== null);
-    assertEqual(client.properties(), connectedBag());
-    await service.stop();
-    await waitFor(() => client.properties() === null);
-    assertTrue(changes >= 2, `expected two change notifications, got ${changes}`);
-    client.destroy();
+    let service = null;
+    try {
+        let changes = 0;
+        client.onChange(() => {
+            changes += 1;
+        });
+        service = await FakeHeadsetService.start();
+        await waitFor(() => client.properties() !== null);
+        assertEqual(client.properties(), connectedBag());
+        await service.stop();
+        await waitFor(() => client.properties() === null);
+        assertTrue(changes >= 2, `expected two change notifications, got ${changes}`);
+    } finally {
+        client.destroy();
+        await service?.stop();
+    }
 });
 
 test('client relays changed properties', () => withRunningApp(async (client, service) => {

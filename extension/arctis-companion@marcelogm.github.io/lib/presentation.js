@@ -1,5 +1,5 @@
 const HIDDEN_STATES = ['absent', 'permission-denied'];
-const HEADSET_ICON = 'audio-headset-symbolic';
+export const HEADSET_ICON = 'audio-headset-symbolic';
 const UNKNOWN_LEVEL_ICON = 'battery-missing-symbolic';
 const WARNING_ICONS = new Map([
     ['low', 'battery-caution-symbolic'],
@@ -71,11 +71,9 @@ function subtitle(properties, _) {
 }
 
 function reasonTemplate(reason, app, _) {
-    if (app === '')
-        return '{preset}';
-    if (reason === 'app')
+    if (app !== '' && reason === 'app')
         return _('{preset} · {app}');
-    if (reason === 'manual')
+    if (app !== '' && reason === 'manual')
         return _('{preset} · Until {app} stops');
     return '{preset}';
 }
@@ -124,6 +122,14 @@ function items(properties) {
     }));
 }
 
-function canPick({State, Route}) {
-    return State !== 'connecting' && !(State === 'awaiting-headset' && Route !== 'bluetooth');
+function canPick(properties) {
+    return !isConnecting(properties) && !awaitsHeadsetOnDongle(properties);
+}
+
+function isConnecting({State}) {
+    return State === 'connecting';
+}
+
+function awaitsHeadsetOnDongle({State, Route}) {
+    return State === 'awaiting-headset' && Route !== 'bluetooth';
 }
