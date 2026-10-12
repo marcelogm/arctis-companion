@@ -1,6 +1,6 @@
 use std::path::Path;
 
-use arctis_app::locale::{GETTEXT_PACKAGE, locale_dir_beside};
+use arctis_app::locale::locale_dir_beside;
 
 #[test]
 fn the_catalogue_sits_under_the_prefix_share_dir() {
