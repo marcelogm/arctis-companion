@@ -31,3 +31,16 @@ jobs:
       - run: cargo test --package arctis-core
         env:
           PROPTEST_CASES: "2560"
+
+  shell-smoke:
+    runs-on: ubuntu-latest
+    container: fedora:44
+    continue-on-error: true
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False nodejs npm gjs dbus-daemon gettext gnome-shell mesa-dri-drivers procps-ng
+      - uses: actions/checkout@v4
+      - run: npm ci
+        working-directory: extension
+      - name: headless shell with the fake app
+        working-directory: extension
+        run: for scenario in connected low-battery absent; do npm run smoke -- "$scenario"; done

@@ -84,13 +84,23 @@ jobs:
     needs: rules
     runs-on: ubuntu-latest
     container: fedora:44
+    defaults:
+      run:
+        working-directory: extension
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False nodejs npm
+      - run: dnf install -y --setopt=install_weak_deps=False nodejs npm gjs dbus-daemon gettext gnome-shell unzip
+        working-directory: /
       - uses: actions/checkout@v4
       - run: npm ci
-        working-directory: extension
       - run: npx eslint .
-        working-directory: extension
+      - run: npm test
+      - run: npm run check-po
+      - run: npm run pack
+      - run: unzip -l dist/arctis-companion@marcelogm.github.io.shell-extension.zip
+      - uses: actions/upload-artifact@v4
+        with:
+          name: shell-extension
+          path: extension/dist/arctis-companion@marcelogm.github.io.shell-extension.zip
 
   flatpak:
     needs: test
