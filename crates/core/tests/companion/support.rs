@@ -3,6 +3,8 @@ use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
+use arctis_core::settings::headset_settings::HeadsetSettings;
+use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
 
 pub fn sink(terminal: SinkKind, via_equalizer: bool, via_easy_effects: bool) -> DefaultSink {
     DefaultSink {
@@ -39,4 +41,20 @@ pub fn stream(app: &str, path: Option<SoundPath>, running: bool) -> StreamInfo {
         running,
         path,
     }
+}
+
+pub fn observed_with(equalizer: Curve) -> HeadsetSettings {
+    HeadsetSettings {
+        mic_volume: MicVolume::try_from(7).expect("mic volume"),
+        sidetone: Sidetone::try_from(3).expect("sidetone"),
+        mute_light: MuteLight::Low,
+        volume_limiter: false,
+        wireless_mode: WirelessMode::ExtendedRange,
+        auto_power_off: AutoPowerOff::try_from(15).expect("auto power off"),
+        equalizer,
+    }
+}
+
+pub fn observed() -> HeadsetSettings {
+    observed_with(curve_of("flat"))
 }

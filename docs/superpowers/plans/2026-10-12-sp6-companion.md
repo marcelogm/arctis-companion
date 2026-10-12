@@ -2057,7 +2057,7 @@ git push
 - Modify: `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/app_settings.rs`, `crates/core/tests/companion/adoption.rs`, `crates/core/tests/companion/main.rs`, `crates/core/tests/companion/support.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod adoption;` and `mod app_settings;` to `crates/core/tests/companion/main.rs`.
 
@@ -2244,12 +2244,12 @@ fn a_second_unknown_curve_gets_a_free_id() {
 Note `custom("headset-curve", curve_of("podcast"))` matches the built-in Podcast curve, so `adopt` of
 `unique_curve()` is still unknown and must pick the free id.
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: FAIL to compile (`app_settings`, `adoption` missing).
 
-- [ ] **Step 3: Implement `app_settings`**
+- [x] **Step 3: Implement `app_settings`**
 
 `crates/core/src/companion/app_settings.rs`:
 
@@ -2411,7 +2411,7 @@ pub struct Persisted {
 }
 ```
 
-- [ ] **Step 4: Implement `adoption`**
+- [x] **Step 4: Implement `adoption`**
 
 `crates/core/src/companion/adoption.rs`:
 
@@ -2495,12 +2495,12 @@ pub mod seen_apps;
 pub mod timing;
 ```
 
-- [ ] **Step 5: Run the tests to see them pass**
+- [x] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion`
 Expected: PASS, 39 tests.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
