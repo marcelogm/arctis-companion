@@ -1,6 +1,7 @@
 #!/bin/sh
 set -eu
 cargo test --package arctis-audio --test unreachable -- --ignored
+cargo test --package arctis-audio --test reconnect -- --ignored
 pipewire > "$XDG_RUNTIME_DIR/pipewire.log" 2>&1 &
 pipewire_pid=$!
 wireplumber > "$XDG_RUNTIME_DIR/wireplumber.log" 2>&1 &
