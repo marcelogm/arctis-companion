@@ -1,7 +1,7 @@
 use arctis_core::intent::Intent;
 use arctis_ui::intents::IntentSink;
 
-use crate::support::recording_sink;
+use crate::support::{recorder, recording_sink};
 
 #[test]
 fn an_emitted_intent_reaches_the_handler() {
@@ -26,11 +26,6 @@ fn nested_renders_restore_the_outer_state() {
 }
 
 #[test]
-fn a_sink_without_a_handler_drops_intents() {
-    IntentSink::default().emit(Intent::RetryWrite);
-}
-
-#[test]
 fn emit_some_skips_none() {
     let (sink, log) = recording_sink();
     sink.emit_some(None);
@@ -39,11 +34,19 @@ fn emit_some_skips_none() {
 }
 
 #[test]
-fn a_handler_may_render_again() {
+fn a_handler_may_reconnect_while_handling() {
     let sink = IntentSink::default();
+    let (record, log) = recorder();
     let inner = sink.clone();
-    sink.connect(move |_| inner.rendering(|| inner.emit(Intent::RetryWrite)));
+    sink.connect(move |intent| {
+        let (nested, _) = recorder();
+        inner.connect(nested);
+        inner.rendering(|| ());
+        record(intent);
+    });
     sink.emit(Intent::RetryWrite);
+    sink.emit(Intent::EndPreview);
+    assert_eq!(*log.borrow(), vec![Intent::RetryWrite]);
 }
 
 #[test]

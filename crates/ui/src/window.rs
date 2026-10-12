@@ -1,5 +1,6 @@
 use std::rc::Rc;
 
+use adw::prelude::*;
 use adw::subclass::prelude::*;
 use arctis_core::companion::Snapshot;
 use arctis_core::intent::Intent;
@@ -128,7 +129,7 @@ impl Window {
             .build()
     }
 
-    pub fn connect_intent(&self, handler: impl Fn(Intent) + 'static) {
+    pub fn on_intent(&self, handler: impl Fn(Intent) + 'static) {
         self.imp().sink.connect(handler);
     }
 
@@ -194,7 +195,10 @@ impl Window {
         imp.headset_page.render(model);
         self.show_banner(model.banner.as_ref());
         imp.main_stack.set_visible_child_name("headset");
-        if let Some(toast) = imp.toast_feed.next(model.failure_toast.as_ref(), &imp.sink) {
+        if let Some(toast) = imp
+            .toast_feed
+            .toast_for_new_failure(model.failure_toast.as_ref(), &imp.sink)
+        {
             imp.toasts.add_toast(toast);
         }
     }
@@ -205,6 +209,7 @@ impl Window {
         if let Some(banner) = banner {
             view.set_title(&resolve(&banner.title));
             view.set_button_label(banner.button.as_ref().map(resolve).as_deref());
+            view.set_action_name(banner.button.is_some().then_some(PERMISSION_ACTION));
         }
     }
 }

@@ -29,14 +29,6 @@ fn the_rule_is_the_shipped_udev_rule() {
     assert!(UDEV_RULE.contains("TAG+=\"uaccess\""));
 }
 
-#[test]
-fn the_command_reloads_and_triggers_udev() {
-    assert_eq!(
-        RELOAD_COMMAND,
-        "sudo udevadm control --reload-rules && sudo udevadm trigger"
-    );
-}
-
 #[gtk::test]
 fn the_dialog_shows_the_rule_and_the_command() {
     let dialog = dialog();

@@ -2,8 +2,8 @@
 
 pub mod app_dialogs;
 mod equalizer_group;
-mod headset_groups;
 mod headset_page;
+mod headset_rows;
 mod headset_status;
 pub mod intents;
 mod permission_dialog;

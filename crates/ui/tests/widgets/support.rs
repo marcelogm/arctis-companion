@@ -1,15 +1,18 @@
-use adw::prelude::*;
-use arctis_core::companion::Snapshot;
-use arctis_core::view::headset_page::{HeadsetModel, HeadsetPageModel, headset_page};
-use arctis_ui::Window;
-use gtk::glib;
 use std::cell::RefCell;
+use std::ffi::CString;
 use std::rc::Rc;
 use std::sync::Once;
 
+use adw::prelude::*;
+use arctis_core::companion::Snapshot;
 use arctis_core::companion::selection::{ActivePreset, PresetReason};
 use arctis_core::intent::Intent;
+use arctis_core::testkit::snapshots::{id, snapshot};
+use arctis_core::view::headset_page::{HeadsetModel, HeadsetPageModel, headset_page};
+use arctis_ui::Window;
 use arctis_ui::intents::IntentSink;
+use gtk::glib;
+use gtk::glib::translate::{IntoGlib, ToGlibPtr};
 
 static RESOURCES: Once = Once::new();
 
@@ -20,12 +23,39 @@ pub fn init() {
 
 pub type Log = Rc<RefCell<Vec<Intent>>>;
 
-pub fn recording_sink() -> (IntentSink, Log) {
-    let sink = IntentSink::default();
+pub fn recorder() -> (impl Fn(Intent) + 'static, Log) {
     let log = Log::default();
     let writer = Rc::clone(&log);
-    sink.connect(move |intent| writer.borrow_mut().push(intent));
+    (move |intent| writer.borrow_mut().push(intent), log)
+}
+
+pub fn recording_sink() -> (IntentSink, Log) {
+    let sink = IntentSink::default();
+    let (record, log) = recorder();
+    sink.connect(record);
     (sink, log)
+}
+
+pub fn has_accessible_text(
+    widget: &impl IsA<gtk::Accessible>,
+    property: gtk::AccessibleProperty,
+    expected: &str,
+) -> bool {
+    let expected = CString::new(expected).expect("text without NUL");
+    let accessible: *mut gtk::ffi::GtkAccessible =
+        widget.upcast_ref::<gtk::Accessible>().to_glib_none().0;
+    let mismatch = unsafe {
+        gtk::ffi::gtk_test_accessible_check_property(
+            accessible,
+            property.into_glib(),
+            expected.as_ptr(),
+        )
+    };
+    let matches = mismatch.is_null();
+    if !matches {
+        unsafe { glib::ffi::g_free(mismatch.cast()) };
+    }
+    matches
 }
 
 pub fn descendants(root: &impl IsA<gtk::Widget>) -> Vec<gtk::Widget> {
@@ -82,9 +112,8 @@ pub fn combo_text(row: &adw::ComboRow) -> String {
 pub fn rendered_window(snapshot: Snapshot) -> (Window, Log) {
     init();
     let window: Window = glib::Object::new();
-    let log = Log::default();
-    let writer = Rc::clone(&log);
-    window.connect_intent(move |intent| writer.borrow_mut().push(intent));
+    let (record, log) = recorder();
+    window.on_intent(record);
     window.render(&Rc::new(snapshot));
     (window, log)
 }
@@ -99,12 +128,25 @@ fn is_toplevel(widget: &gtk::Widget) -> bool {
 }
 
 pub fn rich_snapshot() -> Snapshot {
-    let mut s = arctis_core::testkit::snapshots::snapshot();
+    let mut s = snapshot();
     s.audio.bluetooth_sink_seen = true;
     s.audio.manager_denied = true;
     s.presets.active.dongle = ActivePreset {
-        preset: arctis_core::testkit::snapshots::id("footsteps"),
+        preset: id("footsteps"),
         reason: PresetReason::App("Firefox".to_owned()),
     };
     s
+}
+
+pub fn has_value_text(row: &arctis_ui::ScaleRow, text: &str) -> bool {
+    has_accessible_text(
+        &first::<gtk::Scale>(row),
+        gtk::AccessibleProperty::ValueText,
+        text,
+    )
+}
+
+#[track_caller]
+pub fn assert_close(actual: f64, expected: f64) {
+    assert!((actual - expected).abs() < 1e-9, "{actual} != {expected}");
 }

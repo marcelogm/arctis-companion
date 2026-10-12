@@ -244,11 +244,15 @@ fn header_description(reading: Option<Reading>, route: &str) -> Text {
 
 fn failure_toast(snapshot: &Snapshot) -> Option<ToastModel> {
     let failure = snapshot.dongle.last_failure?;
-    Some(ToastModel {
-        serial: failure.serial,
-        title: Text::plain(failure_msgid(failure.setting)),
-        retry: Intent::RetryWrite,
-    })
+    snapshot
+        .dongle
+        .not_applied
+        .contains(&failure.setting)
+        .then(|| ToastModel {
+            serial: failure.serial,
+            title: Text::plain(failure_msgid(failure.setting)),
+            retry: Intent::RetryWrite,
+        })
 }
 
 const fn failure_msgid(setting: Setting) -> &'static str {

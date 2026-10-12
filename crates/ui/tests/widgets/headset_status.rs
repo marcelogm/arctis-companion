@@ -7,7 +7,7 @@ use arctis_core::testkit::snapshots::{snapshot, with};
 use arctis_ui::HeadsetStatus;
 use gtk::{AccessibleProperty, glib};
 
-use crate::support::{first, headset_model, init, named};
+use crate::support::{descendants, first, has_accessible_text, headset_model, init, named};
 
 fn rendered(snapshot: &Snapshot) -> HeadsetStatus {
     init();
@@ -37,7 +37,7 @@ fn the_level_icon_comes_from_the_model() {
     let s = snapshot();
     let header = headset_model(&s).header;
     let status = rendered(&s);
-    let icons: Vec<String> = crate::support::descendants(&status)
+    let icons: Vec<String> = descendants(&status)
         .into_iter()
         .filter_map(|widget| widget.downcast::<gtk::Image>().ok())
         .filter_map(|image| image.icon_name().map(String::from))
@@ -52,7 +52,7 @@ fn connecting_shows_a_spinner_and_its_subtitle() {
     assert!(named::<gtk::Box>(&status, "connection").get_visible());
     assert!(first::<adw::Spinner>(&status).get_visible());
     assert!(
-        crate::support::descendants(&status)
+        descendants(&status)
             .into_iter()
             .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
             .any(|label| label.label() == "Connecting…")
@@ -63,7 +63,7 @@ fn connecting_shows_a_spinner_and_its_subtitle() {
 fn rebinding_reads_reconnecting() {
     let status = rendered(&with(Phase::Rebinding, Route::Dongle));
     assert!(
-        crate::support::descendants(&status)
+        descendants(&status)
             .into_iter()
             .filter_map(|widget| widget.downcast::<gtk::Label>().ok())
             .any(|label| label.label() == "Reconnecting…")
@@ -82,12 +82,9 @@ fn an_unknown_battery_hides_the_level_text() {
 fn the_header_has_an_accessible_description() {
     let s = snapshot();
     let status = rendered(&s);
-    assert!(gtk::test_accessible_has_property(
+    assert!(has_accessible_text(
         &status,
-        AccessibleProperty::Description
+        AccessibleProperty::Description,
+        &english(&headset_model(&s).header.description)
     ));
-    assert_eq!(
-        status.description(),
-        english(&headset_model(&s).header.description)
-    );
 }

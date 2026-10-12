@@ -13,7 +13,11 @@ pub struct ToastFeed {
 
 impl ToastFeed {
     #[must_use]
-    pub fn next(&self, model: Option<&ToastModel>, sink: &IntentSink) -> Option<adw::Toast> {
+    pub fn toast_for_new_failure(
+        &self,
+        model: Option<&ToastModel>,
+        sink: &IntentSink,
+    ) -> Option<adw::Toast> {
         let model = model?;
         let previous = self.shown.replace(Some(model.serial));
         (previous != Some(model.serial)).then(|| failure_toast(model, sink))

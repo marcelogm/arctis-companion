@@ -8,10 +8,11 @@ use arctis_core::testkit::snapshots::snapshot;
 use arctis_core::view::headset_rows::{HeadsetGroupsModel, ScaleModel, headset_groups};
 use arctis_ui::ScaleRow;
 use arctis_ui::intents::IntentSink;
-use arctis_ui::widget_values::nearest_step;
 use gtk::{AccessibleProperty, glib};
 
-use crate::support::{Log, first, init, named, recording_sink};
+use crate::support::{
+    Log, assert_close, descendants, first, has_accessible_text, init, named, recording_sink,
+};
 
 fn groups(snapshot: &Snapshot) -> HeadsetGroupsModel {
     headset_groups(&snapshot.dongle).expect("a supported model")
@@ -36,9 +37,13 @@ fn the_row_shows_the_model() {
     let (row, _, _) = rendered(&model);
     let scale = first::<gtk::Scale>(&row);
     assert_eq!(row.title(), english(&model.title));
-    assert_eq!(nearest_step(scale.value(), Sidetone::MAX), 3);
-    assert_eq!(nearest_step(scale.adjustment().upper(), 20), Sidetone::MAX);
-    assert_eq!(row.value_text(), "Low");
+    assert_close(scale.value(), 3.0);
+    assert_close(scale.adjustment().upper(), f64::from(Sidetone::MAX));
+    assert!(has_accessible_text(
+        &scale,
+        AccessibleProperty::ValueText,
+        "Low"
+    ));
 }
 
 #[gtk::test]
@@ -46,7 +51,12 @@ fn a_step_between_marks_reads_as_a_count() {
     let mut s = snapshot();
     s.dongle.desired.sidetone = Sidetone::try_from(4).expect("sidetone");
     let (row, _, _) = rendered(&sidetone_model(&s));
-    assert_eq!(row.value_text(), "4 of 10");
+    let scale = first::<gtk::Scale>(&row);
+    assert!(has_accessible_text(
+        &scale,
+        AccessibleProperty::ValueText,
+        "4 of 10"
+    ));
 }
 
 #[gtk::test]
@@ -74,7 +84,7 @@ fn rendering_a_new_value_emits_nothing() {
 fn the_microphone_volume_has_quiet_and_loud_icons() {
     let model = groups(&snapshot()).mic_volume.expect("mic volume");
     let (row, _, log) = rendered(&model);
-    let icons: Vec<gtk::Image> = crate::support::descendants(&row)
+    let icons: Vec<gtk::Image> = descendants(&row)
         .into_iter()
         .filter_map(|widget| widget.downcast::<gtk::Image>().ok())
         .filter(WidgetExt::get_visible)
@@ -93,7 +103,7 @@ fn the_microphone_volume_has_quiet_and_loud_icons() {
 fn sidetone_has_no_end_icons() {
     let (row, _, _) = rendered(&sidetone_model(&snapshot()));
     assert!(
-        crate::support::descendants(&row)
+        descendants(&row)
             .into_iter()
             .filter_map(|widget| widget.downcast::<gtk::Image>().ok())
             .all(|icon| !icon.get_visible())
@@ -114,12 +124,14 @@ fn a_setting_not_applied_shows_its_subtitle() {
 fn the_scale_has_an_accessible_label_and_value_text() {
     let (row, _, _) = rendered(&sidetone_model(&snapshot()));
     let scale = first::<gtk::Scale>(&row);
-    assert!(gtk::test_accessible_has_property(
+    assert!(has_accessible_text(
         &scale,
-        AccessibleProperty::Label
+        AccessibleProperty::Label,
+        &english(&sidetone_model(&snapshot()).title)
     ));
-    assert!(gtk::test_accessible_has_property(
+    assert!(has_accessible_text(
         &scale,
-        AccessibleProperty::ValueText
+        AccessibleProperty::ValueText,
+        "Low"
     ));
 }

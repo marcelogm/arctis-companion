@@ -2,7 +2,7 @@ use adw::prelude::*;
 use adw::subclass::prelude::*;
 use arctis_core::intent::Intent;
 use arctis_core::settings::values::Percent;
-use arctis_core::view::preferences::{LOW_BATTERY_MAX, LOW_BATTERY_MIN, PreferencesModel};
+use arctis_core::view::preferences::{LOW_BATTERY_MAX, PreferencesModel};
 use gtk::{gio, glib};
 
 use crate::intents::IntentSink;
@@ -14,6 +14,7 @@ pub const SHELL_EXTENSIONS_URI: &str = "https://extensions.gnome.org/";
 mod imp {
     use adw::prelude::*;
     use adw::subclass::prelude::*;
+    use arctis_core::view::preferences::{LOW_BATTERY_MAX, LOW_BATTERY_MIN};
     use gtk::glib;
 
     #[derive(Default, gtk::CompositeTemplate)]
@@ -47,6 +48,8 @@ mod imp {
             self.parent_constructed();
             self.shell_integration
                 .connect_activated(super::open_extensions);
+            self.low_battery
+                .set_range(f64::from(LOW_BATTERY_MIN), f64::from(LOW_BATTERY_MAX));
         }
     }
 
@@ -73,8 +76,6 @@ impl PreferencesDialog {
         imp.run_in_background.set_active(model.run_in_background);
         imp.run_in_background
             .set_subtitle(&optional(model.background_subtitle.as_ref()));
-        imp.low_battery
-            .set_range(f64::from(LOW_BATTERY_MIN), f64::from(LOW_BATTERY_MAX));
         imp.low_battery.set_value(f64::from(model.low_battery));
     }
 

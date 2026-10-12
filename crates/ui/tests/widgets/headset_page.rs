@@ -14,7 +14,9 @@ use arctis_ui::intents::IntentSink;
 use arctis_ui::{HeadsetPage, ScaleRow};
 use gtk::glib;
 
-use crate::support::{Log, combo_text, first, headset_model, init, named, recording_sink};
+use crate::support::{
+    Log, combo_text, first, has_value_text, headset_model, init, named, recording_sink,
+};
 
 const SETTING_GROUPS: [&str; 4] = [
     "microphone-group",
@@ -55,12 +57,15 @@ fn shown_groups(page: &HeadsetPage) -> Vec<&'static str> {
 fn a_ready_headset_shows_every_setting() {
     let (page, _, _) = rendered(&snapshot());
     assert_eq!(shown_groups(&page), SETTING_GROUPS.to_vec());
-    assert_eq!(named::<ScaleRow>(&page, "sidetone").value_text(), "Low");
-    assert_eq!(
-        named::<ScaleRow>(&page, "mic-volume").value_text(),
+    assert!(has_value_text(&named::<ScaleRow>(&page, "sidetone"), "Low"));
+    assert!(has_value_text(
+        &named::<ScaleRow>(&page, "mic-volume"),
         "7 of 15"
-    );
-    assert_eq!(named::<ScaleRow>(&page, "mute-light").value_text(), "Low");
+    ));
+    assert!(has_value_text(
+        &named::<ScaleRow>(&page, "mute-light"),
+        "Low"
+    ));
     assert!(!named::<adw::SwitchRow>(&page, "volume-limiter").is_active());
     assert!(named::<adw::SwitchRow>(&page, "extended-range").is_active());
     assert_eq!(
@@ -173,7 +178,7 @@ fn a_setting_not_applied_shows_the_observed_value() {
     s.dongle.observed = Some(observed);
     let (page, _, _) = rendered(&s);
     let row = named::<ScaleRow>(&page, "sidetone");
-    assert_eq!(row.value_text(), "Medium");
+    assert!(has_value_text(&row, "Medium"));
     assert_eq!(named::<gtk::Label>(&row, "subtitle").label(), "Not applied");
 }
 
@@ -211,6 +216,9 @@ fn rendering_new_values_emits_nothing() {
     s.dongle.observed =
         Some(desired.with_curve(s.dongle.observed.clone().expect("observed").equalizer));
     sink.rendering(|| page.render(&headset_model(&s)));
-    assert_eq!(named::<ScaleRow>(&page, "sidetone").value_text(), "High");
+    assert!(has_value_text(
+        &named::<ScaleRow>(&page, "sidetone"),
+        "High"
+    ));
     assert!(log.borrow().is_empty());
 }

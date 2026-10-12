@@ -7,7 +7,8 @@ use arctis_ui::{HeadsetStatus, PermissionDialog};
 use gtk::{AccessibleProperty, AccessibleRelation, AccessibleRole};
 
 use crate::support::{
-    descendants, first, headset_model, init, rendered_window, rich_snapshot, shown,
+    descendants, first, has_accessible_text, headset_model, init, rendered_window, rich_snapshot,
+    shown,
 };
 
 const INTERACTIVE: [AccessibleRole; 8] = [
@@ -106,12 +107,9 @@ fn the_header_has_a_description() {
     let s = rich_snapshot();
     let (window, _) = rendered_window(s.clone());
     let status = first::<HeadsetStatus>(&window);
-    assert!(gtk::test_accessible_has_property(
+    assert!(has_accessible_text(
         &status,
-        AccessibleProperty::Description
+        AccessibleProperty::Description,
+        &english(&headset_model(&s).header.description)
     ));
-    assert_eq!(
-        status.description(),
-        english(&headset_model(&s).header.description)
-    );
 }
