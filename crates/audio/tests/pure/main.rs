@@ -2,6 +2,7 @@ mod changes;
 mod graph;
 mod links;
 mod outputs;
+mod samples;
 mod streams;
 mod support;
 mod volume;
