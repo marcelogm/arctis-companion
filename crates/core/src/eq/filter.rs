@@ -1,4 +1,7 @@
-#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
+use serde::{Deserialize, Serialize};
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(rename_all = "kebab-case")]
 pub enum FilterKind {
     Peaking,
     LowShelf,
@@ -58,6 +61,7 @@ pub struct Gain(i8);
 impl Gain {
     pub const MIN_HALF_DB: i8 = -20;
     pub const MAX_HALF_DB: i8 = 20;
+    pub const MILLI_DB_PER_STEP: i64 = 500;
 
     pub const fn from_half_db(half_db: i8) -> Result<Self, EnvelopeError> {
         if matches!(half_db, Self::MIN_HALF_DB..=Self::MAX_HALF_DB) {
