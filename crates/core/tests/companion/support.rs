@@ -9,6 +9,7 @@ use arctis_core::companion::{Action, Companion, Input, Snapshot};
 use arctis_core::eq::library;
 use arctis_core::eq::preset::{Preset, PresetId};
 use arctis_core::eq::{Curve, Filter, FilterKind};
+use arctis_core::intent::Intent;
 use arctis_core::messages::audio::{AppIdentifiers, SoundPath, StreamInfo};
 use arctis_core::messages::audio::{AudioCommand, AudioEvent};
 use arctis_core::messages::audio::{DefaultSink, SinkKind};
@@ -317,5 +318,32 @@ pub fn chosen_for(preset: &str, app: &str) -> ActivePreset {
 impl Harness {
     pub fn headset_holds(&mut self, preset: &str) -> Vec<Action> {
         self.device(DeviceUpdate::Observed(observed_with(curve_of(preset))))
+    }
+}
+
+impl Harness {
+    pub fn intent(&mut self, intent: Intent) -> Vec<Action> {
+        self.send(Input::Intent(intent))
+    }
+}
+
+pub fn ready() -> Harness {
+    let mut h = Harness::new(adopted());
+    let _ = h.connect(observed());
+    h
+}
+
+pub fn firefox_playing() -> Harness {
+    let mut h = ruled(&[("firefox", "footsteps"), ("spotify", "bass-boost")]);
+    let _ = h.at(1_000).audio(playing(&["firefox"], SoundPath::Dongle));
+    let _ = h.at(2_000).send(Input::Woke);
+    let _ = h.headset_holds("footsteps");
+    h
+}
+
+pub fn picked_by_hand(preset: &str, app: Option<&str>) -> ActivePreset {
+    ActivePreset {
+        preset: id(preset),
+        reason: PresetReason::Manual(app.map(str::to_owned)),
     }
 }

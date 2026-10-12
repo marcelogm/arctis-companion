@@ -76,7 +76,11 @@ impl Companion {
             Input::Device(update) => self.device(update, now, out),
             Input::Audio(event) => self.audio_event(&event, out),
             Input::Woke => self.deadlines.woke(),
-            Input::Intent(_) | Input::SettingsChanged(_) | Input::Quitting => {}
+            Input::Intent(intent) => {
+                self.intent(intent, out);
+                return Cause::User;
+            }
+            Input::SettingsChanged(_) | Input::Quitting => {}
         }
         Cause::Automatic
     }

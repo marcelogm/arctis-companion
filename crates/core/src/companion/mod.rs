@@ -8,6 +8,7 @@ pub mod deadlines;
 pub mod dongle;
 pub mod engines;
 pub mod input;
+mod intents;
 mod reducer;
 pub mod routing;
 pub mod seen_apps;
