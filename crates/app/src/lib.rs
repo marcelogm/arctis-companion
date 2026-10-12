@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+pub mod alarm;
 pub mod application;
 pub mod bridge;
 pub mod logging;

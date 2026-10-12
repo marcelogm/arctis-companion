@@ -19,6 +19,8 @@ pub const START: Millis = Millis(1_760_000_000_000);
 pub struct Rig {
     pub bridge: Rc<Bridge>,
     pub journal: Journal,
+    pub alarm: ManualAlarm,
+    pub clock: ManualClock,
 }
 
 impl Rig {
@@ -52,7 +54,12 @@ impl Rig {
         let bridge = Bridge::new(Companion::new(persisted), ports, stores);
         bridge.attach(Rc::new(recorder));
         journal.borrow_mut().clear();
-        Self { bridge, journal }
+        Self {
+            bridge,
+            journal,
+            alarm,
+            clock,
+        }
     }
 
     pub fn send(&self, input: Input) -> Vec<Seen> {
@@ -83,6 +90,12 @@ pub fn persisted() -> Persisted {
         seen_apps: Vec::new(),
         battery: Vec::new(),
     }
+}
+
+pub fn with_rule(app: &str, preset: &str) -> Persisted {
+    let mut saved = persisted();
+    saved.settings.app_rules.set(app.to_owned(), id(preset));
+    saved
 }
 
 pub fn curve(preset: &str) -> Curve {
