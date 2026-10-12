@@ -249,8 +249,9 @@ fn unknown_text_file_is_reported() {
 }
 
 #[test]
-fn plain_text_and_json_are_accepted() {
+fn plain_text_json_and_hex_dumps_are_accepted() {
     assert_accepted("notes/todo.txt", "# not a comment\n");
+    assert_accepted("docs/research/captures/reply.hex", "27 00 00\n");
     assert_accepted("data/value.json", "{\"color\": \"#fff\"}\n");
 }
 

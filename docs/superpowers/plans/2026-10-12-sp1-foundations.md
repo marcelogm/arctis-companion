@@ -4210,7 +4210,7 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     only, so `url(http://…)` is accepted; hash (`toml`, `lock`, `yml`, `yaml`, `sh`, `py`, `ini`, `conf`,
     `desktop`, `service`, `rules`, `po`, `pot`, `meson.build`, `Containerfile`, `Dockerfile`, git attribute and
     ignore files, and any file starting with a `#!/` shebang); XML (`xml`, `ui`, `svg`, `policy`); Markdown,
-    `<!--` outside fenced blocks and code spans; plain (`json`, `txt`). Known false positives: an unquoted
+    `<!--` outside fenced blocks and code spans; plain (`json`, `txt`, `hex` captures). Known false positives: an unquoted
     `url(//…)` in SCSS, and the regex-literal case of deviation 3.
 27. **Hash rule quoting**: a backslash escapes only inside double quotes, so a TOML literal string or a shell
     single-quoted string ending in `\` closes normally. `#` inside a word (`C#`, `$#`) is not a comment.

@@ -77,7 +77,7 @@ fn by_extension(extension: &str) -> Option<Syntax> {
         | "rules" | "po" | "pot" => Some(Syntax::Hash),
         "xml" | "ui" | "svg" | "policy" => Some(Syntax::Xml),
         "md" => Some(Syntax::Markdown),
-        "json" | "txt" => Some(Syntax::Plain),
+        "json" | "txt" | "hex" => Some(Syntax::Plain),
         _ => None,
     }
 }
