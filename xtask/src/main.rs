@@ -5,6 +5,7 @@ mod check_doc_paths;
 mod check_pure;
 mod check_rules;
 mod cli;
+mod commit_message;
 mod git;
 mod install_hooks;
 mod report;
