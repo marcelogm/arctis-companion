@@ -40,9 +40,9 @@ differs from the designed default, an issue is opened against the named constant
 
 | # | Check | How | Passes when | Done |
 |---|---|---|---|---|
-| A1 | 2.4 GHz edit latency | headset on, run H14: it drives the real `crates/hid/src/worker.rs::Worker` and confirms each sidetone write by an `Observed` readback; writes that cross a Rebinding are counted as interrupted, not timed | the `soak:` line's "slowest confirmation" is at most 300 ms | [ ] |
+| A1 | 2.4 GHz edit latency | headset on, run H14: it drives the real `crates/hid/src/worker.rs::Worker` and confirms each sidetone write by an `Observed` readback; writes that cross a Rebinding are counted as interrupted, not timed | H14 passes; it fails when the slowest confirmed write took more than 300 ms | [ ] |
 | A2 | Ruled app | add a rule for a player (for example `org.gnome.Totem` or `firefox`) with a preset that is not the current one, start playback, then stop it; time it with a stopwatch or the debug log timestamps | the preset row changes 1 s after playback starts and returns 10 s after it stops | [ ] |
-| A3 | Bluetooth system engine | on a Bluetooth-paired computer, play audio through "Arctis Nova 5 (Equalizer)" for 30 minutes at 48 kHz with quantum 256 (`pw-metadata -n settings 0 clock.force-quantum 256`); watch `pw-top` | `pw-top` shows ERR 0 for the EQ node at the end | [ ] |
+| A3 | Bluetooth system engine | on a Bluetooth-paired computer, play audio through "Arctis Nova 5 (Equalizer)" for 30 minutes after `pw-metadata -n settings 0 clock.force-rate 48000` and `pw-metadata -n settings 0 clock.force-quantum 256`; confirm in `pw-top` that the EQ node shows RATE 48000 and QUANT 256; afterwards reset both with `pw-metadata -n settings 0 clock.force-rate 0` and `pw-metadata -n settings 0 clock.force-quantum 0` | `pw-top` shows RATE 48000, QUANT 256 and ERR 0 for the EQ node at the end | [ ] |
 
 ## F — Flatpak and desktop
 
@@ -53,7 +53,7 @@ differs from the designed default, an issue is opened against the named constant
 | F3 | Plug-in retry | with the rule installed, unplug the dongle and plug it back by hand | the permission page never flashes | [ ] |
 | F4 | Background | turn Run in Background on and close the window; then log out and in | the process stays, GNOME's background apps list shows "Headset connected, NN %"; after login the app starts in the background | [ ] |
 | F5 | Low battery | let the battery fall below the threshold, click the notification, then plug the charger | the notification appears, opens the battery page, and is withdrawn while charging | [ ] |
-| F6 | pt_BR | if `flatpak info --user io.github.marcelogm.ArctisCompanion.Locale` does not list `pt`, run `flatpak config --user --set extra-languages pt_BR && flatpak update --user`; quit the running instance and start `LANG=pt_BR.UTF-8 LANGUAGE=pt_BR flatpak run io.github.marcelogm.ArctisCompanion` | every page, dialog, toast and the About dialog are in Portuguese, numbers use a decimal comma, nothing is truncated at 360 px wide | [ ] |
+| F6 | pt_BR | quit the running instance and start `LANG=pt_BR.UTF-8 LANGUAGE=pt_BR flatpak run io.github.marcelogm.ArctisCompanion` | every page, dialog, toast and the About dialog are in Portuguese, numbers use a decimal comma, nothing is truncated at 360 px wide | [ ] |
 
 ## U — UI by hand
 

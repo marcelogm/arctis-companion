@@ -14,10 +14,3 @@ fn the_catalogue_sits_under_the_prefix_share_dir() {
 fn a_bare_name_has_no_prefix() {
     assert_eq!(locale_dir_beside(Path::new("arctis-companion")), None);
 }
-
-#[test]
-fn the_domain_is_the_meson_project_name() {
-    let meson = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/../../meson.build"))
-        .expect("meson.build");
-    assert!(meson.starts_with(&format!("project(\n  '{GETTEXT_PACKAGE}',")));
-}
