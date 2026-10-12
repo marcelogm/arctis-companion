@@ -1,5 +1,6 @@
 use std::f32::consts::TAU;
 
+use arctis_core::eq::biquad::Biquad;
 use arctis_core::eq::{Curve, Equalizer, Filter, FilterKind, Gain, Hertz, Q};
 use proptest::prelude::*;
 
@@ -73,4 +74,14 @@ pub fn processed(equalizer: &mut Equalizer, input: &[f32]) -> Vec<f32> {
 
 pub fn bits(samples: &[f32]) -> Vec<u32> {
     samples.iter().map(|sample| sample.to_bits()).collect()
+}
+
+#[expect(clippy::cast_possible_truncation)]
+fn through_f32(coefficient: f64) -> f64 {
+    f64::from(coefficient as f32)
+}
+
+pub fn poles_inside_unit_circle(biquad: &Biquad) -> bool {
+    let (a1, a2) = (through_f32(biquad.a1), through_f32(biquad.a2));
+    a2.abs() < 1.0 && a1.abs() < 1.0 + a2
 }

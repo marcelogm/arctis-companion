@@ -1,7 +1,6 @@
-use super::biquad::{Biquad, Params, Section, SectionState, narrow};
+use super::biquad::{Section, SectionState, narrow, shaping_biquads};
 use super::curve::{Curve, MAX_FILTERS};
-use super::filter::Filter;
-use super::response::preamp_db;
+use super::response::preamp_db_at;
 
 pub type ChannelState = [SectionState; MAX_FILTERS];
 
@@ -16,19 +15,13 @@ pub struct Coefficients {
 impl Coefficients {
     #[must_use]
     pub fn design(curve: &Curve, rate: u32) -> Self {
-        let designed = curve
-            .filters()
-            .iter()
-            .copied()
-            .filter(|filter| filter.shapes_sound() && below_nyquist(*filter, rate))
-            .map(|filter| Section::from(Biquad::design(&Params::from(filter), f64::from(rate))));
         let mut sections = [Section::IDENTITY; MAX_FILTERS];
         let mut count = 0;
-        for (slot, section) in sections.iter_mut().zip(designed) {
-            *slot = section;
+        for (slot, biquad) in sections.iter_mut().zip(shaping_biquads(curve, rate)) {
+            *slot = Section::from(biquad);
             count += 1;
         }
-        let preamp = narrow(10f64.powf(preamp_db(curve) / 20.0));
+        let preamp = narrow(10f64.powf(preamp_db_at(curve, rate) / 20.0));
         Self {
             sections,
             count,
@@ -62,8 +55,4 @@ impl Coefficients {
             });
         shaped * self.preamp
     }
-}
-
-fn below_nyquist(filter: Filter, rate: u32) -> bool {
-    2 * u32::from(filter.hz().get()) < rate
 }

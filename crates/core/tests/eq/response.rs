@@ -1,7 +1,10 @@
-use arctis_core::eq::response::preamp_db;
+use arctis_core::eq::biquad::shaping_biquads;
+use arctis_core::eq::response::{preamp_db, preamp_db_at};
 use arctis_core::eq::{Curve, FilterKind, library, response};
 
 use crate::support::{assert_close, filter, log_grid, peaking};
+
+const SWEEP_POINTS: u32 = 200_000;
 
 fn dense_peak(curve: &Curve) -> f64 {
     let gains = response(curve, &log_grid(2_000));
@@ -96,4 +99,58 @@ fn the_preamp_cancels_overlapping_boosts() {
 fn the_preamp_cancels_a_resonant_pass_filter() {
     let curve = Curve::from_array([filter(FilterKind::LowPass, 1_000, 0, 10_000)]);
     assert_close(preamp_db(&curve), -20.0, 0.05, "resonance");
+}
+
+fn swept_peak_db(curve: &Curve, rate: u32) -> f64 {
+    let biquads: Vec<_> = shaping_biquads(curve, rate).collect();
+    let nyquist = f64::from(rate) / 2.0;
+    let step = (nyquist - 20.0) / f64::from(SWEEP_POINTS);
+    (0..=SWEEP_POINTS)
+        .map(|index| 20.0 + step * f64::from(index))
+        .map(|hz| {
+            let rate = f64::from(rate);
+            biquads
+                .iter()
+                .map(|biquad| biquad.magnitude_db(hz, rate))
+                .sum::<f64>()
+        })
+        .fold(0.0, f64::max)
+}
+
+fn high_shelf(hz: u16) -> Curve {
+    Curve::from_array([filter(FilterKind::HighShelf, hz, 20, 10_000)])
+}
+
+#[test]
+fn the_preamp_cancels_boosts_up_to_nyquist() {
+    let curves = [
+        high_shelf(20_000),
+        high_shelf(16_000),
+        Curve::from_array([
+            filter(FilterKind::LowPass, 18_000, 0, 10_000),
+            filter(FilterKind::HighShelf, 15_000, 20, 707),
+        ]),
+    ];
+    for curve in &curves {
+        for rate in [44_100, 48_000] {
+            let case = format!("{curve:?} at {rate} Hz");
+            assert_close(
+                preamp_db_at(curve, rate),
+                -swept_peak_db(curve, rate),
+                0.05,
+                &case,
+            );
+        }
+    }
+}
+
+#[test]
+fn the_exported_preamp_is_the_one_at_the_graph_rate() {
+    let curve = high_shelf(20_000);
+    assert_close(
+        preamp_db(&curve),
+        preamp_db_at(&curve, 48_000),
+        1e-12,
+        "graph rate",
+    );
 }

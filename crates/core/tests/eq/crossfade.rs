@@ -127,9 +127,9 @@ fn faded(rate: u32, frames: usize, channels: usize) -> Vec<f32> {
     equalizer.retarget(&target);
     let output = processed(&mut equalizer, &vec![0.5; 2 * frames * channels]);
     assert!(
-        output
-            .chunks(channels)
-            .all(|frame| frame.iter().all(|&sample| sample.to_bits() == frame[0].to_bits())),
+        output.chunks(channels).all(|frame| frame
+            .iter()
+            .all(|&sample| sample.to_bits() == frame[0].to_bits())),
         "{channels} channels move together"
     );
     channel(&output, channels)
@@ -141,8 +141,14 @@ fn assert_fade_lasts(rate: u32, frames: usize) {
     for channels in [1, 2] {
         let output = faded(rate, frames, channels);
         let case = format!("{rate} Hz, {channels} channels");
-        assert!((output[frames / 2 - 1] - midway).abs() < 1e-3, "{case} half-way");
-        assert!((output[frames - 2] - settled).abs() > 1e-4, "{case} still fading");
+        assert!(
+            (output[frames / 2 - 1] - midway).abs() < 1e-3,
+            "{case} half-way"
+        );
+        assert!(
+            (output[frames - 2] - settled).abs() > 1e-4,
+            "{case} still fading"
+        );
         let tail = &output[frames - 1..];
         assert!(
             tail.iter().all(|sample| (sample - settled).abs() < 1e-4),
