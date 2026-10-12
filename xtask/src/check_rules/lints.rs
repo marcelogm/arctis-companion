@@ -56,7 +56,7 @@ fn check_workspace(manifest: &toml::Table) -> Report {
     };
     let clippy = workspace.get("lints").and_then(|lints| lints.get("clippy"));
     let missing = GUARDED.iter().filter(|lint| !is_allowed(clippy, lint));
-    Report::errors(missing.map(|lint| {
+    Report::from_errors(missing.map(|lint| {
         format!("Cargo.toml: [workspace.lints.clippy] must keep {lint} = \"allow\"; it would demand doc comments")
     }))
 }

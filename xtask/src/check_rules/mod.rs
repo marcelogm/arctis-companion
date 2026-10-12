@@ -1,6 +1,6 @@
 mod comments;
 mod dbus_copy;
-mod generated;
+mod exempt;
 mod line_limit;
 mod lints;
 mod snapshot;
@@ -33,7 +33,7 @@ fn check_tree(snapshot: Snapshot, files: &[String], tracked: &[String]) -> Repor
 
 fn check_file(snapshot: Snapshot, file: &str) -> Report {
     let path = Path::new(file);
-    if generated::is_generated(path) {
+    if exempt::is_exempt(path) {
         return Report::default();
     }
     snapshot

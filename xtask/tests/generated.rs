@@ -63,3 +63,27 @@ fn fresh_lockfile_and_translation_pass_check_rules() {
     let outcome = fixture.xtask(&["check-rules"]);
     assert!(outcome.succeeded(), "{}", outcome.stderr);
 }
+
+const EXEMPT: [&str; 10] = [
+    "Cargo.lock",
+    "build-aux/cargo-sources.json",
+    "extension/package-lock.json",
+    "LICENSE",
+    "po/pt_BR.po",
+    "po/arctis-companion.pot",
+    "po/LINGUAS",
+    "po/POTFILES.in",
+    "data/icons/app.svg",
+    "data/screenshots/main.png",
+];
+
+#[test]
+fn every_exempt_entry_skips_the_line_limit() {
+    let fixture = Fixture::init();
+    for path in EXEMPT {
+        fixture.write(path, &"line\n".repeat(900));
+    }
+    let outcome = fixture.xtask(&["check-rules"]);
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+    assert!(!outcome.stderr.contains("warning"), "{}", outcome.stderr);
+}

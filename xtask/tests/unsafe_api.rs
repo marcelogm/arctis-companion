@@ -31,3 +31,40 @@ fn unsafe_block_inside_a_safe_pub_fn_is_accepted() {
         "pub fn read() -> u8 {\n    unsafe { core::ptr::read(&1) }\n}\n",
     );
 }
+
+#[test]
+fn pub_fn_in_an_extern_block_is_rejected() {
+    assert_rejected(
+        PORT,
+        "unsafe extern \"C\" {\n    pub fn ioctl(fd: i32) -> i32;\n}\n",
+    );
+}
+
+#[test]
+fn pub_static_in_an_extern_block_is_rejected() {
+    assert_rejected(PORT, "extern \"C\" {\n    pub static errno: i32;\n}\n");
+}
+
+#[test]
+fn pub_safe_fn_in_an_extern_block_is_accepted() {
+    assert_accepted(
+        PORT,
+        "unsafe extern \"C\" {\n    pub safe fn abs(value: i32) -> i32;\n}\n",
+    );
+}
+
+#[test]
+fn private_fn_in_an_extern_block_is_accepted() {
+    assert_accepted(
+        PORT,
+        "unsafe extern \"C\" {\n    fn ioctl(fd: i32) -> i32;\n}\npub fn safe() {}\n",
+    );
+}
+
+#[test]
+fn pub_items_after_an_extern_block_are_accepted() {
+    assert_accepted(
+        PORT,
+        "unsafe extern \"C\" {\n    fn ioctl(fd: i32) -> i32;\n}\npub fn safe() {}\npub static VALUE: i32 = 1;\n",
+    );
+}

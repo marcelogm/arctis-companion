@@ -12,7 +12,7 @@ pub fn check(snapshot: Snapshot, tracked: &[String]) -> Report {
         .iter()
         .filter(|file| is_extension_copy(file))
         .filter(|file| snapshot.read(file) != source);
-    Report::errors(diverging.map(|file| format!("{file} must be byte-equal to {SOURCE}")))
+    Report::from_errors(diverging.map(|file| format!("{file} must be byte-equal to {SOURCE}")))
 }
 
 fn is_extension_copy(file: &str) -> bool {

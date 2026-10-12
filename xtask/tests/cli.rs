@@ -32,3 +32,18 @@ fn every_command_is_recognised() {
         assert_ne!(fixture.xtask(&[command]).code, Some(2), "{command}");
     }
 }
+
+#[test]
+fn flag_of_another_command_exits_with_two() {
+    let fixture = Fixture::init();
+    let outcome = fixture.xtask(&["check-rules", "--range", "HEAD"]);
+    assert_eq!(outcome.code, Some(2));
+    assert!(
+        outcome
+            .stderr
+            .contains("unknown flag --range for check-rules"),
+        "{}",
+        outcome.stderr
+    );
+    assert_eq!(fixture.xtask(&["check-pure", "--staged"]).code, Some(2));
+}

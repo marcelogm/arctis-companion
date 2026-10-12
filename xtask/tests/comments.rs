@@ -141,3 +141,135 @@ fn desktop_entry_comment_is_rejected() {
 fn template_file_uses_the_syntax_of_its_output() {
     assert_rejected("data/app.service.in", "# why\n[D-BUS Service]\n");
 }
+
+#[test]
+fn shell_script_without_an_extension_is_checked() {
+    assert_rejected("build-aux/run", "#!/bin/sh\n# why\n");
+}
+
+#[test]
+fn python_comment_is_rejected() {
+    assert_rejected("tests/mock.py", "value = 1  # why\n");
+}
+
+#[test]
+fn containerfile_comment_is_rejected() {
+    assert_rejected("build-aux/Containerfile", "# why\nFROM fedora\n");
+}
+
+#[test]
+fn dockerfile_comment_is_rejected() {
+    assert_rejected("Dockerfile", "# why\nFROM fedora\n");
+}
+
+#[test]
+fn ini_comment_is_rejected() {
+    assert_rejected("data/settings.ini", "# why\n[section]\n");
+}
+
+#[test]
+fn gtk_builder_comment_is_rejected() {
+    assert_rejected(
+        "crates/ui/resources/window.ui",
+        "<interface><!-- why --></interface>\n",
+    );
+}
+
+#[test]
+fn svg_comment_is_rejected() {
+    assert_rejected("data/icons/app.svg", "<svg><!-- why --></svg>\n");
+}
+
+#[test]
+fn policy_comment_is_rejected() {
+    assert_rejected(
+        "data/app.policy",
+        "<policyconfig><!-- why --></policyconfig>\n",
+    );
+}
+
+#[test]
+fn markdown_html_comment_is_rejected() {
+    assert_rejected("docs/notes.md", "# Notes\n\nText <!-- why -->\n");
+}
+
+#[test]
+fn markdown_comment_marker_inside_code_is_accepted() {
+    assert_accepted(
+        "docs/notes.md",
+        "Write `<!--` in XML.\n\n```xml\n<!-- example -->\n```\n",
+    );
+}
+
+#[test]
+fn commonjs_comment_is_rejected() {
+    assert_rejected(
+        "extension/eslint.config.cjs",
+        "module.exports = {}; // why\n",
+    );
+}
+
+#[test]
+fn typescript_comment_is_rejected() {
+    assert_rejected("extension/lib/types.ts", "/* why */\nexport type A = 1;\n");
+}
+
+#[test]
+fn scss_line_comment_is_rejected() {
+    assert_rejected("crates/ui/resources/style.scss", "// why\n.row {}\n");
+}
+
+#[test]
+fn css_unquoted_url_is_accepted() {
+    assert_accepted(
+        "crates/ui/resources/style.css",
+        ".row { background: url(http://example.org/a.png); }\n",
+    );
+}
+
+#[test]
+fn javascript_template_literal_holding_slashes_is_accepted() {
+    assert_accepted(
+        "extension/lib/client.js",
+        "export const url = `http://example.org`;\n",
+    );
+}
+
+#[test]
+fn unknown_text_file_is_reported() {
+    let fixture = support::Fixture::init();
+    fixture.write("data/thing.weird", "text\n");
+    let outcome = fixture.xtask(&["check-rules"]);
+    assert!(!outcome.succeeded());
+    assert!(
+        outcome.stderr.contains("data/thing.weird: unknown syntax"),
+        "{}",
+        outcome.stderr
+    );
+}
+
+#[test]
+fn plain_text_and_json_are_accepted() {
+    assert_accepted("notes/todo.txt", "# not a comment\n");
+    assert_accepted("data/value.json", "{\"color\": \"#fff\"}\n");
+}
+
+#[test]
+fn hash_inside_a_word_is_accepted() {
+    assert_accepted("build-aux/run.sh", "#!/bin/sh\necho C# $#\n");
+}
+
+#[test]
+fn comment_after_an_escaped_quote_is_rejected() {
+    assert_rejected("config/settings.toml", "value = \"a\\\"\" # why\n");
+}
+
+#[test]
+fn comment_after_an_escaped_backslash_is_rejected() {
+    assert_rejected("config/settings.toml", "value = \"a\\\\\" # why\n");
+}
+
+#[test]
+fn comment_after_a_literal_string_ending_in_a_backslash_is_rejected() {
+    assert_rejected("config/settings.toml", "path = 'C:\\' # why\n");
+}

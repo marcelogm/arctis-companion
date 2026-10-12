@@ -2,7 +2,7 @@ use std::fs;
 use std::path::Path;
 
 use crate::cli::MessageSource;
-use crate::commit_message::{attribution_problem, editor_message, subject_of, subject_problem};
+use crate::commit_message::{above_scissors, attribution_problem, subject_of, subject_problem};
 use crate::git;
 use crate::report::Report;
 
@@ -27,7 +27,7 @@ fn check_source(root: &Path, source: &MessageSource) -> Report {
 
 fn check_file(path: &Path) -> Report {
     match fs::read_to_string(path) {
-        Ok(raw) => check_message("commit message", &editor_message(&raw)),
+        Ok(raw) => check_message("commit message", &above_scissors(&raw)),
         Err(error) => Report::failed(format!("{}: {error}", path.display())),
     }
 }

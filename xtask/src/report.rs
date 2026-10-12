@@ -8,10 +8,10 @@ pub struct Report {
 
 impl Report {
     pub fn failed(message: impl Into<String>) -> Self {
-        Self::errors([message.into()])
+        Self::from_errors([message.into()])
     }
 
-    pub fn errors(messages: impl IntoIterator<Item = String>) -> Self {
+    pub fn from_errors(messages: impl IntoIterator<Item = String>) -> Self {
         Self {
             errors: messages.into_iter().collect(),
             warnings: Vec::new(),
@@ -26,13 +26,9 @@ impl Report {
         self.warnings.push(message.into());
     }
 
-    pub fn merge(&mut self, other: Self) {
+    pub fn merged(mut self, other: Self) -> Self {
         self.errors.extend(other.errors);
         self.warnings.extend(other.warnings);
-    }
-
-    pub fn merged(mut self, other: Self) -> Self {
-        self.merge(other);
         self
     }
 
