@@ -67,6 +67,10 @@ impl FakeSysfs {
         fs::write(device.join("uevent"), uevent).expect("the uevent file");
     }
 
+    pub fn remove(&self, name: &str) {
+        let _ = fs::remove_dir_all(self.dir.path().join("class").join(name));
+    }
+
     pub fn add_nova_5(&self) {
         self.add(COMMAND_NODE, &NodeSpec::nova_5(3));
         self.add(EVENTS_NODE, &NodeSpec::nova_5(5));
