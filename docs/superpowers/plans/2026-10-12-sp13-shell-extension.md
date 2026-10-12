@@ -43,6 +43,11 @@ ADR 0002, `CONTEXT.md` ("Quick Settings toggle", "Preset reason", "Low battery w
   `Co-Authored-By`, "Generated with", or any AI or tool name in a commit message, PR title or PR body. Never use
   `--no-verify`.
 - Push after every commit: `git push -u origin sp13-shell-extension` (first time), then `git push`.
+- **Host safety:** the user's own GNOME session shares `~/.config/dconf/user` and `/run/user/$UID` with the
+  toolbox. Never run `gsettings set org.gnome.shell …`, `gnome-extensions enable|disable` or a second
+  `gnome-shell` except through `tests/nested-shell.sh`, which exports throwaway `XDG_*` dirs and
+  `GSETTINGS_BACKEND=keyfile` *before* it starts the private bus. A `dconf-service` activated on a private bus
+  started from an unisolated shell writes the user's real database and replaces their enabled extensions.
 
 ## Acceptance criteria → tasks
 
@@ -55,9 +60,9 @@ ADR 0002, `CONTEXT.md` ("Quick Settings toggle", "Preset reason", "Low battery w
 | XML copy equals `data/dbus/…Headset1.xml` | 2 (copy + xtask check), 8 (copy parses, declares every property) |
 | Manual check in `gnome-shell --devkit` | 13 |
 | Hidden when the app is absent | 3 (`present(null)`, `absent`, `permission-denied`), 9 (no owner → `null`), 11 (wiring), 13 (`absent` scenario) |
-| Proxy uses `DO_NOT_AUTO_START` | 8 |
+| Proxy uses `DO_NOT_AUTO_START` | 8 (flag), 10 (an activatable test bus never starts the app) |
 | `SystemIndicator` panel icon only for `BatteryWarning` or charging | 5, 11 |
-| `QuickMenuToggle` "App Presets", checked = `AutomaticPresets`, click toggles it | 3, 10, 11 |
+| `QuickMenuToggle` "App Presets", checked = `AutomaticPresets`, click toggles it | 3 (`automaticPresetsAfterClick`), 10, 11 |
 | Subtitles: preset name, "Footsteps · Firefox", "Bass Boost · Until Firefox stops", "No app rules" | 4 |
 | Insensitive with `AppRuleCount` 0 | 3, 11 |
 | Menu header: headset icon, `Model`, "73 %" or "Charging · 73 %" | 6, 11 |
@@ -78,7 +83,7 @@ extension/
     metadata.json                  uuid, shell-version ["50"], gettext-domain
     extension.js                   ArctisCompanionExtension: enable/disable wiring only
     dbus/io.github.marcelogm.ArctisCompanion.Headset1.xml   byte-equal copy of data/dbus/
-    lib/presentation.js            present(bag, _) -> {visible, panelIcon, title, subtitle, sensitive, checked, header, items}; fill()
+    lib/presentation.js            present(bag, _) -> {visible, panelIcon, title, subtitle, sensitive, checked, header, items}; fill(); automaticPresetsAfterClick()
     lib/client.js                  BUS_NAME, OBJECT_PATH, INTERFACE_NAME, interfaceXml(), interfaceInfo(), createProxy(), HeadsetClient
     lib/failures.js                reportFailure(error, warn)
     lib/toggle.js                  AppPresetsToggle (QuickMenuToggle)
@@ -96,6 +101,9 @@ extension/
     shell-session.sh               enables the extension, starts the fake app and a headless or devkit shell
     support/harness.js support/assert.js support/paths.js support/loop.js support/bags.js
     support/fake_headset_service.js
+    support/session-bus.xml        private bus config for npm test: standard policy plus servicedir activation/
+    support/activation/io.github.marcelogm.ArctisCompanion.service   activatable app name that touches a marker
+    support/activation.js          armActivationMarker(), wasActivated(), startAppByName()
 .github/workflows/ci.yml           extension job extended
 .github/workflows/nightly.yml      optional shell-smoke job
 .gitignore                         + /extension/dist
@@ -432,7 +440,12 @@ import {test} from './support/harness.js';
 import {assertEqual, assertTrue} from './support/assert.js';
 import {connectedBag} from './support/bags.js';
 import {extensionPath, readText} from './support/paths.js';
-import {HIDDEN, fill, present} from '../arctis-companion@marcelogm.github.io/lib/presentation.js';
+import {
+    HIDDEN,
+    automaticPresetsAfterClick,
+    fill,
+    present,
+} from '../arctis-companion@marcelogm.github.io/lib/presentation.js';
 
 const VISIBLE_STATES = ['bluetooth-only', 'connecting', 'awaiting-headset', 'headset-off', 'connected'];
 
@@ -468,6 +481,13 @@ test('toggle is checked when automatic presets are on', () =>
 
 test('toggle is insensitive without app rules', () =>
     assertEqual([0, 1].map(count => presentWith({AppRuleCount: count}).sensitive), [false, true]));
+
+test('a click asks for the opposite of checked', () =>
+    assertEqual([true, false].map(on => automaticPresetsAfterClick(presentWith({AutomaticPresets: on}))),
+        [false, true]));
+
+test('a click asks for nothing while insensitive', () =>
+    assertEqual([presentWith({AppRuleCount: 0}), HIDDEN].map(automaticPresetsAfterClick), [null, null]));
 ```
 
 In `extension/tests/run.js`, add `import './presentation.test.js';` after the metadata import.
@@ -530,6 +550,10 @@ export function fill(template, values) {
     return template.replace(PLACEHOLDER, (placeholder, name) => values[name] ?? placeholder);
 }
 
+export function automaticPresetsAfterClick({sensitive, checked}) {
+    return sensitive ? !checked : null;
+}
+
 function untranslated(text) {
     return text;
 }
@@ -538,7 +562,7 @@ function untranslated(text) {
 - [ ] **Step 4: Run the tests**
 
 Run (toolbox): `npm test && npx eslint .`
-Expected: 17 passed, 0 failed; ESLint silent.
+Expected: 19 passed, 0 failed; ESLint silent.
 
 - [ ] **Step 5: Commit**
 
@@ -624,7 +648,7 @@ function activePresetName({Presets, ActivePreset}) {
 
 - [ ] **Step 4: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 24 passed, 0 failed; ESLint silent.
+Run (toolbox): `npm test && npx eslint .` — Expected: 26 passed, 0 failed; ESLint silent.
 
 - [ ] **Step 5: Commit**
 
@@ -706,7 +730,7 @@ function chargingIcon(level) {
 
 - [ ] **Step 4: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 31 passed, 0 failed; ESLint silent.
+Run (toolbox): `npm test && npx eslint .` — Expected: 33 passed, 0 failed; ESLint silent.
 
 - [ ] **Step 5: Commit**
 
@@ -807,7 +831,7 @@ The `HIDDEN` object keeps `header: null` and `items: []`; Shell code reads them 
 
 - [ ] **Step 4: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 40 passed, 0 failed; ESLint silent.
+Run (toolbox): `npm test && npx eslint .` — Expected: 42 passed, 0 failed; ESLint silent.
 
 - [ ] **Step 5: Commit**
 
@@ -880,7 +904,7 @@ function isCancellation(error) {
 
 - [ ] **Step 4: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 43 passed, 0 failed.
+Run (toolbox): `npm test && npx eslint .` — Expected: 45 passed, 0 failed.
 
 - [ ] **Step 5: Commit**
 
@@ -977,7 +1001,7 @@ hence `GLib.Uri.resolve_relative`.
 
 - [ ] **Step 4: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 46 passed, 0 failed.
+Run (toolbox): `npm test && npx eslint .` — Expected: 48 passed, 0 failed.
 
 - [ ] **Step 5: Commit**
 
@@ -1230,13 +1254,8 @@ Expected: `SyntaxError: … doesn't provide an export named: 'HeadsetClient'`.
 
 - [ ] **Step 4: Implement `HeadsetClient`**
 
-In `lib/client.js`, below `const INTERFACE_FILE …`, add:
-
-```js
-Gio._promisify(Gio.DBusProxy.prototype, 'init_async');
-```
-
-Append the class:
+GJS 1.88 already returns a Promise from `init_async` when the callback is omitted (checked in the toolbox), so
+`lib/client.js` does not promisify it. Append the class:
 
 ```js
 export class HeadsetClient {
@@ -1276,7 +1295,7 @@ before it notifies `g-name-owner`, so a non-null owner means a full bag.
 
 - [ ] **Step 5: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 50 passed, 0 failed.
+Run (toolbox): `npm test && npx eslint .` — Expected: 52 passed, 0 failed.
 
 - [ ] **Step 6: Commit**
 
@@ -1291,13 +1310,85 @@ git push
 ### Task 10: Client — writes and calls
 
 **Files:**
-- Modify: `extension/arctis-companion@marcelogm.github.io/lib/client.js`
+- Modify: `extension/arctis-companion@marcelogm.github.io/lib/client.js`, `extension/package.json`
+- Create: `extension/tests/support/session-bus.xml`,
+  `extension/tests/support/activation/io.github.marcelogm.ArctisCompanion.service`,
+  `extension/tests/support/activation.js`
 - Test: `extension/tests/client.test.js`
 
-- [ ] **Step 1: Write the failing tests**
+- [ ] **Step 1: Make the app name activatable on the test bus**
+
+The default `dbus-run-session` bus has no service file for the app, so it could never start the app whatever the
+flags; ADR 0002's "never starts the app" needs a bus that *could*. Verified in the toolbox: a relative
+`<servicedir>` resolves against the config file, and `UpdateActivationEnvironment` reaches the spawned `Exec`.
+
+`extension/tests/support/session-bus.xml`:
+
+```xml
+<!DOCTYPE busconfig PUBLIC "-//freedesktop//DTD D-Bus Bus Configuration 1.0//EN"
+ "http://www.freedesktop.org/standards/dbus/1.0/busconfig.dtd">
+<busconfig>
+  <type>session</type>
+  <keep_umask/>
+  <listen>unix:tmpdir=/tmp</listen>
+  <auth>EXTERNAL</auth>
+  <servicedir>activation</servicedir>
+  <policy context="default">
+    <allow send_destination="*" eavesdrop="true"/>
+    <allow eavesdrop="true"/>
+    <allow own="*"/>
+  </policy>
+</busconfig>
+```
+
+`extension/tests/support/activation/io.github.marcelogm.ArctisCompanion.service` (`exit 1` makes the bus answer
+`Spawn.ChildExited` at once instead of waiting for the name):
+
+```ini
+[D-BUS Service]
+Name=io.github.marcelogm.ArctisCompanion
+Exec=/bin/sh -c 'touch "$ARCTIS_ACTIVATION_MARKER"; exit 1'
+```
+
+`extension/tests/support/activation.js`:
+
+```js
+import Gio from 'gi://Gio';
+import GLib from 'gi://GLib';
+
+import {BUS_NAME} from '../../arctis-companion@marcelogm.github.io/lib/client.js';
+
+export async function armActivationMarker() {
+    const marker = GLib.build_filenamev([GLib.get_tmp_dir(), `arctis-activation-${GLib.random_int()}`]);
+    await busCall('UpdateActivationEnvironment', new GLib.Variant('(a{ss})', [{ARCTIS_ACTIVATION_MARKER: marker}]));
+    return marker;
+}
+
+export function wasActivated(marker) {
+    return GLib.file_test(marker, GLib.FileTest.EXISTS);
+}
+
+export function startAppByName() {
+    return busCall('StartServiceByName', new GLib.Variant('(su)', [BUS_NAME, 0]));
+}
+
+function busCall(method, parameters) {
+    return Gio.DBus.session.call('org.freedesktop.DBus', '/org/freedesktop/DBus', 'org.freedesktop.DBus', method,
+        parameters, null, Gio.DBusCallFlags.NONE, -1, null);
+}
+```
+
+In `extension/package.json`, change `test` to
+`"test": "GIO_USE_VFS=local dbus-run-session --config-file=tests/support/session-bus.xml -- gjs -m tests/run.js"`.
+Run (toolbox): `npm test` — Expected: still 52 passed (the fake service owns the name, so nothing is activated).
+
+- [ ] **Step 2: Write the failing tests**
 
 In `extension/tests/client.test.js`, change the assert import to
-`import {assertEqual, assertRejects, assertTrue} from './support/assert.js';` and append:
+`import {assertEqual, assertRejects, assertTrue} from './support/assert.js';`, add
+`import GLib from 'gi://GLib';` below the `Gio` import and
+`import {armActivationMarker, startAppByName, wasActivated} from './support/activation.js';` below the bags
+import, and append:
 
 ```js
 test('toggling writes AutomaticPresets', () => withRunningApp(async (client, service) => {
@@ -1320,15 +1411,38 @@ test('Headset Settings activates the app', () => withRunningApp(async (client, s
     await client.activateApplication();
     assertEqual(service.activations, 1);
 }));
+
+test('neither the proxy nor its calls start the app', async () => {
+    const marker = await armActivationMarker();
+    const client = await startClient();
+    await Promise.allSettled([
+        client.setAutomaticPresets(true),
+        client.activatePreset('flat'),
+        client.activateApplication(),
+    ]);
+    await delay(200);
+    client.destroy();
+    assertTrue(!wasActivated(marker), 'the app was started');
+});
+
+test('the test bus can start the app when asked', async () => {
+    const marker = await armActivationMarker();
+    await startAppByName().catch(() => null);
+    await waitFor(() => wasActivated(marker));
+    GLib.unlink(marker);
+});
 ```
 
-- [ ] **Step 2: Run to see them fail**
+The last test is the control: it proves the marker detects an activation, so the test before it cannot pass
+vacuously.
+
+- [ ] **Step 3: Run to see them fail**
 
 Run (toolbox): `npm test`
-Expected: `not ok - toggling writes AutomaticPresets` with `client.setAutomaticPresets is not a function`, and
-the same for the other three.
+Expected: `not ok - toggling writes AutomaticPresets` with `client.setAutomaticPresets is not a function`, the
+same for the next three, and `ok - the test bus can start the app when asked`.
 
-- [ ] **Step 3: Implement the calls**
+- [ ] **Step 4: Implement the calls**
 
 In `lib/client.js`, below `const INTERFACE_FILE …` add:
 
@@ -1337,7 +1451,8 @@ const CALL_FLAGS = Gio.DBusCallFlags.NO_AUTO_START;
 const DEFAULT_TIMEOUT = -1;
 ```
 
-below the existing `_promisify` line add:
+below them add (GJS 1.88 still requires a callback for both `call`s outside the Shell, checked in the toolbox;
+the Shell promisifies `DBusConnection.call` itself, and `_promisify` keeps callback callers working):
 
 ```js
 Gio._promisify(Gio.DBusProxy.prototype, 'call');
@@ -1364,11 +1479,13 @@ and insert into `HeadsetClient`, before `destroy()`:
     }
 ```
 
-- [ ] **Step 4: Run the tests**
+- [ ] **Step 5: Run the tests**
 
-Run (toolbox): `npm test && npx eslint .` — Expected: 54 passed, 0 failed; ESLint silent.
+Run (toolbox): `npm test && npx eslint .` — Expected: 58 passed, 0 failed; ESLint silent.
+Run (toolbox, root): `git add extension && cargo xtask check-rules --staged` — Expected: exit 0 (`.xml` and
+`.service` are known syntaxes).
 
-- [ ] **Step 5: Commit**
+- [ ] **Step 6: Commit**
 
 ```bash
 git add extension
@@ -1402,6 +1519,7 @@ import * as PopupMenu from 'resource:///org/gnome/shell/ui/popupMenu.js';
 import {QuickMenuToggle} from 'resource:///org/gnome/shell/ui/quickSettings.js';
 
 import {reportFailure} from './failures.js';
+import {HIDDEN, automaticPresetsAfterClick} from './presentation.js';
 
 const HEADSET_ICON = 'audio-headset-symbolic';
 
@@ -1410,7 +1528,7 @@ class AppPresetsToggle extends QuickMenuToggle {
     _init(client) {
         super._init({title: _('App Presets'), iconName: HEADSET_ICON, toggleMode: false, visible: false});
         this._client = client;
-        this._sensitive = false;
+        this._presentation = HIDDEN;
         this._presets = new PopupMenu.PopupMenuSection();
         this.menu.addMenuItem(this._presets);
         this.menu.addMenuItem(new PopupMenu.PopupSeparatorMenuItem());
@@ -1419,6 +1537,7 @@ class AppPresetsToggle extends QuickMenuToggle {
     }
 
     render(presentation) {
+        this._presentation = presentation;
         this.visible = presentation.visible;
         if (presentation.visible)
             this._renderVisible(presentation);
@@ -1426,15 +1545,10 @@ class AppPresetsToggle extends QuickMenuToggle {
 
     _renderVisible({title, subtitle, checked, sensitive, header, items}) {
         this.set({title, subtitle, checked});
-        this._setSensitive(sensitive);
+        this._switchButton().reactive = sensitive;
         this.menu.setHeader(header.icon, header.title, header.subtitle);
         this._presets.removeAll();
         items.forEach(item => this._presets.addMenuItem(this._presetItem(item)));
-    }
-
-    _setSensitive(sensitive) {
-        this._sensitive = sensitive;
-        this._switchButton().reactive = sensitive;
     }
 
     _switchButton() {
@@ -1450,8 +1564,9 @@ class AppPresetsToggle extends QuickMenuToggle {
     }
 
     _toggleAutomaticPresets() {
-        if (this._sensitive)
-            this._client.setAutomaticPresets(!this.checked).catch(reportFailure);
+        const next = automaticPresetsAfterClick(this._presentation);
+        if (next !== null)
+            this._client.setAutomaticPresets(next).catch(reportFailure);
     }
 
     _openSettings() {
@@ -1462,7 +1577,10 @@ class AppPresetsToggle extends QuickMenuToggle {
 ```
 
 `toggleMode: false` keeps `checked` under the app's control: a click only writes `AutomaticPresets`, and the
-check follows the `PropertiesChanged` that comes back (ADR 0002: the extension holds no state).
+check follows the `PropertiesChanged` that comes back (ADR 0002: the extension holds no state). What a click
+writes is decided by the tested `automaticPresetsAfterClick` (Task 3); the toggle only keeps the last
+presentation. Shell 50.5 `QuickMenuToggle` still subclasses through `_init(params)` (read from
+`libshell-18.so`), so `_init(client)` is the right override.
 
 - [ ] **Step 2: Write the indicator**
 
@@ -1557,7 +1675,7 @@ In `extension/package.json` `scripts`, add after `test`:
 - [ ] **Step 5: Lint, pack and inspect the bundle**
 
 Run (toolbox): `npx eslint . && npm test && npm run pack && unzip -l dist/arctis-companion@marcelogm.github.io.shell-extension.zip`
-Expected: ESLint silent, 54 passed, and the listing shows `metadata.json`, `extension.js`,
+Expected: ESLint silent, 58 passed, and the listing shows `metadata.json`, `extension.js`,
 `lib/presentation.js`, `lib/client.js`, `lib/failures.js`, `lib/toggle.js`, `lib/indicator.js`,
 `dbus/io.github.marcelogm.ArctisCompanion.Headset1.xml` and no `tests/` or `prefs.js`.
 
@@ -1695,8 +1813,8 @@ loop.run();
 
 - [ ] **Step 2: Write the nested shell scripts**
 
-`extension/tests/nested-shell.sh` (packs, installs into throwaway XDG dirs so the user's settings are never
-touched, and starts a private session bus):
+`extension/tests/nested-shell.sh` (packs, installs into throwaway XDG dirs, and starts a private session bus
+only after every isolating variable is exported, so the bus and everything it activates inherit them):
 
 ```sh
 #!/bin/sh
@@ -1706,7 +1824,13 @@ scenario=${2:-connected}
 extension_root=$(cd "$(dirname "$0")/.." && pwd)
 session=$(mktemp -d)
 export XDG_DATA_HOME="$session/data" XDG_CONFIG_HOME="$session/config" XDG_CACHE_HOME="$session/cache"
-export GIO_USE_VFS=local
+export GSETTINGS_BACKEND=keyfile GIO_USE_VFS=local
+unset DBUS_SESSION_BUS_ADDRESS
+if [ "$mode" != devkit ]; then
+    export XDG_RUNTIME_DIR="$session/runtime"
+    mkdir -m 700 "$XDG_RUNTIME_DIR"
+    unset WAYLAND_DISPLAY DISPLAY
+fi
 cd "$extension_root"
 npm run --silent pack
 gnome-extensions install --force dist/arctis-companion@marcelogm.github.io.shell-extension.zip
@@ -1750,6 +1874,13 @@ fi
 echo "nested shell passed: $mode $scenario"
 ```
 
+`GSETTINGS_BACKEND=keyfile` keeps `gsettings`, the nested Shell and every service the private bus activates on
+`$XDG_CONFIG_HOME/glib-2.0/settings/keyfile`: no `dconf-service` can reach `~/.config/dconf/user`, and the
+settings still work in a CI container without dconf (where GSettings would otherwise fall back to the memory
+backend and the extension would never be enabled). The headless run also gets its own `XDG_RUNTIME_DIR`, so its
+Wayland socket, dconf shm and document portal stay out of `/run/user/$UID`; devkit keeps the real one because
+its window connects to the user's compositor.
+
 The headless run enables the extension, waits for `State: ACTIVE`, lets it render against the fake app, then
 disables it and waits for `State: INACTIVE`, so `enable()`, the first render and `disable()` all run; any
 `JS ERROR` or `reportFailure` line fails the run. The `trap` matters: a fake app left running keeps the caller's
@@ -1761,7 +1892,7 @@ In `extension/package.json` `scripts`, add `"smoke": "sh tests/nested-shell.sh s
 ```json
   "scripts": {
     "lint": "eslint .",
-    "test": "GIO_USE_VFS=local dbus-run-session -- gjs -m tests/run.js",
+    "test": "GIO_USE_VFS=local dbus-run-session --config-file=tests/support/session-bus.xml -- gjs -m tests/run.js",
     "pack": "mkdir -p dist && gnome-extensions pack arctis-companion@marcelogm.github.io --extra-source=lib --extra-source=dbus --podir=../po --out-dir=dist --force",
     "pot": "sh po/extract.sh",
     "check-po": "sh po/check.sh",
@@ -1772,9 +1903,18 @@ In `extension/package.json` `scripts`, add `"smoke": "sh tests/nested-shell.sh s
 
 - [ ] **Step 3: Run the headless smoke for every scenario**
 
-Run (toolbox): `for s in connected low-battery charging app-rule manual-pick no-rules connecting absent; do timeout 120 npm run smoke -- "$s" > /tmp/smoke-$s.log 2>&1; echo "$s exit=$?"; grep -h "nested shell passed\|JS ERROR\|Arctis Companion:" /tmp/smoke-$s.log; done`
+First record the user's session state (host, in the worktree): `for k in enabled-extensions disabled-extensions
+disable-user-extensions; do gsettings get org.gnome.shell $k; done > extension/dist/host-shell.before`.
+
+Run (toolbox): `for s in connected low-battery charging app-rule manual-pick no-rules connecting absent; do timeout 120 npm run smoke -- "$s" > dist/smoke-$s.log 2>&1; echo "$s exit=$?"; grep -h "nested shell passed\|JS ERROR\|Arctis Companion:" dist/smoke-$s.log; done`
 Expected: every scenario `exit=0` and `nested shell passed: smoke <scenario>`; no `JS ERROR` lines.
 Afterwards `pgrep -f '^gjs -m tests/fake_app.js'` prints nothing.
+
+Then check the user's session was not touched (host):
+`for k in enabled-extensions disabled-extensions disable-user-extensions; do gsettings get org.gnome.shell $k;
+done | diff - extension/dist/host-shell.before`. Expected: no output, exit 0. If it differs, stop, report the
+saved values from `host-shell.before` so the user can restore them, and fix the isolation before any further
+nested-shell run.
 
 - [ ] **Step 4: Manual check in `gnome-shell --devkit`**
 
@@ -1798,7 +1938,9 @@ In `connected` also click the toggle (the fake app turns it off and the check fo
 `JS ERROR`. Disabling is covered by the headless run of Step 3.
 
 If no person is at the machine, run only Step 3, and record "devkit visual check pending" with this table in a
-comment on the pull request; SP14 carries it into its end-to-end checklist.
+comment on the pull request; SP14 carries it into its end-to-end checklist. If the permission system refuses a
+nested-shell run (it starts a second `gnome-shell` on the user's machine), do not work around it: record the
+headless smoke as pending in the same comment and rely on the CI `shell-smoke` job.
 
 - [ ] **Step 5: Lint and commit**
 
@@ -1863,11 +2005,11 @@ Append to `.github/workflows/nightly.yml` under `jobs:`:
         working-directory: extension
       - name: headless shell with the fake app
         working-directory: extension
-        run: |
-          export XDG_RUNTIME_DIR="$(mktemp -d)"
-          chmod 700 "$XDG_RUNTIME_DIR"
-          for scenario in connected low-battery absent; do npm run smoke -- "$scenario"; done
+        run: for scenario in connected low-battery absent; do npm run smoke -- "$scenario"; done
 ```
+
+(`tests/nested-shell.sh` creates its own `XDG_RUNTIME_DIR` and keyfile settings, so the job needs neither dconf
+nor a session.)
 
 - [ ] **Step 3: Check the workflows locally**
 
@@ -1981,6 +2123,7 @@ flowchart LR
 | Presentation tests | `extension/tests/presentation.test.js` |
 | Client tests | `extension/tests/client.test.js` |
 | Fake `Headset1` service | `extension/tests/support/fake_headset_service.js` |
+| Activatable test bus | `extension/tests/support/session-bus.xml`, `extension/tests/support/activation.js` |
 | Nested shells | `extension/tests/nested-shell.sh`, `extension/tests/shell-session.sh`, `extension/tests/fake_app.js` |
 
 ## Build and translations
@@ -2030,9 +2173,10 @@ git push
 git fetch origin && git rebase origin/main
 ```
 
-Run (toolbox): `npm ci && npx eslint . && npm test && npm run check-po && npm run pack && npm run smoke`
+Run (toolbox): `npm ci && npx eslint . && npm test && npm run check-po && npm run pack && npm run smoke`, with
+the host check of Task 13 Step 3 before and after `npm run smoke`.
 Run (toolbox, root): `cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-commits --range origin/main..HEAD`
-Expected: all exit 0; 54 gjs tests pass.
+Expected: all exit 0; 58 gjs tests pass.
 
 - [ ] **Step 2: Push and open the pull request**
 
@@ -2101,3 +2245,15 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 15. **No new file types**: `.js`, `.json`, `.xml`, `.sh`, `.po` and `.pot` are already known to
     `xtask/src/check_rules/comments/mod.rs` and `xtask/src/check_rules/exempt.rs`.
 16. **Tests live in `extension/tests/`, outside the uuid directory**, so `gnome-extensions pack` never ships them.
+17. **What a toggle click writes is a pure function**, `automaticPresetsAfterClick(presentation)` in
+    `lib/presentation.js` (`!checked`, or `null` while insensitive or hidden), so "clicking toggles it" and
+    "insensitive with no rules" are unit-tested instead of living untested in `lib/toggle.js`.
+18. **"Never starts the app" is tested behaviourally**: `npm test` runs on a private bus whose config
+    (`tests/support/session-bus.xml`) makes the app name activatable through a service file that only touches a
+    marker; the proxy and all three calls must leave the marker absent, and a control test proves
+    `StartServiceByName` does create it. The flag test of Task 8 stays as the cheap first check.
+19. **Nested shells never share the user's settings**: `tests/nested-shell.sh` exports throwaway `XDG_*` dirs,
+    `GSETTINGS_BACKEND=keyfile` and (headless) its own `XDG_RUNTIME_DIR` before it starts the private bus, and
+    Task 13 compares the host's `org.gnome.shell` extension keys before and after. A probe run during plan review
+    that set these variables only inside the private bus wrote `enabled-extensions` into the user's real dconf
+    database through the bus-activated `dconf-service`.
