@@ -139,3 +139,26 @@ fn an_interrupted_write_has_no_latency() {
     );
     assert_eq!(log.slowest_confirmation(), None);
 }
+
+fn confirmed_after(latency: Duration) -> SoakLog {
+    let mut log = log_after(vec![
+        DeviceUpdate::Phase(Phase::Ready),
+        DeviceUpdate::Observed(original()),
+    ]);
+    let start = Duration::from_millis(1_000);
+    let desired = log.toggle_request(start).expect("a toggle");
+    log.record(start + latency, DeviceUpdate::Observed(desired));
+    log
+}
+
+#[test]
+fn a_confirmation_inside_the_limit_passes() {
+    let log = confirmed_after(Duration::from_millis(250));
+    assert!(log.confirmations_within(Duration::from_millis(300)));
+}
+
+#[test]
+fn a_confirmation_past_the_limit_fails() {
+    let log = confirmed_after(Duration::from_millis(350));
+    assert!(!log.confirmations_within(Duration::from_millis(300)));
+}

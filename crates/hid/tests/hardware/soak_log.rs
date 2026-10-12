@@ -13,10 +13,15 @@ pub struct SoakLog {
     pub confirmed: usize,
     pub failed: usize,
     pub interrupted: usize,
-    pub confirmations: Vec<Duration>,
-    waiting_for: Option<HeadsetSettings>,
-    waiting_since: Option<Duration>,
+    confirmations: Vec<Duration>,
+    pending: Option<Pending>,
     pub unrestored: bool,
+}
+
+#[derive(Debug)]
+struct Pending {
+    desired: HeadsetSettings,
+    since: Duration,
 }
 
 impl SoakLog {
@@ -30,8 +35,7 @@ impl SoakLog {
     }
 
     fn enter(&mut self, at: Duration, phase: Phase) {
-        if phase != Phase::Ready && self.waiting_for.take().is_some() {
-            self.waiting_since = None;
+        if phase != Phase::Ready && self.pending.take().is_some() {
             self.interrupted += 1;
         }
         self.phases.push((at, phase));
@@ -41,17 +45,20 @@ impl SoakLog {
         if self.original.is_none() {
             self.original = Some(settings.clone());
         }
-        if self.waiting_for.as_ref() == Some(&settings) {
+        if self
+            .pending
+            .as_ref()
+            .is_some_and(|pending| pending.desired == settings)
+        {
             self.confirm(at);
         }
         self.observed = Some(settings);
     }
 
     fn confirm(&mut self, at: Duration) {
-        self.waiting_for = None;
-        self.confirmed += 1;
-        if let Some(since) = self.waiting_since.take() {
-            self.confirmations.push(at.saturating_sub(since));
+        if let Some(pending) = self.pending.take() {
+            self.confirmed += 1;
+            self.confirmations.push(at.saturating_sub(pending.since));
         }
     }
 
@@ -59,8 +66,13 @@ impl SoakLog {
         self.confirmations.iter().max().copied()
     }
 
+    pub fn confirmations_within(&self, limit: Duration) -> bool {
+        self.slowest_confirmation()
+            .is_none_or(|slowest| slowest <= limit)
+    }
+
     pub fn toggle_request(&mut self, at: Duration) -> Option<HeadsetSettings> {
-        if !self.is_ready() || self.waiting_for.is_some() {
+        if !self.is_ready() || self.pending.is_some() {
             return None;
         }
         let desired = toggled(self.original.as_ref()?, self.observed.as_ref()?);
@@ -81,8 +93,10 @@ impl SoakLog {
 
     fn request(&mut self, at: Duration, desired: HeadsetSettings) -> HeadsetSettings {
         self.requested += 1;
-        self.waiting_for = Some(desired.clone());
-        self.waiting_since = Some(at);
+        self.pending = Some(Pending {
+            desired: desired.clone(),
+            since: at,
+        });
         desired
     }
 

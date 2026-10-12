@@ -19,6 +19,7 @@ const DEFAULT_MINUTES: u64 = 30;
 const WRITE_EVERY: Duration = Duration::from_secs(60);
 const RESTORE_WITHIN: Duration = Duration::from_secs(5);
 const TICK: Duration = Duration::from_millis(50);
+const CONFIRMATION_LIMIT: Duration = Duration::from_millis(300);
 const REBINDS_PER_MINUTE: u64 = 3;
 const INITIAL_OPENS: usize = 2;
 
@@ -157,5 +158,10 @@ fn assert_soak_passed(minutes: u64, rebinds: usize, log: &SoakLog) {
         log.confirmed + log.interrupted,
         log.requested,
         "a write was lost"
+    );
+    assert!(
+        log.confirmations_within(CONFIRMATION_LIMIT),
+        "slowest confirmation {:?} exceeds 300 ms",
+        log.slowest_confirmation()
     );
 }
