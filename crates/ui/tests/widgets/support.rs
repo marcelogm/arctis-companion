@@ -61,3 +61,10 @@ pub fn headset_model(snapshot: &Snapshot) -> HeadsetModel {
         HeadsetPageModel::Status(kind, _) => panic!("expected the headset page, got {kind:?}"),
     }
 }
+
+pub fn combo_text(row: &adw::ComboRow) -> String {
+    row.selected_item()
+        .and_downcast::<gtk::StringObject>()
+        .map(|item| item.string().to_string())
+        .unwrap_or_default()
+}

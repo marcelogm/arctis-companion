@@ -1,0 +1,61 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisEqualizerGroup: Adw.PreferencesGroup {
+  title: _("Equalizer");
+
+  Adw.ComboRow dongle_preset {
+    name: "dongle-preset";
+    title: _("2.4 GHz Preset");
+    use-markup: false;
+  }
+
+  Adw.ComboRow bluetooth_preset {
+    name: "bluetooth-preset";
+    title: _("Bluetooth from This Computer");
+    use-markup: false;
+  }
+
+  Adw.ActionRow now_playing {
+    name: "now-playing";
+    title: _("Now Playing");
+    use-markup: false;
+
+    [suffix]
+    Button use_route_preset {
+      name: "use-route-preset";
+      valign: center;
+    }
+  }
+
+  Adw.SwitchRow automatic_presets {
+    name: "automatic-presets";
+    title: _("Automatic App Presets");
+  }
+
+  Adw.ActionRow {
+    name: "app-presets-row";
+    title: _("App Presets");
+    activatable: true;
+    action-name: "win.show-page";
+    action-target: "'app-presets'";
+
+    [suffix]
+    Image {
+      icon-name: "go-next-symbolic";
+    }
+  }
+
+  Adw.ActionRow {
+    name: "presets-row";
+    title: _("Presets");
+    activatable: true;
+    action-name: "win.show-page";
+    action-target: "'presets'";
+
+    [suffix]
+    Image {
+      icon-name: "go-next-symbolic";
+    }
+  }
+}
