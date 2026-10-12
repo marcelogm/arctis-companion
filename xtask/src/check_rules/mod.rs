@@ -1,7 +1,44 @@
+mod generated;
+mod line_limit;
+
+use std::fs;
 use std::path::Path;
 
+use crate::git;
 use crate::report::Report;
 
-pub fn run(_root: &Path, _staged: bool) -> Report {
-    Report::default()
+pub fn run(root: &Path, staged: bool) -> Report {
+    let files = if staged {
+        git::staged_files(root)
+    } else {
+        git::tracked_files(root)
+    };
+    match files {
+        Ok(files) => check_tree(root, &files),
+        Err(message) => Report::failed(message),
+    }
+}
+
+fn check_tree(root: &Path, files: &[String]) -> Report {
+    files
+        .iter()
+        .map(|file| check_file(root, file))
+        .fold(Report::default(), Report::merged)
+}
+
+fn check_file(root: &Path, file: &str) -> Report {
+    let path = Path::new(file);
+    if generated::is_generated(path) {
+        return Report::default();
+    }
+    fs::read_to_string(root.join(path))
+        .map_or_else(|_| Report::default(), |text| check_text(path, &text))
+}
+
+fn check_text(path: &Path, text: &str) -> Report {
+    let mut report = Report::default();
+    if let Some(warning) = line_limit::check(path, text) {
+        report.warning(warning);
+    }
+    report
 }
