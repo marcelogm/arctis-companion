@@ -15,7 +15,7 @@ use crate::logging::warn;
 use crate::ports::SnapshotView;
 
 pub trait Portal {
-    fn request(&self, answer: Box<dyn FnOnce(bool)>);
+    fn request(&self, autostart: bool, answer: Box<dyn FnOnce(bool)>);
     fn set_status(&self, message: String);
 }
 
@@ -35,6 +35,7 @@ pub struct BackgroundController {
     view: Rc<dyn BackgroundView>,
     status: RefCell<Option<String>>,
     held: Cell<bool>,
+    ticket: Cell<u64>,
     watch: RefCell<Option<glib::SignalHandlerId>>,
     myself: Weak<Self>,
 }
@@ -54,6 +55,7 @@ impl BackgroundController {
             view,
             status: RefCell::default(),
             held: Cell::new(false),
+            ticket: Cell::new(0),
             watch: RefCell::default(),
             myself: myself.clone(),
         });
@@ -74,7 +76,7 @@ impl BackgroundController {
     fn key_changed(&self) {
         match (self.is_enabled(), self.held.get()) {
             (true, false) => self.keep_running(),
-            (false, true) => self.stop_running(Background::Off),
+            (false, true) => self.switch_off(),
             _ => {}
         }
     }
@@ -97,12 +99,16 @@ impl BackgroundController {
 
     pub fn set_enabled(&self, on: bool) {
         self.store(RUN_IN_BACKGROUND, on);
+        self.key_changed();
         if on {
-            self.keep_running();
             self.ask();
-        } else {
-            self.stop_running(Background::Off);
         }
+    }
+
+    fn switch_off(&self) {
+        self.stop_running(Background::Off);
+        self.next_ticket();
+        self.portal.request(false, Box::new(|_| {}));
     }
 
     fn keep_running(&self) {
@@ -119,15 +125,25 @@ impl BackgroundController {
 
     fn ask(&self) {
         let controller = self.myself.clone();
-        self.portal
-            .request(Box::new(move |granted| answer(&controller, granted)));
+        let ticket = self.next_ticket();
+        self.portal.request(
+            true,
+            Box::new(move |granted| answer(&controller, ticket, granted)),
+        );
     }
 
-    fn answered(&self, granted: bool) {
+    fn next_ticket(&self) -> u64 {
+        let ticket = self.ticket.get() + 1;
+        self.ticket.set(ticket);
+        ticket
+    }
+
+    fn answered(&self, ticket: u64, granted: bool) {
         self.store(BACKGROUND_REQUESTED, true);
-        if !granted && self.is_enabled() {
-            self.store(RUN_IN_BACKGROUND, false);
+        let latest = ticket == self.ticket.get();
+        if latest && !granted && self.is_enabled() {
             self.stop_running(Background::Denied);
+            self.store(RUN_IN_BACKGROUND, false);
         }
     }
 
@@ -163,9 +179,9 @@ fn key_changed(controller: &Weak<BackgroundController>) {
     }
 }
 
-fn answer(controller: &Weak<BackgroundController>, granted: bool) {
+fn answer(controller: &Weak<BackgroundController>, ticket: u64, granted: bool) {
     if let Some(controller) = controller.upgrade() {
-        controller.answered(granted);
+        controller.answered(ticket, granted);
     }
 }
 

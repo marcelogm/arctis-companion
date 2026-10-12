@@ -7,7 +7,6 @@ use gtk::glib;
 use super::background::Portal;
 use crate::logging::{LOG_DOMAIN, warn};
 
-const AUTOSTART: bool = true;
 const COMMAND: [&str; 2] = ["arctis-companion", "--gapplication-service"];
 const REASON: &str =
     msgid("Keep battery warnings, battery history and app presets working with the window closed");
@@ -15,9 +14,9 @@ const REASON: &str =
 pub struct AshpdPortal;
 
 impl Portal for AshpdPortal {
-    fn request(&self, answer: Box<dyn FnOnce(bool)>) {
+    fn request(&self, autostart: bool, answer: Box<dyn FnOnce(bool)>) {
         glib::spawn_future_local(async move {
-            answer(request_background().await);
+            answer(request_background(autostart).await);
         });
     }
 
@@ -26,11 +25,11 @@ impl Portal for AshpdPortal {
     }
 }
 
-async fn request_background() -> bool {
+async fn request_background(autostart: bool) -> bool {
     let reason = resolve(&Text::plain(REASON));
     let request = Background::request()
         .reason(reason.as_str())
-        .auto_start(AUTOSTART)
+        .auto_start(autostart)
         .command(COMMAND)
         .dbus_activatable(false)
         .send()
