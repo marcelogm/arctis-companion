@@ -1,0 +1,18 @@
+<node>
+  <interface name="io.github.marcelogm.ArctisCompanion.Headset1">
+    <property name="State" type="s" access="read"/>
+    <property name="Model" type="s" access="read"/>
+    <property name="BatteryLevel" type="i" access="read"/>
+    <property name="Charging" type="s" access="read"/>
+    <property name="BatteryWarning" type="s" access="read"/>
+    <property name="Route" type="s" access="read"/>
+    <property name="Presets" type="a(ss)" access="read"/>
+    <property name="ActivePreset" type="s" access="read"/>
+    <property name="ActivePresetReason" type="(ss)" access="read"/>
+    <property name="AppRuleCount" type="u" access="read"/>
+    <property name="AutomaticPresets" type="b" access="readwrite"/>
+    <method name="ActivatePreset">
+      <arg name="id" type="s" direction="in"/>
+    </method>
+  </interface>
+</node>
