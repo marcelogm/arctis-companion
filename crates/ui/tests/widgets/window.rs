@@ -257,32 +257,6 @@ fn rendering_a_changed_snapshot_emits_nothing() {
     assert!(log.borrow().is_empty());
 }
 
-fn open_presets(window: &Window) {
-    WidgetExt::activate_action(window, "win.show-page", Some(&"presets".to_variant()))
-        .expect("the action exists");
-}
-
-#[gtk::test]
-fn navigation_rows_open_their_page_once_it_exists() {
-    let (window, _) = rendered_window(snapshot());
-    let navigation = named::<adw::NavigationView>(&window, "navigation");
-    let tag = || {
-        navigation
-            .visible_page()
-            .and_then(|page| page.tag())
-            .map(String::from)
-    };
-    open_presets(&window);
-    assert_eq!(tag().as_deref(), Some("main"));
-    navigation.add(&adw::NavigationPage::with_tag(
-        &gtk::Label::new(None),
-        "Presets",
-        "presets",
-    ));
-    open_presets(&window);
-    assert_eq!(tag().as_deref(), Some("presets"));
-}
-
 #[gtk::test]
 fn the_background_state_reaches_the_preferences() {
     let (window, log) = rendered_window(snapshot());

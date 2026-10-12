@@ -145,7 +145,8 @@ Dependency direction inside `crates/ui`: `text`, `intents`, `widget_values` → 
 
 ## Deviations
 
-Decisions taken where the spec is silent or ambiguous; each is the simplest option consistent with it.
+Decisions taken where the spec is silent or ambiguous; each is the simplest option consistent with it. Rows 26 and
+above were taken during execution after review and supersede the code blocks of the tasks below where they differ.
 
 | # | Decision | Why |
 |---|---|---|
@@ -174,6 +175,15 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 | 23 | A JSON preset whose `name` is empty or blank is named after the file without its extension, like an APO import | a custom preset with an empty title would render an empty row and an empty editor title |
 | 24 | `win.show-preset` with an id the current snapshot does not know (a stale row) does nothing: the editor keeps its state and nothing is pushed | otherwise the editor would be pushed showing the previous preset |
 | 25 | The accessibility and 360 px checks for the new pages are written after the pages (Task 12); each is first seen failing by temporarily breaking the property it guards, then restored | the walks need both pages in the window; Task 12 still observes red before green |
+| 26 | The decisions of the editor live in `core::view::preset_edits::WorkingCopy` (`opened`, `published`, `apply` returning `Applied { preset, starts_burst }`, `burst_ended`, `undo`), tested in `crates/core/tests/view/preset_edits.rs`. `EqEditorPage` keeps a `WorkingCopy` and the toast handle only. Opening a preset dismisses the previous undo toast, and a dismissed handler acts only when it is still the page's current toast, so a late dismissal of preset A's toast cannot end preset B's burst (test `switching_presets_keeps_one_toast_per_burst`) | review: decisions stay pure in core; the stale-toast bug of the earlier sketch |
+| 27 | Rounding to the device grid lives next to the types: `Hertz::nearest_milli`, `Gain::nearest_milli_db`, used by `eq::apo` and `preset_edits`; no `MILLI_PER_HZ` copy in the view | one copy of the grid rules |
+| 28 | An import lists what it clamped: `Imported.clamped` holds one `Text` per changed value ("Filter 3: Gain"). The toast keeps the count and gets a Details button that opens an `AdwAlertDialog` (`details_dialog`) with the list; the dialog's presentation is not tested, its body is | audio §3 "clamped and listed in a toast"; supersedes the count-only part of row 12 |
+| 29 | JSON imports stay strict: a gain off the 0.5 dB grid or a value outside the envelope makes the file "not a preset file" (test `json_must_already_sit_on_the_device_grid`); only APO is rounded and clamped | JSON is this app's own export format, which is always on the grid |
+| 30 | `export_text` returns `Option<String>`; `Export.render` returns `Option<String>` and a `None` calls `done(false)`, so the "Could not export" toast covers a serialization failure | no silent empty file |
+| 31 | One `toasts::button_toast` builds the failure, undo and details toasts; `Services::undo_toast` adds the toast and returns the handle; `Services` is the only seam the editor uses | review: no duplicated toast code |
+| 32 | `text::saturating_count` replaces three copies of `u32::try_from(x).unwrap_or(u32::MAX)`; `widget_values::while_rendering` replaces three hand-written re-entrancy guards; `kind_position` is an exhaustive `match`; `preset_edits::apply_edit`, `EqBandRow::report_edit` and `EqEditorPage::save_change` replace the three meanings of "edited" | review: naming and duplication |
+| 33 | Test seams: `arctis_core::testkit::snapshots` gains `filter`, `custom_preset`, `with_preset`; the ui tests share `support::Mounted<P>`/`mount` and `one_peak`. A page that is not inside a window does not wire `action-name` buttons, so tests of action-bound buttons and their sensitivity run in a window (`rendered_window`) or call `activate_action` on the page. `AdwSwitchRow` ignores `activate` on an unmapped widget, so the keyboard test sets the switch. Visible checks in a window use `support::shown`. The window navigation tests moved to `tests/widgets/preset_navigation.rs` to keep `window.rs` under 400 lines | observed behaviour of GTK on unmapped widgets |
+| 34 | The keyboard-only test drives every field of every band: `change-value` on frequency, gain and Q, `set_selected` on the type row and the enabled switch, then asserts a `SavePreset` carrying the edited band each time (50 saves for ten bands); supersedes row 20. The graph test counts stroke nodes (8 grid lines, 9 with the curve) | review: the earlier check only proved focusability |
 
 ---
 

@@ -1,16 +1,18 @@
 use adw::prelude::*;
 use arctis_core::companion::routing::Route;
+use arctis_core::eq::FilterKind;
 use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
-use arctis_core::testkit::snapshots::{snapshot, with};
-use arctis_ui::{HeadsetStatus, PermissionDialog};
+use arctis_core::testkit::snapshots::{id, snapshot, with};
+use arctis_core::view::eq_editor::eq_editor;
+use arctis_ui::{HeadsetStatus, PermissionDialog, ResponseGraph};
 use gtk::{AccessibleProperty, AccessibleRelation, AccessibleRole};
 
 use crate::add_rule_dialog::{rendered_dialog, spotify_seen};
 use crate::app_presets_page::rendered_page;
 use crate::support::{
-    descendants, first, has_accessible_text, headset_model, init, rendered_window, rich_snapshot,
-    ruled, shown,
+    band_rows, custom_preset, descendants, filter, first, has_accessible_text, headset_model, init,
+    open_editor, open_presets, rendered_window, rich_snapshot, ruled, shown, with_preset,
 };
 
 const INTERACTIVE: [AccessibleRole; 8] = [
@@ -143,4 +145,43 @@ fn every_control_of_the_add_rule_dialog_has_a_name() {
         assert!(widgets.iter().any(needs_name), "the walk sees the controls");
         assert_eq!(unnamed_among(widgets), Vec::<String>::new());
     }
+}
+
+fn two_kinds_snapshot() -> arctis_core::companion::Snapshot {
+    with_preset(&custom_preset(&[
+        filter(FilterKind::Peaking, 250, 4, 1_000),
+        filter(FilterKind::LowPass, 8_000, 0, 707),
+    ]))
+}
+
+#[gtk::test]
+fn every_control_of_the_presets_page_has_a_name() {
+    let (window, _) = rendered_window(two_kinds_snapshot());
+    open_presets(&window);
+    assert_eq!(unnamed(&window), Vec::<String>::new());
+}
+
+#[gtk::test]
+fn every_control_of_the_editor_has_a_name() {
+    for preset in ["mine", "flat"] {
+        let (window, _) = rendered_window(two_kinds_snapshot());
+        let page = open_editor(&window, preset);
+        for row in band_rows(&page) {
+            row.set_expanded(true);
+        }
+        assert_eq!(unnamed(&window), Vec::<String>::new(), "{preset}");
+    }
+}
+
+#[gtk::test]
+fn the_response_graph_has_a_description() {
+    let s = two_kinds_snapshot();
+    let (window, _) = rendered_window(s.clone());
+    let page = open_editor(&window, "mine");
+    let model = eq_editor(&s, &id("mine")).expect("editor");
+    assert!(has_accessible_text(
+        &first::<ResponseGraph>(&page),
+        AccessibleProperty::Description,
+        &english(&model.graph.description)
+    ));
 }

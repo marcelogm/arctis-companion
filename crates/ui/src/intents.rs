@@ -3,6 +3,8 @@ use std::rc::Rc;
 
 use arctis_core::intent::Intent;
 
+use crate::widget_values::while_rendering;
+
 type Handler = Rc<dyn Fn(Intent)>;
 
 #[derive(Clone, Default)]
@@ -33,9 +35,6 @@ impl IntentSink {
     }
 
     pub fn rendering<T>(&self, render: impl FnOnce() -> T) -> T {
-        let outer = self.rendering.replace(true);
-        let result = render();
-        self.rendering.set(outer);
-        result
+        while_rendering(&self.rendering, render)
     }
 }

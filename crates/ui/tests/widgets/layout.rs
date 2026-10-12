@@ -1,11 +1,15 @@
 use adw::prelude::*;
 use arctis_core::companion::routing::Route;
+use arctis_core::eq::FilterKind;
 use arctis_core::messages::device::Phase;
 use arctis_core::testkit::snapshots::{snapshot, with};
 use arctis_ui::PermissionDialog;
 
 use crate::app_presets_page::rendered_page;
-use crate::support::{descendants, rendered_window, rich_snapshot, ruled, seen_app, shown};
+use crate::support::{
+    custom_preset, descendants, filter, open_editor, open_presets, rendered_window, rich_snapshot,
+    ruled, seen_app, shown, with_preset,
+};
 
 const NARROWEST: i32 = 360;
 
@@ -70,4 +74,44 @@ fn the_app_presets_page_and_dialog_fit_the_narrowest_window() {
         "{}",
         minimum_width(&dialog)
     );
+}
+fn content_width(window: &arctis_ui::Window) -> i32 {
+    minimum_width(&window.content().expect("window content"))
+}
+
+fn shown_scrolled_windows(window: &arctis_ui::Window) -> Vec<gtk::ScrolledWindow> {
+    descendants(window)
+        .into_iter()
+        .filter(shown)
+        .filter_map(|widget| widget.downcast::<gtk::ScrolledWindow>().ok())
+        .collect()
+}
+
+#[gtk::test]
+fn the_preset_pages_fit_the_narrowest_window() {
+    let mine = custom_preset(&[filter(FilterKind::Peaking, 250, 4, 1_000)]);
+    let (window, _) = rendered_window(with_preset(&mine));
+    open_presets(&window);
+    assert!(
+        content_width(&window) <= NARROWEST,
+        "{}",
+        content_width(&window)
+    );
+    open_editor(&window, "mine");
+    assert!(
+        content_width(&window) <= NARROWEST,
+        "{}",
+        content_width(&window)
+    );
+}
+
+#[gtk::test]
+fn the_editor_never_scrolls_horizontally() {
+    let (window, _) = rendered_window(rich_snapshot());
+    open_editor(&window, "flat");
+    let scrolled = shown_scrolled_windows(&window);
+    assert!(!scrolled.is_empty(), "the band list scrolls vertically");
+    for view in scrolled {
+        assert_eq!(view.hscrollbar_policy(), gtk::PolicyType::Never);
+    }
 }
