@@ -3,5 +3,6 @@
 mod bounded;
 
 pub mod eq;
+pub mod protocol;
 pub mod settings;
 pub mod time;
