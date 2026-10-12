@@ -104,3 +104,8 @@ fn a_headset_change_updates_the_observed_copy() {
     dongle.headset_changed(&SettingChange::Sidetone(ten));
     assert_eq!(dongle.observed.map(|o| o.sidetone), Some(ten));
 }
+
+#[test]
+fn the_default_dongle_state_is_a_fresh_one() {
+    assert_eq!(DongleState::default(), DongleState::new());
+}
