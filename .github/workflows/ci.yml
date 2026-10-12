@@ -107,8 +107,10 @@ jobs:
     runs-on: ubuntu-latest
     container:
       image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
-      options: --privileged
+      options: --privileged -v /:/host
     steps:
+      - name: Free runner disk space
+        run: rm -rf /host/usr/share/dotnet /host/usr/local/lib/android /host/opt/ghc /host/opt/hostedtoolcache/CodeQL /host/usr/local/share/boost
       - uses: actions/checkout@v4
       - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
         with:
