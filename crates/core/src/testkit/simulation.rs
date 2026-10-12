@@ -2,6 +2,7 @@ use super::fake_headset::{Emission, FakeHeadset};
 use crate::messages::device::{DeviceUpdate, Phase, SyncPolicy};
 use crate::protocol::Frame;
 use crate::protocol::status::Link;
+use crate::session::timing::RESCAN_REBINDING;
 use crate::session::{Cadence, Effect, Input, Interface, Session};
 use crate::settings::headset_settings::{HeadsetSettings, SettingChange};
 use crate::settings::values::Percent;
@@ -270,7 +271,7 @@ impl Simulation {
     }
 
     fn rescan(&mut self) {
-        self.next_rescan = self.next_rescan.map(|at| at.after(rescan_interval()));
+        self.next_rescan = self.next_rescan.map(|at| at.after(RESCAN_REBINDING));
         let CommandNode::Missing {
             back_at,
             readable_at,
@@ -324,29 +325,24 @@ impl Simulation {
             "the session wrote while the command node was gone"
         );
         let now = self.now;
-        self.writes.push((now, frame));
         if std::mem::take(&mut self.fail_next_write) {
+            self.writes.push((now, frame));
             self.flap(Flap {
                 node_back_after: 60,
                 ..Flap::default()
             });
             return;
         }
-        let emissions = self
-            .headset
-            .receive(&self.writes[self.writes.len() - 1].1, now);
+        let emissions = self.headset.receive(&frame, now);
+        self.writes.push((now, frame));
         self.inbox.extend(emissions);
     }
 
     fn set_cadence(&mut self, cadence: Cadence) {
         self.rescans.push(cadence);
         self.next_rescan = match cadence {
-            Cadence::Rebinding => Some(self.now.after(rescan_interval())),
+            Cadence::Rebinding => Some(self.now.after(RESCAN_REBINDING)),
             Cadence::Absent | Cadence::Off => None,
         };
     }
-}
-
-fn rescan_interval() -> u64 {
-    Cadence::Rebinding.interval().unwrap_or(1)
 }

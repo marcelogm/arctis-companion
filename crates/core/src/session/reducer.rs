@@ -1,16 +1,15 @@
-use super::echo::EchoFilter;
 use super::effect::{Cadence, Effect};
 use super::exchange::Exchange;
 use super::input::Input;
 use super::phase::Stage;
 use super::rebind::Rebinding;
+use super::reconcile::Reconciler;
 use super::timing::{ENUMERATION_SETTLE, HEADSET_OFF_POLL};
-use super::verify::Transaction;
 use crate::messages::device::{DeviceUpdate, Phase, SyncPolicy};
 use crate::protocol::firmware::Firmware;
 use crate::protocol::model::{Model, ModelLookup};
 use crate::protocol::status::Status;
-use crate::settings::headset_settings::{HeadsetSettings, Setting};
+use crate::settings::headset_settings::HeadsetSettings;
 use crate::time::Millis;
 
 const UNREAD_FIRMWARE: Firmware = Firmware {
@@ -30,13 +29,9 @@ pub struct Session {
     pub(super) outbox: Vec<Effect>,
     pub(super) stage: Stage,
     pub(super) dongle: Option<Dongle>,
-    pub(super) desired: Option<HeadsetSettings>,
-    pub(super) observed: Option<HeadsetSettings>,
     pub(super) status: Option<Status>,
     pub(super) last_status_at: Millis,
-    pub(super) transaction: Option<Transaction>,
-    pub(super) failed: Vec<Setting>,
-    pub(super) echoes: EchoFilter,
+    pub(super) reconciler: Reconciler,
     pub(super) exchange: Exchange,
     pub(super) published: Phase,
     pub(super) scheduled: Option<Millis>,
@@ -56,13 +51,9 @@ impl Session {
             outbox: Vec::new(),
             stage: Stage::Absent,
             dongle: None,
-            desired: None,
-            observed: None,
             status: None,
             last_status_at: Millis(0),
-            transaction: None,
-            failed: Vec::new(),
-            echoes: EchoFilter::default(),
+            reconciler: Reconciler::default(),
             exchange: Exchange::default(),
             published: Phase::Absent,
             scheduled: None,
@@ -154,19 +145,13 @@ impl Session {
     }
 
     fn desire(&mut self, settings: HeadsetSettings, policy: SyncPolicy) {
-        self.failed.clear();
-        match policy {
-            SyncPolicy::Enforce => self.desired = Some(settings),
-            SyncPolicy::Adopt => {
-                self.desired = None;
-                self.publish_observed();
-            }
-        }
+        let updates = self.reconciler.desire(settings, policy, self.now);
+        self.publish_all(updates);
     }
 
     pub(super) fn enter(&mut self, stage: Stage) {
         if matches!(stage, Stage::Syncing(_)) {
-            self.failed.clear();
+            self.reconciler.clear_failures();
         }
         self.stage = stage;
         self.announce();
@@ -194,10 +179,8 @@ impl Session {
         }
     }
 
-    pub(super) fn publish_observed(&mut self) {
-        if let Some(observed) = self.observed.clone() {
-            self.publish(DeviceUpdate::Observed(observed));
-        }
+    pub(super) fn publish_all(&mut self, updates: Vec<DeviceUpdate>) {
+        self.outbox.extend(updates.into_iter().map(Effect::Publish));
     }
 
     pub(super) fn publish(&mut self, update: DeviceUpdate) {
@@ -211,8 +194,7 @@ impl Session {
     }
 
     pub(super) fn interrupt(&mut self) {
-        self.transaction = None;
+        self.reconciler.interrupt(self.now);
         self.exchange.abandon();
-        self.echoes.close(self.now);
     }
 }

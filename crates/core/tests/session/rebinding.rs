@@ -364,6 +364,15 @@ fn a_headset_off_poll_keeps_its_schedule_across_a_flap() {
 }
 
 #[test]
+fn a_power_on_during_a_flap_from_headset_off_syncs_right_after_the_rebind() {
+    let mut simulation = headset_off();
+    simulation.run_for(1_000);
+    simulation.flap(QUICK_FLAP);
+    simulation.power_on();
+    simulation.run_until(Phase::Syncing, FLAP_DONE);
+}
+
+#[test]
 fn a_bootloader_node_never_reaches_rebinding() {
     let mut simulation = Simulation::new(FakeHeadset::nova_5().with_pid(0x2254));
     simulation.plug();

@@ -1,8 +1,9 @@
 use super::replies;
 use crate::eq::library::flat;
 use crate::eq::{Curve, Filter};
+use crate::protocol::command::{EQUALIZER, WIRELESS_MODE};
 use crate::protocol::eq_wire::decode_curve;
-use crate::protocol::event::{DeviceEvent, decode_event};
+use crate::protocol::event::{BATTERY, DeviceEvent, LINK, decode_event};
 use crate::protocol::frame::PAYLOAD_LEN;
 use crate::protocol::status::{Charging, Link, Status};
 use crate::protocol::{Command, Frame, Query, encode};
@@ -135,12 +136,12 @@ impl FakeHeadset {
 
     pub fn link_event(&mut self, link: Link, now: Millis) -> Vec<Emission> {
         self.status.link = link;
-        self.event(vec![0xB9, link.raw()], now)
+        self.event(vec![LINK, link.raw()], now)
     }
 
     pub fn battery_event(&mut self, battery: Percent, now: Millis) -> Vec<Emission> {
         self.status.battery = battery;
-        self.event(vec![0xB7, battery.get()], now)
+        self.event(vec![BATTERY, battery.get()], now)
     }
 
     pub fn press(&mut self, change: SettingChange, now: Millis) -> Vec<Emission> {
@@ -198,11 +199,11 @@ impl FakeHeadset {
     }
 
     fn decode_setter(&self, payload: &[u8]) -> Option<SettingChange> {
-        match payload.first()? {
-            0x33 => decode_curve(payload)
+        match *payload.first()? {
+            EQUALIZER => decode_curve(payload)
                 .ok()
                 .map(|curve| SettingChange::Equalizer(self.stored(curve))),
-            0x35 => WirelessMode::try_from(*payload.get(1)?)
+            WIRELESS_MODE => WirelessMode::try_from(*payload.get(1)?)
                 .ok()
                 .map(SettingChange::WirelessMode),
             _ => match decode_event(payload)? {
