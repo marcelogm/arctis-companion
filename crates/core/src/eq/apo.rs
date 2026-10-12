@@ -1,5 +1,5 @@
 use super::curve::Curve;
-use super::decimal::{parse_thousandths, render_thousandths, rounded_quotient, thousandths_of};
+use super::decimal::{parse_thousandths, render_thousandths, thousandths_of};
 use super::filter::{Clamped, Filter, FilterKind, Gain, Hertz, Q};
 use super::response::preamp_db;
 
@@ -137,7 +137,7 @@ impl RawFilter {
     }
 
     fn to_envelope(&self, position: usize) -> (Filter, Vec<Clamp>) {
-        let hz = Hertz::clamped(rounded_quotient(self.hz, 1_000));
+        let hz = Hertz::nearest_milli(self.hz);
         let gain = self.bounded_gain();
         let q = Q::clamped_milli(self.q);
         let clamps = [
@@ -154,7 +154,7 @@ impl RawFilter {
     }
 
     fn bounded_gain(&self) -> Clamped<Gain> {
-        let gain = Gain::clamped_half_db(rounded_quotient(self.gain, Gain::MILLI_DB_PER_STEP));
+        let gain = Gain::nearest_milli_db(self.gain);
         let dropped = !self.kind.has_gain() && gain.value != Gain::NONE;
         Clamped {
             clamped: gain.clamped || dropped,

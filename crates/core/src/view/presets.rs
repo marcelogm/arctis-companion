@@ -1,4 +1,4 @@
-use super::text::{Text, preset_arg, preset_title};
+use super::text::{Text, preset_arg, preset_title, saturating_count};
 use crate::companion::per_path::PATHS;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::preset::{Preset, PresetId, PresetKind};
@@ -58,7 +58,7 @@ pub fn preset_uses(snapshot: &Snapshot, id: &PresetId) -> PresetUses {
         .count();
     PresetUses {
         paths,
-        app_rules: u32::try_from(rules).unwrap_or(u32::MAX),
+        app_rules: saturating_count(rules),
     }
 }
 

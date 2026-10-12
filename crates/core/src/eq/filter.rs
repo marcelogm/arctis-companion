@@ -2,6 +2,8 @@ use std::fmt;
 
 use serde::{Deserialize, Serialize};
 
+use super::decimal::rounded_quotient;
+
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(rename_all = "kebab-case")]
 pub enum FilterKind {
@@ -89,6 +91,7 @@ pub struct Hertz(u16);
 impl Hertz {
     pub const MIN: u16 = 20;
     pub const MAX: u16 = 20_000;
+    const MILLI_PER_HZ: i64 = 1_000;
 
     pub const fn new(hz: u16) -> Result<Self, EnvelopeError> {
         if matches!(hz, Self::MIN..=Self::MAX) {
@@ -101,6 +104,11 @@ impl Hertz {
     #[must_use]
     pub fn clamped(hz: i64) -> Clamped<Self> {
         bounded(hz, Self::MIN, Self::MAX).map(Self)
+    }
+
+    #[must_use]
+    pub fn nearest_milli(milli_hz: i64) -> Clamped<Self> {
+        Self::clamped(rounded_quotient(milli_hz, Self::MILLI_PER_HZ))
     }
 
     #[must_use]
@@ -129,6 +137,11 @@ impl Gain {
     #[must_use]
     pub fn clamped_half_db(half_db: i64) -> Clamped<Self> {
         bounded(half_db, Self::MIN_HALF_DB, Self::MAX_HALF_DB).map(Self)
+    }
+
+    #[must_use]
+    pub fn nearest_milli_db(milli_db: i64) -> Clamped<Self> {
+        Self::clamped_half_db(rounded_quotient(milli_db, Self::MILLI_DB_PER_STEP))
     }
 
     #[must_use]

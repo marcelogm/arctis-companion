@@ -150,3 +150,24 @@ fn envelope_errors_read_as_sentences() {
         assert_eq!(error.to_string(), message);
     }
 }
+
+#[test]
+fn nearest_frequencies_round_to_whole_hertz_and_pin() {
+    assert_eq!(Hertz::nearest_milli(250_499), kept(Hertz::new(250)));
+    assert_eq!(Hertz::nearest_milli(250_500), kept(Hertz::new(251)));
+    assert_eq!(Hertz::nearest_milli(5_000), pinned(Hertz::new(Hertz::MIN)));
+    assert_eq!(
+        Hertz::nearest_milli(40_000_000),
+        pinned(Hertz::new(Hertz::MAX))
+    );
+}
+
+#[test]
+fn nearest_gains_round_to_half_decibels_and_pin() {
+    assert_eq!(Gain::nearest_milli_db(2_700), kept(Gain::from_half_db(5)));
+    assert_eq!(Gain::nearest_milli_db(-2_200), kept(Gain::from_half_db(-4)));
+    assert_eq!(
+        Gain::nearest_milli_db(14_000),
+        pinned(Gain::from_half_db(20))
+    );
+}

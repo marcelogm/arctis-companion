@@ -1,4 +1,4 @@
-use super::text::{Arg, Text, preset_arg, preset_title};
+use super::text::{Arg, Text, preset_arg, preset_title, saturating_count};
 use crate::companion::snapshot::Snapshot;
 use crate::eq::curve::MAX_FILTERS;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
@@ -8,6 +8,9 @@ use crate::eq::response::response;
 pub const GRAPH_POINTS: u16 = 96;
 const GRAPH_LOW_HZ: f32 = 20.0;
 const GRAPH_SPAN: f32 = 1_000.0;
+const GRAPH_DB_RANGE: f32 = 10.0;
+pub const GRID_HZ: [f32; 3] = [100.0, 1_000.0, 10_000.0];
+pub const GRID_DB: [f32; 5] = [-10.0, -5.0, 0.0, 5.0, 10.0];
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BandModel {
@@ -46,10 +49,17 @@ pub struct EqEditorModel {
 
 #[must_use]
 pub fn eq_editor(snapshot: &Snapshot, id: &PresetId) -> Option<EqEditorModel> {
-    let preset = snapshot.presets.find(id)?;
+    snapshot
+        .presets
+        .find(id)
+        .map(|preset| eq_editor_for(snapshot, preset))
+}
+
+#[must_use]
+pub fn eq_editor_for(snapshot: &Snapshot, preset: &Preset) -> EqEditorModel {
     let filters = preset.curve().filters();
-    Some(EqEditorModel {
-        id: id.clone(),
+    EqEditorModel {
+        id: preset.id().clone(),
         title: preset_title(preset),
         editable: preset.kind() == PresetKind::Custom,
         bands: filters
@@ -60,7 +70,33 @@ pub fn eq_editor(snapshot: &Snapshot, id: &PresetId) -> Option<EqEditorModel> {
         can_add_band: filters.len() < MAX_FILTERS,
         graph: graph(preset),
         preview_available: snapshot.picked_path().is_ok(),
-    })
+    }
+}
+
+#[must_use]
+pub fn x_fraction(hz: f32) -> f32 {
+    ((hz / GRAPH_LOW_HZ).log10() / GRAPH_SPAN.log10()).clamp(0.0, 1.0)
+}
+
+#[must_use]
+pub fn y_fraction(db: f32) -> f32 {
+    ((GRAPH_DB_RANGE - db) / (2.0 * GRAPH_DB_RANGE)).clamp(0.0, 1.0)
+}
+
+#[must_use]
+pub fn kind_at(position: usize) -> Option<FilterKind> {
+    FilterKind::ALL.get(position).copied()
+}
+
+#[must_use]
+pub const fn kind_position(kind: FilterKind) -> usize {
+    match kind {
+        FilterKind::Peaking => 0,
+        FilterKind::LowShelf => 1,
+        FilterKind::HighShelf => 2,
+        FilterKind::LowPass => 3,
+        FilterKind::HighPass => 4,
+    }
 }
 
 #[must_use]
@@ -141,7 +177,7 @@ fn graph(preset: &Preset) -> GraphModel {
                 "Nominal frequency response of {preset}, with {n} active band",
                 "Nominal frequency response of {preset}, with {n} active bands",
             ],
-            u32::try_from(active).unwrap_or(u32::MAX),
+            saturating_count(active),
             vec![("preset", preset_arg(preset))],
         ),
     }

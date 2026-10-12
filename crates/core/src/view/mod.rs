@@ -5,6 +5,8 @@ pub mod equalizer_rows;
 pub mod headset_page;
 pub mod headset_rows;
 pub mod preferences;
+pub mod preset_edits;
+pub mod preset_files;
 pub mod presets;
 pub mod status_page;
 pub mod text;
