@@ -9,7 +9,8 @@ use crate::companion::seen_apps::SeenApp;
 use crate::companion::selection::ActivePreset;
 use crate::companion::snapshot::{AudioSnapshot, BatterySnapshot, DongleSnapshot, PresetsSnapshot};
 use crate::eq::library;
-use crate::eq::preset::PresetId;
+use crate::eq::preset::{Preset, PresetId};
+use crate::eq::{Curve, Filter, FilterKind};
 use crate::messages::audio::{DefaultSink, SinkKind};
 use crate::messages::device::Phase;
 use crate::protocol::firmware::{Firmware, Version};
@@ -154,4 +155,22 @@ pub fn seen_app(name: &str, identifiers: &[&str]) -> SeenApp {
             .map(|identifier| (*identifier).to_owned())
             .collect(),
     }
+}
+
+#[must_use]
+pub fn filter(kind: FilterKind, hz: u16, half_db: i8, milli_q: u16) -> Filter {
+    Filter::from_parts(kind, hz, half_db, milli_q).expect("filter in the envelope")
+}
+
+#[must_use]
+pub fn custom_preset(filters: &[Filter]) -> Preset {
+    let curve = Curve::new(filters.to_vec()).expect("at most ten filters");
+    Preset::custom(id("mine"), "Mine".to_owned(), curve)
+}
+
+#[must_use]
+pub fn with_preset(preset: &Preset) -> Snapshot {
+    let mut s = snapshot();
+    s.presets.all.push(preset.clone());
+    s
 }

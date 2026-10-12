@@ -2,7 +2,9 @@ use arctis_core::eq::library;
 use arctis_core::eq::preset::Preset;
 use arctis_core::eq::{Gain, Hertz};
 
-pub use arctis_core::testkit::snapshots::{id, nova_5, percent, rules, snapshot, with};
+pub use arctis_core::testkit::snapshots::{
+    custom_preset, filter, id, nova_5, percent, rules, snapshot, with, with_preset,
+};
 
 pub fn gain(half_db: i8) -> Gain {
     Gain::from_half_db(half_db).expect("gain in the envelope")

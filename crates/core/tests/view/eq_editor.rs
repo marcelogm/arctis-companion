@@ -1,22 +1,20 @@
 use arctis_core::companion::routing::Route;
+use arctis_core::eq::FilterKind;
 use arctis_core::eq::preset::Preset;
-use arctis_core::eq::{Curve, Filter, FilterKind};
 use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
-use arctis_core::view::eq_editor::{GRAPH_POINTS, band_title, eq_editor, kind_items};
+use arctis_core::view::eq_editor::{
+    GRAPH_POINTS, band_title, eq_editor, eq_editor_for, kind_at, kind_items, kind_position,
+    x_fraction, y_fraction,
+};
 
-use crate::support::{assert_close, id, snapshot, with};
-
-fn filter(kind: FilterKind, hz: u16, half_db: i8, milli_q: u16) -> Filter {
-    Filter::from_parts(kind, hz, half_db, milli_q).expect("filter in the envelope")
-}
+use crate::support::{assert_close, custom_preset, filter, id, snapshot, with};
 
 fn two_bands() -> Preset {
-    let bands = [
+    custom_preset(&[
         filter(FilterKind::Peaking, 250, 4, 1_000),
         filter(FilterKind::LowPass, 8_000, 0, 707),
-    ];
-    Preset::custom(id("mine"), "Mine".to_owned(), Curve::from_array(bands))
+    ])
 }
 
 #[test]
@@ -121,4 +119,41 @@ fn every_filter_kind_has_a_name() {
         names,
         ["Peak", "Low Shelf", "High Shelf", "Low-Pass", "High-Pass"]
     );
+}
+
+#[test]
+fn the_editor_model_can_come_from_a_working_copy() {
+    let s = snapshot();
+    let editor = eq_editor_for(&s, &two_bands());
+    assert_eq!(editor.id, id("mine"));
+    assert_eq!(editor.bands.len(), 2);
+    assert!(editor.editable);
+    assert_eq!(eq_editor(&s, &id("mine")), None);
+}
+
+#[test]
+fn twenty_hertz_sits_left_and_twenty_kilohertz_right() {
+    assert_close(f64::from(x_fraction(20.0)), 0.0, 1e-6);
+    assert_close(f64::from(x_fraction(632.455_5)), 0.5, 1e-4);
+    assert_close(f64::from(x_fraction(20_000.0)), 1.0, 1e-6);
+    assert_close(f64::from(x_fraction(5.0)), 0.0, 1e-6);
+}
+
+#[test]
+fn plus_ten_decibels_sits_on_top_and_minus_ten_at_the_bottom() {
+    assert_close(f64::from(y_fraction(10.0)), 0.0, 1e-6);
+    assert_close(f64::from(y_fraction(0.0)), 0.5, 1e-6);
+    assert_close(f64::from(y_fraction(-10.0)), 1.0, 1e-6);
+    assert_close(f64::from(y_fraction(-14.0)), 1.0, 1e-6);
+    assert_close(f64::from(y_fraction(12.0)), 0.0, 1e-6);
+}
+
+#[test]
+fn filter_kinds_map_to_combo_positions() {
+    for (position, kind) in FilterKind::ALL.into_iter().enumerate() {
+        assert_eq!(kind_position(kind), position);
+        assert_eq!(kind_at(position), Some(kind));
+    }
+    assert_eq!(kind_at(FilterKind::ALL.len()), None);
+    assert_eq!(kind_items().len(), FilterKind::ALL.len());
 }

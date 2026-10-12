@@ -78,3 +78,8 @@ pub fn preset_arg(preset: &Preset) -> Arg {
         PresetKind::Custom => Arg::Str(preset.name().to_owned()),
     }
 }
+
+#[must_use]
+pub fn saturating_count(value: usize) -> u32 {
+    u32::try_from(value).unwrap_or(u32::MAX)
+}
