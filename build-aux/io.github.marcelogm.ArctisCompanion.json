@@ -8,6 +8,7 @@
     "org.freedesktop.Sdk.Extension.llvm22"
   ],
   "command": "arctis-companion",
+  "separate-locales": false,
   "finish-args": [
     "--share=ipc",
     "--socket=wayland",

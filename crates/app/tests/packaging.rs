@@ -2,6 +2,8 @@ use std::collections::BTreeSet;
 use std::fs;
 use std::path::PathBuf;
 
+use arctis_app::locale::GETTEXT_PACKAGE;
+
 const MANIFEST: &str = "build-aux/io.github.marcelogm.ArctisCompanion.json";
 const METAINFO: &str = "data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in";
 const RELEASE: &str = ".github/workflows/release.yml";
@@ -11,21 +13,31 @@ fn repo_file(path: &str) -> String {
     fs::read_to_string(root.join(path)).unwrap_or_else(|error| panic!("{path}: {error}"))
 }
 
-fn meson_version() -> String {
+fn manifest() -> serde_json::Value {
+    serde_json::from_str(&repo_file(MANIFEST)).expect("manifest is JSON")
+}
+
+fn meson_quoted_after(marker: &str) -> String {
     let meson = repo_file("meson.build");
-    let marker = "\n  version: '";
-    let start = meson.find(marker).expect("project version") + marker.len();
+    let start = meson.find(marker).expect(marker) + marker.len();
     meson[start..]
         .split('\'')
-        .next()
-        .expect("closing quote")
+        .nth(1)
+        .expect("quoted value")
         .to_owned()
+}
+
+fn meson_version() -> String {
+    meson_quoted_after("\n  version:")
+}
+
+fn meson_project_name() -> String {
+    meson_quoted_after("project(")
 }
 
 #[test]
 fn the_sandbox_grants_hidraw_pipewire_and_a_display() {
-    let manifest: serde_json::Value =
-        serde_json::from_str(&repo_file(MANIFEST)).expect("manifest is JSON");
+    let manifest = manifest();
     let granted: BTreeSet<&str> = manifest["finish-args"]
         .as_array()
         .expect("finish-args")
@@ -40,6 +52,16 @@ fn the_sandbox_grants_hidraw_pipewire_and_a_display() {
         "--filesystem=xdg-run/pipewire-0",
     ]);
     assert_eq!(granted, expected);
+}
+
+#[test]
+fn the_bundle_keeps_its_translations() {
+    assert_eq!(manifest()["separate-locales"], serde_json::Value::Bool(false));
+}
+
+#[test]
+fn the_gettext_domain_is_the_meson_project_name() {
+    assert_eq!(meson_project_name(), GETTEXT_PACKAGE);
 }
 
 #[test]
@@ -65,7 +87,9 @@ fn the_metainfo_explains_the_device_permission() {
     let metainfo = repo_file(METAINFO);
     assert!(metainfo.contains("access to all devices"));
     assert!(metainfo.contains("70-arctis-companion.rules"));
-    assert!(metainfo.contains("<translation type=\"gettext\">arctis-companion</translation>"));
+    assert!(metainfo.contains(&format!(
+        "<translation type=\"gettext\">{GETTEXT_PACKAGE}</translation>"
+    )));
 }
 
 #[test]

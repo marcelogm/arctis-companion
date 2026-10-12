@@ -82,6 +82,11 @@ sequenceDiagram
     T->>G: gettext / ngettext per Text
 ```
 
+The manifest sets `"separate-locales": false`, so `arctis-companion.mo` stays in `/app/share/locale` inside the app
+ref. `flatpak build-bundle` packs only the app ref, and a bundle's origin has no URL to fetch a `.Locale` extension
+from, so a split catalogue would never reach a computer that installs the release asset.
+`crates/app/tests/packaging.rs::the_bundle_keeps_its_translations` pins it.
+
 | Step | Symbol |
 |---|---|
 | Startup | `crates/app/src/application.rs::run` |
