@@ -238,6 +238,11 @@ extension:
 | 16 | `crates/ui/build.rs` runs `msgfmt --xml -d ../../po` and bundles the merged metainfo in the GResource; `msgfmt` (gettext ≥ 0.19.7 with its built-in `metainfo.its`) becomes a build tool of `arctis-ui`, like `blueprint-compiler` | `AdwAboutDialog::from_appdata` shows the metainfo summary and release notes; the English template alone would leave them English under pt_BR |
 | 17 | SP14 adds a latency figure to SP5's hardware test support (`crates/hid/tests/hardware/soak_log.rs`) | the acceptance "verified readback within 300 ms" needs a number a person can read; the soak's log had only counts. No hidraw is opened by SP14: only the person runs the ignored test |
 | 18 | The installed app is started with `gapplication launch` (D-Bus activation through the exported service file), falling back to `flatpak run` | it is how the app grid starts a `DBusActivatable` app, and it does not depend on the agent shell's `WAYLAND_DISPLAY` |
+| 19 | `po/extract.sh` passes `--force-po` | the first `xgettext` call writes no file when it finds no message (before Task 5), and the later `--join-existing` calls then fail |
+| 20 | `msgcmp` is the first line of `po/check.sh` to fail on the untranslated catalogue in Task 4, not `msgattrib` | `msgcmp` treats an empty `msgstr` as missing; the failure is still "nothing is translated yet" |
+| 21 | The adopted preset name "Headset Curve" (`crates/core/src/companion/catalog.rs::HEADSET_CURVE_NAME`) stays English | it is saved as a custom preset's name in the user's data and shown verbatim; translating it would need gettext in the pure core |
+| 22 | The census APO input is built with `collect::<Vec<String>>().concat()` | clippy's `format_collect` rejects collecting `format!` into a `String` |
+| 23 | The extension is installed but GNOME Shell lists it only after the next login | on Wayland the Shell does not rescan `~/.local/share/gnome-shell/extensions`; the extension stays not enabled |
 
 ---
 
