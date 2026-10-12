@@ -73,6 +73,9 @@ name = "arctis-hid"
 version = "0.1.0"
 dependencies = [
  "arctis-core",
+ "async-channel",
+ "rustix",
+ "tempfile",
 ]
 
 [[package]]

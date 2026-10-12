@@ -7,6 +7,13 @@ publish.workspace = true
 
 [dependencies]
 arctis-core.workspace = true
+async-channel = "2.5"
+rustix = { version = "1.1", features = ["event", "fs", "pipe", "std"] }
+
+[dev-dependencies]
+arctis-core = { workspace = true, features = ["testkit"] }
+rustix = { version = "1.1", features = ["event", "fs", "net", "pipe", "process", "std"] }
+tempfile = "3"
 
 [lints]
 workspace = true
