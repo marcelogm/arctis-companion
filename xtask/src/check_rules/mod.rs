@@ -1,4 +1,5 @@
 mod comments;
+mod dbus_copy;
 mod generated;
 mod line_limit;
 mod lints;
@@ -27,6 +28,7 @@ fn check_tree(root: &Path, files: &[String]) -> Report {
     per_file
         .fold(Report::default(), Report::merged)
         .merged(lints::check(root, files))
+        .merged(dbus_copy::check(root, files))
 }
 
 fn check_file(root: &Path, file: &str) -> Report {
