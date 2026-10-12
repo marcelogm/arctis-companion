@@ -2,7 +2,7 @@ use std::cell::RefCell;
 use std::collections::HashMap;
 use std::rc::Rc;
 
-use arctis_app::dbus::headset_object::HeadsetObject;
+use arctis_app::dbus::headset_object::{HeadsetObject, INTERFACE};
 use arctis_app::ports::SnapshotView;
 use arctis_core::companion::Snapshot;
 use arctis_core::companion::adoption::AdoptionStatus;
@@ -16,7 +16,7 @@ use gtk::gio::prelude::*;
 use gtk::glib;
 
 use crate::bus::{Bus, Target, call, property, settle, wait_until};
-use crate::fixtures::{INTERFACE, Intents, PATH, contract_xml, recorder};
+use crate::fixtures::{Intents, PATH, contract_xml, recorder};
 use crate::introspection::canonical_members;
 
 pub fn matches_the_contract(bus: &Bus) {
@@ -126,6 +126,10 @@ fn refused_with(result: &Result<glib::Variant, glib::Error>, error: &str) -> boo
 pub fn activate_preset_follows_the_picked_path(bus: &Bus) {
     let (result, intents) = activate(bus, with(Phase::Absent, Route::None));
     assert!(refused_with(&result, "Error.NoRoute"), "{result:?}");
+    assert!(
+        refused_with(&result, "No headset route is active"),
+        "{result:?}"
+    );
     assert!(intents.is_empty());
     let mut never_read = with(Phase::HeadsetOff, Route::None);
     never_read.dongle.adoption = AdoptionStatus::NeverAdopted;
@@ -137,19 +141,58 @@ pub fn activate_preset_follows_the_picked_path(bus: &Bus) {
     assert_eq!(intents, [Intent::ActivatePreset(id("bass-boost"))]);
 }
 
+fn on_the_bus<'a>(name: &'a str, interface: &'a str) -> Target<'a> {
+    Target {
+        name,
+        path: PATH,
+        interface,
+    }
+}
+
+fn set_property(bus: &Bus, name: &str, property: &str, value: glib::Variant) -> bool {
+    let target = on_the_bus(name, "org.freedesktop.DBus.Properties");
+    let arguments = (INTERFACE, property, value).to_variant();
+    call(&bus.client(), &target, "Set", Some(&arguments)).is_ok()
+}
+
 pub fn automatic_presets_is_writable(bus: &Bus) {
     let session = bus.session();
     let name = session.unique_name().expect("unique name");
     let object = HeadsetObject::register(&session, PATH, Rc::new(snapshot())).expect("exported");
     let intents = Intents::default();
     object.on_intent(recorder(&intents));
-    let target = Target {
-        name: &name,
-        path: PATH,
-        interface: "org.freedesktop.DBus.Properties",
-    };
-    let value = (INTERFACE, "AutomaticPresets", false.to_variant()).to_variant();
-    call(&bus.client(), &target, "Set", Some(&value)).expect("set");
+    assert!(set_property(
+        bus,
+        &name,
+        "AutomaticPresets",
+        false.to_variant()
+    ));
     assert_eq!(*intents.borrow(), [Intent::SetAutomaticPresets(false)]);
     object.unregister();
+}
+
+pub fn refuses_unknown_methods_and_mistyped_writes(bus: &Bus) {
+    let session = bus.session();
+    let name = session.unique_name().expect("unique name");
+    let object = HeadsetObject::register(&session, PATH, Rc::new(snapshot())).expect("exported");
+    let intents = Intents::default();
+    object.on_intent(recorder(&intents));
+    assert!(!set_property(
+        bus,
+        &name,
+        "AutomaticPresets",
+        "off".to_variant()
+    ));
+    assert!(!set_property(bus, &name, "State", "connected".to_variant()));
+    let unknown = call(&bus.client(), &on_the_bus(&name, INTERFACE), "Forget", None);
+    assert!(refused_with(&unknown, "UnknownMethod"), "{unknown:?}");
+    assert!(intents.borrow().is_empty());
+    drop(object);
+    let gone = call(
+        &bus.client(),
+        &on_the_bus(&name, INTERFACE),
+        "ActivatePreset",
+        Some(&("flat",).to_variant()),
+    );
+    assert!(gone.is_err(), "dropping the object unregisters it");
 }

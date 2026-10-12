@@ -10,7 +10,7 @@ use gtk::glib;
 use gtk::glib::prelude::*;
 
 use super::properties::{PropertyMap, changed, property_values};
-use super::state::error_name;
+use super::wire_names::{error_message, error_name};
 use crate::logging::warn;
 use crate::ports::SnapshotView;
 
@@ -20,7 +20,7 @@ const CONTRACT: &str =
 const PROPERTIES: &str = "org.freedesktop.DBus.Properties";
 const UNKNOWN_METHOD: &str = "org.freedesktop.DBus.Error.UnknownMethod";
 
-type IntentHandler = Rc<dyn Fn(Intent)>;
+pub type IntentHandler = Rc<dyn Fn(Intent)>;
 
 pub struct HeadsetObject {
     connection: gio::DBusConnection,
@@ -50,8 +50,8 @@ impl HeadsetObject {
         Ok(object)
     }
 
-    pub fn on_intent(&self, handler: impl Fn(Intent) + 'static) {
-        self.intents.replace(Some(Rc::new(handler)));
+    pub fn on_intent(&self, handler: IntentHandler) {
+        self.intents.replace(Some(handler));
     }
 
     pub fn unregister(&self) {
@@ -89,19 +89,18 @@ impl HeadsetObject {
                 invocation.return_value(None);
                 self.emit(Intent::ActivatePreset(PresetId::new(id)));
             }
-            Err(error) => invocation.return_dbus_error(error_name(error), &format!("{error:?}")),
+            Err(error) => invocation.return_dbus_error(error_name(error), error_message(error)),
         }
     }
 
     fn set(&self, name: &str, value: &glib::Variant) -> bool {
-        let automatic = (name == "AutomaticPresets")
-            .then(|| value.get::<bool>())
-            .flatten();
-        let Some(on) = automatic else {
-            return false;
-        };
-        self.emit(Intent::SetAutomaticPresets(on));
-        true
+        match (name, value.get::<bool>()) {
+            ("AutomaticPresets", Some(on)) => {
+                self.emit(Intent::SetAutomaticPresets(on));
+                true
+            }
+            _ => false,
+        }
     }
 
     fn emit(&self, intent: Intent) {
@@ -127,6 +126,12 @@ impl HeadsetObject {
         if let Err(error) = sent {
             warn(&format!("PropertiesChanged was not sent: {error}"));
         }
+    }
+}
+
+impl Drop for HeadsetObject {
+    fn drop(&mut self) {
+        self.unregister();
     }
 }
 

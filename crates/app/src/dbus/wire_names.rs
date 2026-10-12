@@ -75,3 +75,11 @@ pub const fn error_name(error: ActivateError) -> &'static str {
         ActivateError::NotReady => NOT_READY,
     }
 }
+
+#[must_use]
+pub const fn error_message(error: ActivateError) -> &'static str {
+    match error {
+        ActivateError::NoRoute => "No headset route is active",
+        ActivateError::NotReady => "The headset is not ready yet",
+    }
+}

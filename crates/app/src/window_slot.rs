@@ -14,7 +14,13 @@ use crate::ports::SnapshotView;
 const SHOW_PAGE: &str = "win.show-page";
 
 type IntentHandler = Rc<dyn Fn(Intent)>;
-type CloseHandler = Rc<dyn Fn() -> glib::Propagation>;
+type CloseHandler = Rc<dyn Fn() -> OnClose>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum OnClose {
+    ForgetWindow,
+    HideUntilQuit,
+}
 
 pub struct WindowSlot {
     window: RefCell<Option<Window>>,
@@ -80,13 +86,16 @@ impl WindowSlot {
     }
 
     fn closing(&self, window: &Window) -> glib::Propagation {
-        let decision = (self.on_close)();
-        if decision == glib::Propagation::Stop {
-            window.set_visible(false);
-        } else {
-            self.window.replace(None);
+        match (self.on_close)() {
+            OnClose::ForgetWindow => {
+                self.window.replace(None);
+                glib::Propagation::Proceed
+            }
+            OnClose::HideUntilQuit => {
+                window.set_visible(false);
+                glib::Propagation::Stop
+            }
         }
-        decision
     }
 }
 

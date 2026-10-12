@@ -10,7 +10,7 @@ use crate::portal_service::{PortalService, Request};
 fn ask(portal: &AshpdPortal) -> bool {
     let answer = Rc::new(Cell::new(None));
     let slot = Rc::clone(&answer);
-    portal.request(true, Box::new(move |granted| slot.set(Some(granted))));
+    portal.request(Box::new(move |granted| slot.set(Some(granted))));
     wait_until("the portal answer", || answer.get().is_some());
     answer.get().unwrap_or(false)
 }

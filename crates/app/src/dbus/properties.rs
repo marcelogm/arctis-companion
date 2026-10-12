@@ -7,7 +7,7 @@ use arctis_ui::text::resolve;
 use gtk::glib;
 use gtk::glib::prelude::*;
 
-use super::state::{
+use super::wire_names::{
     battery_level, charging_name, reason_pair, route_name, state_name, warning_name,
 };
 
@@ -16,7 +16,7 @@ pub type PropertyMap = BTreeMap<&'static str, glib::Variant>;
 #[must_use]
 pub fn property_values(snapshot: &Snapshot) -> PropertyMap {
     let reading = snapshot.battery.reading;
-    let (active, reason) = active_preset(snapshot);
+    let active = active_preset(snapshot);
     PropertyMap::from([
         ("State", state(snapshot).to_variant()),
         ("Model", model_name(snapshot).to_variant()),
@@ -28,8 +28,8 @@ pub fn property_values(snapshot: &Snapshot) -> PropertyMap {
         ),
         ("Route", route_name(snapshot.audio.route).to_variant()),
         ("Presets", preset_list(snapshot).to_variant()),
-        ("ActivePreset", active.to_variant()),
-        ("ActivePresetReason", reason.to_variant()),
+        ("ActivePreset", active.id.to_variant()),
+        ("ActivePresetReason", active.reason.to_variant()),
         ("AppRuleCount", rule_count(snapshot).to_variant()),
         ("AutomaticPresets", snapshot.presets.automatic.to_variant()),
     ])
@@ -78,15 +78,23 @@ fn rule_count(snapshot: &Snapshot) -> u32 {
     u32::try_from(snapshot.presets.rules.len()).unwrap_or(u32::MAX)
 }
 
-fn active_preset(snapshot: &Snapshot) -> (String, (&'static str, String)) {
+struct ActivePresetProperty {
+    id: String,
+    reason: (&'static str, String),
+}
+
+fn active_preset(snapshot: &Snapshot) -> ActivePresetProperty {
     match snapshot.picked_path() {
         Ok(path) => {
             let active = snapshot.presets.active.get(path);
-            (
-                active.preset.as_str().to_owned(),
-                reason_pair(&active.reason),
-            )
+            ActivePresetProperty {
+                id: active.preset.as_str().to_owned(),
+                reason: reason_pair(&active.reason),
+            }
         }
-        Err(_) => (String::new(), reason_pair(&PresetReason::Route)),
+        Err(_) => ActivePresetProperty {
+            id: String::new(),
+            reason: reason_pair(&PresetReason::Route),
+        },
     }
 }

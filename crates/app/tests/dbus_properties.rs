@@ -1,5 +1,5 @@
 use arctis_app::dbus::properties::{changed, property_values};
-use arctis_app::dbus::state::{
+use arctis_app::dbus::wire_names::{
     battery_level, charging_name, error_name, reason_pair, route_name, state_name, warning_name,
 };
 use arctis_core::battery::sample::Reading;
