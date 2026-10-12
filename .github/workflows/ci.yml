@@ -1,0 +1,107 @@
+name: ci
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+
+env:
+  CARGO_TERM_COLOR: always
+
+jobs:
+  rules:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+          components: rustfmt
+      - run: cargo fmt --all --check
+      - run: cargo xtask check-rules
+      - run: cargo xtask check-doc-paths
+      - run: cargo xtask check-pure
+      - name: check-commits for a pull request
+        if: github.event_name == 'pull_request'
+        env:
+          BASE_SHA: ${{ github.event.pull_request.base.sha }}
+          HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          PR_TITLE: ${{ github.event.pull_request.title }}
+          PR_BODY: ${{ github.event.pull_request.body }}
+        run: cargo xtask check-commits --range "$BASE_SHA..$HEAD_SHA" --pr-title "$PR_TITLE" --pr-body "$PR_BODY"
+      - name: check-commits for main
+        if: github.event_name == 'push' && github.event.before != '0000000000000000000000000000000000000000'
+        env:
+          BEFORE_SHA: ${{ github.event.before }}
+        run: cargo xtask check-commits --range "$BEFORE_SHA..$GITHUB_SHA"
+
+  test:
+    needs: rules
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False git gcc gettext clang-devel pipewire-devel gtk4-devel libadwaita-devel blueprint-compiler
+      - uses: actions/checkout@v4
+      - run: git config --global --add safe.directory "$GITHUB_WORKSPACE"
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+          components: clippy, llvm-tools-preview
+      - uses: taiki-e/install-action@v2
+        with:
+          tool: cargo-llvm-cov
+      - run: cargo clippy --workspace --all-targets -- -D warnings
+      - run: cargo test --workspace --exclude arctis-ui
+      - run: cargo llvm-cov --package arctis-core --fail-under-lines 90
+
+  ui:
+    needs: rules
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False git gcc gtk4-devel libadwaita-devel blueprint-compiler weston mesa-dri-drivers
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@master
+        with:
+          toolchain: 1.98.1
+      - name: widget tests under headless weston
+        env:
+          GDK_BACKEND: wayland
+          GSK_RENDERER: cairo
+          WAYLAND_DISPLAY: wayland-ci
+        run: |
+          export XDG_RUNTIME_DIR="$(mktemp -d)"
+          weston --backend=headless --socket=wayland-ci --idle-time=0 &
+          until [ -S "$XDG_RUNTIME_DIR/wayland-ci" ]; do sleep 0.1; done
+          cargo test --package arctis-ui
+
+  extension:
+    needs: rules
+    runs-on: ubuntu-latest
+    container: fedora:44
+    steps:
+      - run: dnf install -y --setopt=install_weak_deps=False nodejs npm
+      - uses: actions/checkout@v4
+      - run: npm ci
+        working-directory: extension
+      - run: npx eslint .
+        working-directory: extension
+
+  flatpak:
+    needs: test
+    runs-on: ubuntu-latest
+    container:
+      image: ghcr.io/flathub-infra/flatpak-github-actions:gnome-50
+      options: --privileged
+    steps:
+      - uses: actions/checkout@v4
+      - uses: flatpak/flatpak-github-actions/flatpak-builder@v6
+        with:
+          bundle: arctis-companion.flatpak
+          manifest-path: build-aux/io.github.marcelogm.ArctisCompanion.json
+          cache-key: flatpak-builder-${{ github.sha }}
