@@ -182,7 +182,7 @@ fn allocated_editor(width: i32) -> arctis_ui::EqEditorPage {
 #[gtk::test]
 fn a_wide_editor_keeps_one_centered_column() {
     let page = allocated_editor(1920);
-    let graph = bounds_in(&named::<gtk::Widget>(&page, "response-graph"), &page);
+    let graph = bounds_in(&named::<gtk::Widget>(&page, "eq-graph"), &page);
     let bands = bounds_in(&named::<gtk::Widget>(&page, "bands"), &page);
     for (what, rect) in [("graph", &graph), ("bands", &bands)] {
         assert!(
@@ -205,7 +205,7 @@ fn a_wide_editor_keeps_one_centered_column() {
 #[gtk::test]
 fn a_narrow_editor_spends_its_width_on_the_graph_and_the_bands() {
     let page = allocated_editor(440);
-    for name in ["response-graph", "bands"] {
+    for name in ["eq-graph", "bands"] {
         let rect = bounds_in(&named::<gtk::Widget>(&page, name), &page);
         assert!(rect.width() >= 400.0, "{name} is {} wide", rect.width());
     }

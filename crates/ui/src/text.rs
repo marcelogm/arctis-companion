@@ -34,6 +34,10 @@ impl NumberStyle {
             .map_or(Self::POINT, |name| Self::for_locale(name))
     }
 
+    fn hundredths(self, value: f64) -> String {
+        format!("{value:.2}").replace('.', &self.decimal.to_string())
+    }
+
     fn signed_tenths(self, value: f64) -> String {
         format!("{value:+.1}").replace('.', &self.decimal.to_string())
     }
@@ -101,6 +105,7 @@ impl Resolver {
             Arg::Percent(percent) => format!("{} %", percent.get()),
             Arg::Decibels(gain) => format!("{} dB", self.numbers.signed_tenths(gain.db())),
             Arg::Hertz(hertz) => format!("{} Hz", hertz.get()),
+            Arg::Quality(q) => self.numbers.hundredths(q.value()),
             Arg::Number(number) => number.to_string(),
             Arg::Time(at) => local_time(*at),
             Arg::Msgid(msgid) => gettext(msgid.as_str()),

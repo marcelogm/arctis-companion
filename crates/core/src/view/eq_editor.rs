@@ -1,18 +1,11 @@
-use super::text::{Arg, Text, preset_arg, preset_title, saturating_count};
+use super::eq_graph::{GraphModel, graph};
+use super::text::{Arg, Text, preset_title};
 use crate::companion::selection::PresetReason;
 use crate::companion::snapshot::Snapshot;
 use crate::eq::curve::MAX_FILTERS;
 use crate::eq::filter::{Filter, FilterKind, Gain, Hertz, Q};
 use crate::eq::preset::{Preset, PresetId, PresetKind};
-use crate::eq::response::response;
-use crate::l10n::{forms, msgid};
-
-pub const GRAPH_POINTS: u16 = 96;
-const GRAPH_LOW_HZ: f32 = 20.0;
-const GRAPH_SPAN: f32 = 1_000.0;
-const GRAPH_DB_RANGE: f32 = 10.0;
-pub const GRID_HZ: [f32; 3] = [100.0, 1_000.0, 10_000.0];
-pub const GRID_DB: [f32; 5] = [-10.0, -5.0, 0.0, 5.0, 10.0];
+use crate::l10n::msgid;
 
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub struct BandModel {
@@ -24,18 +17,6 @@ pub struct BandModel {
     pub q: Q,
     pub enabled: bool,
     pub gain_sensitive: bool,
-}
-
-#[derive(Clone, Copy, Debug, PartialEq)]
-pub struct GraphPoint {
-    pub hz: f32,
-    pub db: f32,
-}
-
-#[derive(Clone, Debug, PartialEq)]
-pub struct GraphModel {
-    pub points: Vec<GraphPoint>,
-    pub description: Text,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -102,16 +83,6 @@ fn preview_state(snapshot: &Snapshot, id: &PresetId) -> PreviewState {
 }
 
 #[must_use]
-pub fn x_fraction(hz: f32) -> f32 {
-    ((hz / GRAPH_LOW_HZ).log10() / GRAPH_SPAN.log10()).clamp(0.0, 1.0)
-}
-
-#[must_use]
-pub fn y_fraction(db: f32) -> f32 {
-    ((GRAPH_DB_RANGE - db) / (2.0 * GRAPH_DB_RANGE)).clamp(0.0, 1.0)
-}
-
-#[must_use]
 pub fn kind_at(position: usize) -> Option<FilterKind> {
     FilterKind::ALL.get(position).copied()
 }
@@ -164,14 +135,6 @@ pub fn kind_items() -> Vec<Text> {
         .collect()
 }
 
-#[must_use]
-pub fn graph_frequencies() -> Vec<f32> {
-    let last = f32::from(GRAPH_POINTS - 1);
-    (0..GRAPH_POINTS)
-        .map(|step| GRAPH_LOW_HZ * GRAPH_SPAN.powf(f32::from(step) / last))
-        .collect()
-}
-
 fn band(filter: Filter, index: usize) -> BandModel {
     BandModel {
         index,
@@ -182,31 +145,5 @@ fn band(filter: Filter, index: usize) -> BandModel {
         q: filter.q(),
         enabled: filter.is_enabled(),
         gain_sensitive: filter.kind().has_gain(),
-    }
-}
-
-fn graph(preset: &Preset) -> GraphModel {
-    let frequencies = graph_frequencies();
-    let levels = response(preset.curve(), &frequencies);
-    let active = preset
-        .curve()
-        .filters()
-        .iter()
-        .filter(|filter| filter.is_enabled())
-        .count();
-    GraphModel {
-        points: frequencies
-            .into_iter()
-            .zip(levels)
-            .map(|(hz, db)| GraphPoint { hz, db })
-            .collect(),
-        description: Text::plural(
-            forms(
-                "Nominal frequency response of {preset}, with {n} active band",
-                "Nominal frequency response of {preset}, with {n} active bands",
-            ),
-            saturating_count(active),
-            vec![("preset", preset_arg(preset))],
-        ),
     }
 }

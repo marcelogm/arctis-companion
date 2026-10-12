@@ -45,55 +45,76 @@ template $ArctisEqEditorPage: Adw.NavigationPage {
       }
     }
 
-    content: Box layout {
-      name: "editor-layout";
-      orientation: vertical;
+    content: Adw.BreakpointBin {
+      width-request: 360;
+      height-request: 200;
 
-      Adw.Clamp {
-        maximum-size: 720;
-        tightening-threshold: 600;
+      child: Box layout {
+        name: "editor-layout";
+        orientation: vertical;
 
-        child: $ArctisResponseGraph graph {
-          name: "response-graph";
-          height-request: 160;
-          margin-start: 12;
-          margin-end: 12;
-          margin-top: 12;
-        };
-      }
-
-      ScrolledWindow {
-        hscrollbar-policy: never;
-        vexpand: true;
-
-        child: Adw.Clamp {
+        Adw.Clamp {
           maximum-size: 720;
           tightening-threshold: 600;
 
-          child: Adw.PreferencesGroup bands {
-            name: "bands";
-            title: _("Bands");
+          child: $ArctisEqGraph graph {
+            name: "eq-graph";
+            height-request: 300;
             margin-start: 12;
             margin-end: 12;
-            margin-top: 24;
-            margin-bottom: 24;
+            margin-top: 12;
+          };
+        }
 
-            header-suffix: Button add_band {
-              name: "add-band";
-              icon-name: "list-add-symbolic";
-              action-name: "editor.add-band";
-              tooltip-text: _("Add Band");
+        ScrolledWindow {
+          hscrollbar-policy: never;
+          vexpand: true;
 
-              styles [
-                "flat",
-              ]
+          child: Adw.Clamp {
+            maximum-size: 720;
+            tightening-threshold: 600;
 
-              accessibility {
-                label: _("Add Band");
-              }
+            child: Adw.PreferencesGroup bands {
+              name: "bands";
+              title: _("Bands");
+              margin-start: 12;
+              margin-end: 12;
+              margin-top: 18;
+              margin-bottom: 24;
+
+              header-suffix: Button add_band {
+                name: "add-band";
+                icon-name: "list-add-symbolic";
+                action-name: "editor.add-band";
+                tooltip-text: _("Add Band");
+
+                styles [
+                  "flat",
+                ]
+
+                accessibility {
+                  label: _("Add Band");
+                }
+              };
             };
           };
-        };
+        }
+      };
+
+      Adw.Breakpoint {
+        condition ("max-height: 640sp")
+
+        setters {
+          graph.height-request: 220;
+        }
+      }
+
+      Adw.Breakpoint {
+        condition ("max-height: 440sp")
+
+        setters {
+          graph.height-request: 140;
+        }
       }
     };
   };

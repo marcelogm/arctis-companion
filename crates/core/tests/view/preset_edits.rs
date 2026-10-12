@@ -3,8 +3,8 @@ use arctis_core::eq::preset::{Preset, PresetKind};
 use arctis_core::eq::{Filter, FilterKind};
 use arctis_core::testkit::english::english;
 use arctis_core::view::preset_edits::{
-    Applied, BandEdit, NEW_BAND, WorkingCopy, add_band, apply_edit, copy_name, duplicate,
-    new_preset, remove_band, renamed, saved_toast,
+    Applied, BandEdit, NEW_BAND, WorkingCopy, add_band, add_band_at, apply_edit, copy_name,
+    duplicate, new_preset, remove_band, renamed, saved_toast,
 };
 
 use crate::support::{custom, custom_preset, filter, id, snapshot, with_preset};
@@ -83,6 +83,58 @@ fn bands_are_added_as_a_neutral_peak_up_to_ten() {
     assert_eq!(two.curve().filters(), [first_band(&peak()), NEW_BAND]);
     assert_eq!(NEW_BAND, filter(FilterKind::Peaking, 1_000, 0, 1_410));
     assert_eq!(add_band(&custom("Full")), None);
+}
+
+#[test]
+fn a_point_edit_moves_frequency_and_gain_together_on_the_grid() {
+    let moved = apply_edit(
+        &peak(),
+        0,
+        BandEdit::Point {
+            hz: 1_999.6,
+            db: 3.3,
+        },
+    )
+    .expect("edited");
+    assert_eq!(
+        first_band(&moved),
+        filter(FilterKind::Peaking, 2_000, 7, 1_000)
+    );
+    let pass = custom_preset(&[filter(FilterKind::LowPass, 8_000, 0, 707)]);
+    let slid = apply_edit(
+        &pass,
+        0,
+        BandEdit::Point {
+            hz: 4_000.0,
+            db: 6.0,
+        },
+    )
+    .expect("edited");
+    assert_eq!(
+        first_band(&slid),
+        filter(FilterKind::LowPass, 4_000, 0, 707)
+    );
+    let high = apply_edit(
+        &peak(),
+        0,
+        BandEdit::Point {
+            hz: 250.0,
+            db: 30.0,
+        },
+    )
+    .expect("edited");
+    assert_eq!(first_band(&high).gain().half_db(), 20);
+}
+
+#[test]
+fn a_band_added_at_a_point_is_a_peak_there() {
+    let two = add_band_at(&peak(), 3_000.4, -4.2).expect("added");
+    assert_eq!(
+        two.curve().filters()[1],
+        filter(FilterKind::Peaking, 3_000, -8, 1_410)
+    );
+    assert_eq!(add_band_at(&custom("Full"), 3_000.0, 0.0), None);
+    assert_eq!(add_band_at(&library::flat(), 3_000.0, 0.0), None);
 }
 
 #[test]

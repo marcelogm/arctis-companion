@@ -8,7 +8,7 @@ use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
 use arctis_core::testkit::snapshots::{id, snapshot, with};
 use arctis_core::view::eq_editor::eq_editor;
-use arctis_ui::{BatteryChart, HeadsetStatus, PermissionDialog, ResponseGraph};
+use arctis_ui::{BatteryChart, EqGraph, HeadsetStatus, PermissionDialog};
 use gtk::glib;
 use gtk::{AccessibleProperty, AccessibleRelation, AccessibleRole};
 
@@ -212,13 +212,13 @@ fn every_control_of_the_editor_has_a_name() {
 }
 
 #[gtk::test]
-fn the_response_graph_has_a_description() {
+fn the_eq_graph_has_a_description() {
     let s = two_kinds_snapshot();
     let (window, _) = rendered_window(s.clone());
     let page = open_editor(&window, "mine");
     let model = eq_editor(&s, &id("mine")).expect("editor");
     assert!(has_accessible_text(
-        &first::<ResponseGraph>(&page),
+        &first::<EqGraph>(&page),
         AccessibleProperty::Description,
         &english(&model.graph.description)
     ));

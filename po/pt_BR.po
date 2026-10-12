@@ -183,12 +183,50 @@ msgstr "Prateleira baixa"
 msgid "Low-Pass"
 msgstr "Passa-baixas"
 
-#: crates/core/src/view/eq_editor.rs
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid "Band {number}, {kind}, {frequency}, Q {q}"
+msgstr "Banda {number}, {kind}, {frequency}, Q {q}"
+
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid "Band {number}, {kind}, {frequency}, {gain}, Q {q}"
+msgstr "Banda {number}, {kind}, {frequency}, {gain}, Q {q}"
+
+#: crates/core/src/view/eq_graph.rs
 #, rust-format
 msgid "Nominal frequency response of {preset}, with {n} active band"
 msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
 msgstr[0] "Resposta de frequência nominal de {preset}, com {n} banda ativa"
 msgstr[1] "Resposta de frequência nominal de {preset}, com {n} bandas ativas"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Bass"
+msgstr "Graves"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Brilliance"
+msgstr "Brilho"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "High mids"
+msgstr "Médios-agudos"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Low mids"
+msgstr "Médios-graves"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Mids"
+msgstr "Médios"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Presence"
+msgstr "Presença"
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Sub-bass"
+msgstr "Subgraves"
 
 #: crates/core/src/view/eq_editor.rs
 msgid "Peak"
@@ -833,6 +871,14 @@ msgstr "_Atalhos de teclado"
 #: crates/ui/resources/window.blp
 msgid "_Preferences"
 msgstr "_Preferências"
+
+#: crates/ui/src/eq_graph/input.rs
+msgid "_Remove Band"
+msgstr "_Remover banda"
+
+#: crates/ui/src/eq_handle.rs
+msgid "Arrow keys change frequency and gain, Page Up and Page Down change Q"
+msgstr "As setas mudam a frequência e o ganho; Page Up e Page Down mudam o Q"
 
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "Name"

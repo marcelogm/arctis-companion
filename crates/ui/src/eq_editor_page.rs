@@ -1,3 +1,4 @@
+mod graph;
 mod header;
 
 use std::rc::Rc;
@@ -33,7 +34,7 @@ mod imp {
     use gtk::glib::prelude::StaticTypeExt;
 
     use crate::eq_band_row::EqBandRow;
-    use crate::response_graph::ResponseGraph;
+    use crate::eq_graph::EqGraph;
     use crate::services::Services;
 
     #[derive(Default, gtk::CompositeTemplate)]
@@ -46,7 +47,7 @@ mod imp {
         #[template_child]
         pub preview: TemplateChild<gtk::ToggleButton>,
         #[template_child]
-        pub graph: TemplateChild<ResponseGraph>,
+        pub graph: TemplateChild<EqGraph>,
         #[template_child]
         pub bands: TemplateChild<adw::PreferencesGroup>,
         #[template_child]
@@ -54,6 +55,7 @@ mod imp {
         pub services: RefCell<Option<Services>>,
         pub snapshot: RefCell<Option<Rc<Snapshot>>>,
         pub working: RefCell<Option<WorkingCopy>>,
+        pub dragged: RefCell<Option<arctis_core::eq::preset::Preset>>,
         pub band_rows: RefCell<Vec<EqBandRow>>,
         pub undo_toast: RefCell<Option<adw::Toast>>,
         pub rendering: Cell<bool>,
@@ -67,7 +69,7 @@ mod imp {
         type ParentType = adw::NavigationPage;
 
         fn class_init(klass: &mut Self::Class) {
-            ResponseGraph::ensure_type();
+            EqGraph::ensure_type();
             klass.bind_template();
             klass.install_action("editor.add-band", None, |page, _, _| {
                 page.save_change(add_band);
@@ -89,6 +91,7 @@ mod imp {
         fn constructed(&self) {
             self.parent_constructed();
             self.obj().connect_preview();
+            self.obj().connect_graph();
         }
     }
 
@@ -135,6 +138,7 @@ impl EqEditorPage {
     fn open_working(&self, snapshot: &Rc<Snapshot>, preset: Option<Preset>) {
         self.end_preview();
         self.dismiss_undo_toast();
+        self.imp().dragged.replace(None);
         self.imp().working.replace(preset.map(WorkingCopy::opened));
         self.render(snapshot);
     }
@@ -151,7 +155,7 @@ impl EqEditorPage {
     fn render_model(&self) {
         let imp = self.imp();
         let snapshot = imp.snapshot.borrow().clone();
-        let preset = self.preset();
+        let preset = imp.dragged.borrow().clone().or_else(|| self.preset());
         let (Some(snapshot), Some(preset)) = (snapshot, preset) else {
             return;
         };
@@ -159,7 +163,7 @@ impl EqEditorPage {
         while_rendering(&imp.rendering, || {
             self.set_title(&resolve(&model.title));
             self.show_header(&model);
-            imp.graph.render(&model.graph);
+            imp.graph.render(&model.graph, model.editable);
             self.show_bands(&model);
         });
     }
@@ -227,6 +231,7 @@ impl EqEditorPage {
             row,
             move || page.remove_band_row(&row)
         ));
+        self.follow_row(&row);
         row
     }
 
