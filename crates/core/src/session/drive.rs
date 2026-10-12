@@ -52,6 +52,9 @@ impl Session {
     }
 
     fn send(&mut self, outgoing: Outgoing) {
+        if let Outgoing::Write(change) = &outgoing {
+            self.echoes.record(change.clone());
+        }
         let frame = self.exchange.send(outgoing, self.now);
         self.outbox.push(Effect::Write(frame));
     }

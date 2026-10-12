@@ -1,3 +1,4 @@
+use super::echo::EchoFilter;
 use super::effect::{Cadence, Effect};
 use super::exchange::Exchange;
 use super::input::Input;
@@ -28,6 +29,7 @@ pub struct Session {
     pub(super) last_status_at: Millis,
     pub(super) transaction: Option<Transaction>,
     pub(super) failed: Vec<Setting>,
+    pub(super) echoes: EchoFilter,
     pub(super) exchange: Exchange,
     pub(super) published: Phase,
     pub(super) scheduled: Option<Millis>,
@@ -53,6 +55,7 @@ impl Session {
             last_status_at: Millis(0),
             transaction: None,
             failed: Vec::new(),
+            echoes: EchoFilter::default(),
             exchange: Exchange::default(),
             published: Phase::Absent,
             scheduled: None,
@@ -169,5 +172,6 @@ impl Session {
     pub(super) fn interrupt(&mut self) {
         self.transaction = None;
         self.exchange.abandon();
+        self.echoes.close(self.now);
     }
 }
