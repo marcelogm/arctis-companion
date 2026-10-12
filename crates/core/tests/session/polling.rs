@@ -1,11 +1,13 @@
-use arctis_core::messages::device::{DeviceUpdate, Phase};
+use arctis_core::messages::device::{DeviceUpdate, Phase, SyncPolicy};
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::session::timing::{
     COMMAND_SPACING, ENUMERATION_SETTLE, HEADSET_OFF_POLL, REPLY_TIMEOUT, STATUS_SAFETY_POLL,
 };
 use arctis_core::testkit::{Behaviour, FakeHeadset};
 
-use crate::support::{SETTLED, headset_off, percent, plugged, ready, sent, silent};
+use crate::support::{
+    SETTLED, headset_off, percent, plugged, ready, ready_with, sent, silent, with_sidetone,
+};
 
 #[test]
 fn an_unanswered_query_is_resent_once_before_headset_off() {
@@ -76,4 +78,22 @@ fn status_events_are_published_with_the_last_known_status() {
         simulation.updates().last().map(|(_, update)| update),
         Some(&expected)
     );
+}
+
+#[test]
+fn the_safety_poll_waits_for_the_write_transaction() {
+    let lossy = Behaviour {
+        drops_writes: true,
+        ..Behaviour::default()
+    };
+    let mut simulation = ready_with(FakeHeadset::nova_5().with_behaviour(lossy));
+    simulation.run_for(STATUS_SAFETY_POLL - 1_000);
+    simulation.clear_logs();
+    let desired = with_sidetone(simulation.headset().settings(), 6);
+    simulation.desire(desired, SyncPolicy::Enforce);
+    simulation.run_for(5_000);
+    let ids = simulation.sent_ids();
+    assert_eq!(ids.last(), Some(&0xB0));
+    assert_eq!(sent(&simulation, 0xB0), 1);
+    assert_eq!(sent(&simulation, 0x39), 2);
 }

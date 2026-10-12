@@ -3,10 +3,11 @@ use super::exchange::Exchange;
 use super::input::Input;
 use super::phase::Stage;
 use super::timing::{ENUMERATION_SETTLE, HEADSET_OFF_POLL};
-use crate::messages::device::{DeviceUpdate, Phase};
+use super::verify::Transaction;
+use crate::messages::device::{DeviceUpdate, Phase, SyncPolicy};
 use crate::protocol::model::{Model, ModelLookup};
 use crate::protocol::status::Status;
-use crate::settings::headset_settings::HeadsetSettings;
+use crate::settings::headset_settings::{HeadsetSettings, Setting};
 use crate::time::Millis;
 
 #[derive(Clone, Debug)]
@@ -21,9 +22,12 @@ pub struct Session {
     pub(super) outbox: Vec<Effect>,
     pub(super) stage: Stage,
     pub(super) dongle: Option<Dongle>,
+    pub(super) desired: Option<HeadsetSettings>,
     pub(super) observed: Option<HeadsetSettings>,
     pub(super) status: Option<Status>,
     pub(super) last_status_at: Millis,
+    pub(super) transaction: Option<Transaction>,
+    pub(super) failed: Vec<Setting>,
     pub(super) exchange: Exchange,
     pub(super) published: Phase,
     pub(super) scheduled: Option<Millis>,
@@ -43,9 +47,12 @@ impl Session {
             outbox: Vec::new(),
             stage: Stage::Absent,
             dongle: None,
+            desired: None,
             observed: None,
             status: None,
             last_status_at: Millis(0),
+            transaction: None,
+            failed: Vec::new(),
             exchange: Exchange::default(),
             published: Phase::Absent,
             scheduled: None,
@@ -74,10 +81,8 @@ impl Session {
             Input::Woke => self.scheduled = None,
             Input::Reply(bytes) => self.command_frame(&bytes),
             Input::Unsolicited { interface, bytes } => self.unsolicited(interface, &bytes),
-            Input::CommandPortLost
-            | Input::CommandPortBack
-            | Input::CommandPortDenied
-            | Input::Desired { .. } => {}
+            Input::Desired { settings, policy } => self.desire(settings, policy),
+            Input::CommandPortLost | Input::CommandPortBack | Input::CommandPortDenied => {}
         }
     }
 
@@ -114,7 +119,21 @@ impl Session {
         self.announce();
     }
 
+    fn desire(&mut self, settings: HeadsetSettings, policy: SyncPolicy) {
+        self.failed.clear();
+        match policy {
+            SyncPolicy::Enforce => self.desired = Some(settings),
+            SyncPolicy::Adopt => {
+                self.desired = None;
+                self.publish_observed();
+            }
+        }
+    }
+
     pub(super) fn enter(&mut self, stage: Stage) {
+        if matches!(stage, Stage::Syncing(_)) {
+            self.failed.clear();
+        }
         self.stage = stage;
         self.announce();
     }
@@ -148,6 +167,7 @@ impl Session {
     }
 
     pub(super) fn interrupt(&mut self) {
+        self.transaction = None;
         self.exchange.abandon();
     }
 }

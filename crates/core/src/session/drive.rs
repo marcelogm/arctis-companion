@@ -1,9 +1,12 @@
 use super::effect::Effect;
-use super::exchange::Expiry;
+use super::exchange::{Expiry, Outgoing};
 use super::phase::Stage;
+use super::reconcile::drift;
 use super::reducer::Session;
 use super::timing::{HEADSET_OFF_POLL, STATUS_SAFETY_POLL};
+use super::verify::Transaction;
 use crate::protocol::Query;
+use crate::settings::headset_settings::SettingChange;
 use crate::time::Millis;
 
 impl Session {
@@ -12,6 +15,13 @@ impl Session {
             Some(Expiry::Resend(frame)) => self.outbox.push(Effect::Write(frame)),
             Some(Expiry::GaveUp) => self.unanswered(),
             None => {}
+        }
+        if self
+            .transaction
+            .as_ref()
+            .is_some_and(|transaction| transaction.lost_link_for_good(self.now))
+        {
+            self.headset_off();
         }
         self.expire_stage();
     }
@@ -34,31 +44,66 @@ impl Session {
     }
 
     pub(super) fn drive(&mut self) {
-        self.reconcile();
         let free = self.exchange.free_at().is_some_and(|free| self.now >= free);
-        if free && let Some(query) = self.next_query() {
-            let frame = self.exchange.send(query, self.now);
-            self.outbox.push(Effect::Write(frame));
+        self.reconcile(free);
+        if free && let Some(outgoing) = self.next_outgoing() {
+            self.send(outgoing);
         }
     }
 
-    fn reconcile(&mut self) {
-        if matches!(&self.stage, Stage::Syncing(readings) if readings.is_complete()) {
+    fn send(&mut self, outgoing: Outgoing) {
+        let frame = self.exchange.send(outgoing, self.now);
+        self.outbox.push(Effect::Write(frame));
+    }
+
+    fn reconcile(&mut self, free: bool) {
+        if self.transaction.is_some() || !self.reconciles() {
+            return;
+        }
+        let changes = self.drift();
+        if changes.is_empty() && matches!(self.stage, Stage::Syncing(_)) {
             self.enter(Stage::Ready);
+        } else if !changes.is_empty() && free {
+            self.transaction = Some(Transaction::new(changes));
         }
     }
 
-    fn next_query(&mut self) -> Option<Query> {
+    fn reconciles(&self) -> bool {
+        match &self.stage {
+            Stage::Syncing(readings) => readings.is_complete(),
+            Stage::Ready => true,
+            _ => false,
+        }
+    }
+
+    fn drift(&self) -> Vec<SettingChange> {
+        match (&self.desired, &self.observed) {
+            (Some(desired), Some(observed)) => drift(desired, observed, &self.failed),
+            _ => Vec::new(),
+        }
+    }
+
+    fn next_outgoing(&mut self) -> Option<Outgoing> {
         let now = self.now;
         match &mut self.stage {
-            Stage::Probing => Some(Query::Status),
+            Stage::Probing => Some(Outgoing::Ask(Query::Status)),
             Stage::HeadsetOff { next_poll } if now >= *next_poll => {
                 *next_poll = now.after(HEADSET_OFF_POLL);
-                Some(Query::Status)
+                Some(Outgoing::Ask(Query::Status))
             }
-            Stage::Syncing(readings) if readings.wants_query() => readings.next_query(),
-            Stage::Ready => (now >= self.safety_poll_at()).then_some(Query::Status),
+            Stage::Syncing(readings) if readings.wants_query() => {
+                readings.next_query().map(Outgoing::Ask)
+            }
+            Stage::Syncing(_) => self.transaction.as_mut()?.next(now),
+            Stage::Ready => self.ready_outgoing(),
             _ => None,
+        }
+    }
+
+    fn ready_outgoing(&mut self) -> Option<Outgoing> {
+        match &mut self.transaction {
+            Some(transaction) => transaction.next(self.now),
+            None => (self.now >= self.safety_poll_at()).then_some(Outgoing::Ask(Query::Status)),
         }
     }
 
@@ -86,6 +131,9 @@ impl Session {
             timed,
             self.exchange.deadline(),
             self.stage_deadline(),
+            self.transaction
+                .as_ref()
+                .and_then(Transaction::link_lost_at),
         ]
         .into_iter()
         .flatten()
@@ -95,7 +143,11 @@ impl Session {
     fn timed_command(&self) -> Option<Millis> {
         match &self.stage {
             Stage::HeadsetOff { next_poll } => Some(*next_poll),
-            Stage::Ready => Some(self.safety_poll_at()),
+            Stage::Syncing(_) => self.transaction.as_ref().and_then(Transaction::due_at),
+            Stage::Ready => self
+                .transaction
+                .as_ref()
+                .map_or(Some(self.safety_poll_at()), Transaction::due_at),
             _ => None,
         }
     }
