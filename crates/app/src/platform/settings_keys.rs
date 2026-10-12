@@ -1,0 +1,121 @@
+use std::collections::HashMap;
+
+use arctis_core::companion::adoption::DongleIdentity;
+use arctis_core::companion::app_settings::{AppRules, HeadsetValues, RoutePresets};
+use arctis_core::eq::preset::PresetId;
+use arctis_core::messages::audio::SoundPath;
+use arctis_core::settings::values::{AutoPowerOff, MuteLight, WirelessMode};
+use gtk::gio;
+use gtk::gio::prelude::*;
+use gtk::glib;
+
+pub const MIC_VOLUME: &str = "mic-volume";
+pub const SIDETONE: &str = "sidetone";
+pub const MUTE_LIGHT: &str = "mute-light";
+pub const VOLUME_LIMITER: &str = "volume-limiter";
+pub const EXTENDED_RANGE: &str = "extended-range";
+pub const AUTO_POWER_OFF: &str = "auto-power-off";
+pub const PRESET_DONGLE: &str = "preset-dongle";
+pub const PRESET_BLUETOOTH: &str = "preset-bluetooth";
+pub const APP_RULES: &str = "app-rules";
+pub const AUTOMATIC_PRESETS: &str = "automatic-presets";
+pub const ADOPTED_IDENTITY: &str = "adopted-identity";
+pub const BLUETOOTH_SINK_SEEN: &str = "bluetooth-sink-seen";
+pub const LOW_BATTERY_THRESHOLD: &str = "low-battery-threshold";
+pub const RUN_IN_BACKGROUND: &str = "run-in-background";
+pub const BACKGROUND_REQUESTED: &str = "background-requested";
+
+#[must_use]
+pub fn ranged<T: TryFrom<u8>>(settings: &gio::Settings, key: &str) -> T {
+    u8::try_from(settings.int(key))
+        .ok()
+        .and_then(|value| T::try_from(value).ok())
+        .expect("GSettings keeps every integer key inside its schema range")
+}
+
+#[must_use]
+pub fn headset(settings: &gio::Settings) -> HeadsetValues {
+    HeadsetValues {
+        mic_volume: ranged(settings, MIC_VOLUME),
+        sidetone: ranged(settings, SIDETONE),
+        mute_light: MuteLight::from_raw(enum_value(settings, MUTE_LIGHT)),
+        volume_limiter: settings.boolean(VOLUME_LIMITER),
+        wireless_mode: wireless_mode(settings.boolean(EXTENDED_RANGE)),
+        auto_power_off: AutoPowerOff::nearest(small(settings.int(AUTO_POWER_OFF))),
+    }
+}
+
+pub fn write_headset(
+    settings: &gio::Settings,
+    values: HeadsetValues,
+) -> Result<(), glib::BoolError> {
+    settings.set_int(MIC_VOLUME, i32::from(values.mic_volume.get()))?;
+    settings.set_int(SIDETONE, i32::from(values.sidetone.get()))?;
+    settings.set_enum(MUTE_LIGHT, i32::from(values.mute_light.raw()))?;
+    settings.set_boolean(VOLUME_LIMITER, values.volume_limiter)?;
+    let extended = values.wireless_mode == WirelessMode::ExtendedRange;
+    settings.set_boolean(EXTENDED_RANGE, extended)?;
+    settings.set_int(AUTO_POWER_OFF, i32::from(values.auto_power_off.minutes()))
+}
+
+#[must_use]
+pub const fn route_key(path: SoundPath) -> &'static str {
+    match path {
+        SoundPath::Dongle => PRESET_DONGLE,
+        SoundPath::Bluetooth => PRESET_BLUETOOTH,
+    }
+}
+
+#[must_use]
+pub fn route_presets(settings: &gio::Settings) -> RoutePresets {
+    RoutePresets {
+        dongle: PresetId::new(settings.string(PRESET_DONGLE).to_string()),
+        bluetooth: PresetId::new(settings.string(PRESET_BLUETOOTH).to_string()),
+    }
+}
+
+#[must_use]
+pub fn app_rules(settings: &gio::Settings) -> AppRules {
+    stored_rules(settings)
+        .into_iter()
+        .map(|(identifier, preset)| (identifier, PresetId::new(preset)))
+        .collect()
+}
+
+pub fn write_app_rule(
+    settings: &gio::Settings,
+    identifier: &str,
+    preset: Option<&PresetId>,
+) -> Result<(), glib::BoolError> {
+    let mut rules = stored_rules(settings);
+    match preset {
+        Some(preset) => rules.insert(identifier.to_owned(), preset.as_str().to_owned()),
+        None => rules.remove(identifier),
+    };
+    settings.set(APP_RULES, rules.to_variant())
+}
+
+#[must_use]
+pub fn adopted_identity(settings: &gio::Settings) -> Option<DongleIdentity> {
+    DongleIdentity::from_setting(&settings.string(ADOPTED_IDENTITY))
+}
+
+fn stored_rules(settings: &gio::Settings) -> HashMap<String, String> {
+    settings.get(APP_RULES)
+}
+
+fn enum_value(settings: &gio::Settings, key: &str) -> u8 {
+    small(settings.enum_(key))
+}
+
+fn small(value: i32) -> u8 {
+    u8::try_from(value).unwrap_or(u8::MAX)
+}
+
+const fn wireless_mode(extended_range: bool) -> WirelessMode {
+    if extended_range {
+        WirelessMode::ExtendedRange
+    } else {
+        WirelessMode::Standard
+    }
+}
