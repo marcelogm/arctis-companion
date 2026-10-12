@@ -62,14 +62,24 @@ fn debug_dumps_yield_every_msgid_shape() {
 #[test]
 fn the_po_reader_knows_translated_entries() {
     let catalogue = Catalogue::parse(SAMPLE_PO);
-    assert!(catalogue.is_translated("Low"));
-    assert!(catalogue.is_translated("{n} minute"));
-    assert!(catalogue.is_translated("{n} minutes"));
-    assert!(catalogue.is_translated("Long line"));
-    assert!(catalogue.is_translated("Back\\nslash"));
-    assert!(!catalogue.is_translated("High"));
-    assert!(!catalogue.is_translated("Missing"));
-    assert!(!catalogue.is_translated("Absent"));
+    let translated = [
+        "Low",
+        "{n} minute",
+        "{n} minutes",
+        "Long line",
+        "Back\\nslash",
+    ];
+    let untranslated = ["High", "Missing", "Absent"];
+    assert!(
+        translated
+            .iter()
+            .all(|msgid| catalogue.is_translated(msgid))
+    );
+    assert!(
+        !untranslated
+            .iter()
+            .any(|msgid| catalogue.is_translated(msgid))
+    );
 }
 
 fn unescape(quoted: &str) -> String {
