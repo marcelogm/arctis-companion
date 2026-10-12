@@ -33,3 +33,15 @@ fn the_shortcuts_dialog_lists_three_shortcuts() {
         ["<Control>comma", "<Control>question", "<Control>w"]
     );
 }
+
+#[gtk::test]
+fn the_bundled_metainfo_carries_pt_br() {
+    init();
+    let bytes = gtk::gio::resources_lookup_data(
+        "/io/github/marcelogm/ArctisCompanion/ui/metainfo.xml",
+        gtk::gio::ResourceLookupFlags::NONE,
+    )
+    .expect("the metainfo resource");
+    let text = String::from_utf8_lossy(&bytes);
+    assert!(text.contains("xml:lang=\"pt-BR\""), "{text}");
+}
