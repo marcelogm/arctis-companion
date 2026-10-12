@@ -12,6 +12,11 @@ path = "src/lib.rs"
 name = "arctis-companion"
 path = "src/main.rs"
 
+[[test]]
+name = "session_bus"
+path = "tests/session_bus/main.rs"
+harness = false
+
 [dependencies]
 arctis-core.workspace = true
 arctis-hid.workspace = true
