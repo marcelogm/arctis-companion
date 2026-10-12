@@ -3742,3 +3742,23 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
 19. **Captures moved** from `docs/research/captures/` to `crates/core/tests/golden/`; the links in
     `hardware-findings.md` and `hid-protocol.md` point to the new place.
 20. **No serde in SP2.** Nothing here is persisted as JSON; SP3 and SP8 add serde where they store data.
+
+### Deviations taken during execution
+
+21. **SP2 uses SP3's `core::eq` types instead of its own Task 4 types.** When Task 4 ran, SP3 had not merged but its
+    branch `sp3-eq-core` already held `eq/filter.rs` and `eq/curve.rs`, and SP3's plan owns those files and lists
+    the port of SP2's names. To avoid that port, SP2 copied SP3's `filter.rs` (minus `Gain::db`, `Q::value`,
+    `Filter::shapes_sound`, which SP3 tests) and the data part of `curve.rs` (minus `equivalent` and its tolerances),
+    with `FilterKind::ALL` placed where SP3's Task 6 adds it. So `Frequency`, `QFactor`, the wire-byte `Gain`,
+    `Curve::MAX_FILTERS`, `Curve::from_slots` and `TooManyFilters` do not exist; SP2 uses `Hertz`, `Q` (thousandths),
+    `Gain` (half-dB steps, wire byte `20 + half_db`), `curve::MAX_FILTERS`, `Curve::from_array`, `Curve::default`
+    and `EnvelopeError`. Deviations 1 and 3 are superseded: the codec converts at the boundary. When the second of
+    SP2 and SP3 lands, SP3's `eq` files win as they are; `crates/core/tests/eq_types.rs` can then be deleted.
+22. **Disabled filters** (SP3's `enabled` flag) are left out by `encode_curve`; the enabled ones close up and the
+    remaining slots carry the disabled band, as SP3's port note says. `decode_curve` still drops disabled bands.
+23. **A low-pass or high-pass band whose gain byte is not 20** decodes with no gain (SP3 rejects gain on pass
+    filters; the gain has no effect there, and a curve set by another app must still decode). The byte must still
+    be inside 0..40, or the band is `InvalidValue` at the gain offset.
+24. **`decode_curve` builds the curve with `Curve::new`** (no `from_slots` in SP3's API); its `TooManyFilters`
+    error cannot happen for a 60-byte window and maps to `InvalidValue` on the same line, so line coverage stays
+    at 100 %.
