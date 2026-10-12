@@ -44,8 +44,7 @@ impl Bus {
             .expect("client connection")
     }
 
-    pub fn stop(self) {
-        drop(self.session);
+    pub fn stop(&self) {
         self.test.stop();
     }
 }

@@ -7,3 +7,5 @@ pub mod dbus;
 pub mod logging;
 pub mod platform;
 pub mod ports;
+pub mod threads;
+pub mod window_slot;

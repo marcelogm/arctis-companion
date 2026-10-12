@@ -1,6 +1,7 @@
 pub mod background;
 pub mod battery_store;
 pub mod files;
+pub mod lifetime;
 pub mod notifications;
 pub mod persisted;
 pub mod portal;
