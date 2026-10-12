@@ -8,6 +8,14 @@ pub enum FilterKind {
 }
 
 impl FilterKind {
+    pub const ALL: [Self; 5] = [
+        Self::Peaking,
+        Self::LowShelf,
+        Self::HighShelf,
+        Self::LowPass,
+        Self::HighPass,
+    ];
+
     #[must_use]
     pub const fn has_gain(self) -> bool {
         !matches!(self, Self::LowPass | Self::HighPass)

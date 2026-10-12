@@ -1,4 +1,5 @@
 mod biquad;
+mod coefficients;
 mod curve;
 mod filter;
 mod library;

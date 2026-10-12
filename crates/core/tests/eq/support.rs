@@ -1,4 +1,5 @@
-use arctis_core::eq::{Curve, Filter, FilterKind};
+use arctis_core::eq::{Curve, Filter, FilterKind, Gain, Hertz, Q};
+use proptest::prelude::*;
 
 const FACTORY_BANDS: [u16; 10] = [32, 64, 125, 250, 500, 1_000, 2_000, 4_000, 8_000, 16_000];
 
@@ -28,4 +29,18 @@ pub fn log_grid(points: u16) -> Vec<f32> {
     std::iter::successors(Some(20.0_f32), |hz| Some(hz * ratio))
         .take(usize::from(points))
         .collect()
+}
+
+pub fn any_filter() -> impl Strategy<Value = Filter> {
+    let kind = proptest::sample::select(FilterKind::ALL.to_vec());
+    let parts = (
+        kind,
+        Hertz::MIN..=Hertz::MAX,
+        Gain::MIN_HALF_DB..=Gain::MAX_HALF_DB,
+        Q::MIN_MILLI..=Q::MAX_MILLI,
+    );
+    parts.prop_map(|(kind, hz, half_db, milli_q)| {
+        let half_db = if kind.has_gain() { half_db } else { 0 };
+        filter(kind, hz, half_db, milli_q)
+    })
 }
