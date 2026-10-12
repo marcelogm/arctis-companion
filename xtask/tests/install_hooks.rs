@@ -117,11 +117,11 @@ fn pre_commit_hook_skips_checkouts_without_xtask() {
 }
 
 #[test]
-fn commit_msg_hook_runs_the_legacy_guard_in_checkouts_without_xtask() {
+fn commit_msg_hook_ignores_a_legacy_githooks_guard() {
     let fixture = Fixture::init();
     fixture.write(".githooks/commit-msg", "#!/bin/sh\nexit 7\n");
     fixture.xtask(&["install-hooks"]);
-    assert_eq!(run_hook(&fixture, "commit-msg", &["message"]), Some(7));
+    assert_eq!(run_hook(&fixture, "commit-msg", &["message"]), Some(0));
 }
 
 #[test]
