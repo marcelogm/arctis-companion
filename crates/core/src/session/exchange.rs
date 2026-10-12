@@ -9,10 +9,16 @@ pub(crate) enum Outgoing {
     Write(SettingChange),
 }
 
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub(crate) struct Unanswered {
+    pub(crate) query: Query,
+    pub(crate) asked_at: Millis,
+}
+
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub(crate) enum Expiry {
     Resend(Frame),
-    GaveUp,
+    GaveUp(Unanswered),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -64,11 +70,17 @@ impl Exchange {
     pub(crate) fn expire(&mut self, now: Millis) -> Option<Expiry> {
         let awaiting = self.awaiting.filter(|awaiting| now >= awaiting.deadline)?;
         if !awaiting.resent {
-            let frame = self.ask(awaiting.query, awaiting.asked_at, now);
-            return Some(Expiry::Resend(frame));
+            return Some(Expiry::Resend(self.ask(
+                awaiting.query,
+                awaiting.asked_at,
+                now,
+            )));
         }
         self.awaiting = None;
-        Some(Expiry::GaveUp)
+        Some(Expiry::GaveUp(Unanswered {
+            query: awaiting.query,
+            asked_at: awaiting.asked_at,
+        }))
     }
 
     pub(crate) fn abandon(&mut self) {

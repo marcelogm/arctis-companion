@@ -1,5 +1,5 @@
 use super::effect::Effect;
-use super::exchange::{Expiry, Outgoing};
+use super::exchange::{Expiry, Outgoing, Unanswered};
 use super::phase::Stage;
 use super::reconcile::drift;
 use super::reducer::Session;
@@ -13,7 +13,7 @@ impl Session {
     pub(super) fn expire(&mut self) {
         match self.exchange.expire(self.now) {
             Some(Expiry::Resend(frame)) => self.outbox.push(Effect::Write(frame)),
-            Some(Expiry::GaveUp) => self.unanswered(),
+            Some(Expiry::GaveUp(unanswered)) => self.unanswered(unanswered),
             None => {}
         }
         if self
@@ -26,7 +26,13 @@ impl Session {
         self.expire_stage();
     }
 
-    fn unanswered(&mut self) {
+    fn unanswered(&mut self, unanswered: Unanswered) {
+        if let Some(transaction) = &mut self.transaction
+            && transaction.tolerates(unanswered.asked_at)
+        {
+            transaction.requeue(unanswered.query);
+            return;
+        }
         if matches!(
             self.stage,
             Stage::Probing | Stage::Syncing(_) | Stage::Ready
