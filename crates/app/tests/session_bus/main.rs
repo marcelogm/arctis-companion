@@ -36,7 +36,7 @@ const SCENARIOS: &[Scenario] = scenarios![
     headset::refuses_unknown_methods_and_mistyped_writes,
     notifications::battery_alerts_are_notified_then_withdrawn,
     portal::an_absent_portal_counts_as_denied,
-    portal::asks_for_background_with_autostart,
+    portal::asks_for_background_with_or_without_autostart,
     window::presents_one_window_with_the_latest_state,
     service::runs_windowless_until_a_second_launch,
 ];

@@ -29,12 +29,16 @@ type Answer = Box<dyn FnOnce(bool)>;
 
 #[derive(Default)]
 struct FakePortal {
-    requests: Cell<usize>,
+    requests: RefCell<Vec<bool>>,
     pending: RefCell<Vec<Answer>>,
     statuses: RefCell<Vec<String>>,
 }
 
 impl FakePortal {
+    fn asked(&self) -> Vec<bool> {
+        self.requests.borrow().clone()
+    }
+
     fn answer(&self, granted: bool) {
         let answer = self.pending.borrow_mut().remove(0);
         answer(granted);
@@ -42,8 +46,8 @@ impl FakePortal {
 }
 
 impl Portal for FakePortal {
-    fn request(&self, answer: Answer) {
-        self.requests.set(self.requests.get() + 1);
+    fn request(&self, autostart: bool, answer: Answer) {
+        self.requests.borrow_mut().push(autostart);
         self.pending.borrow_mut().push(answer);
     }
 
@@ -117,7 +121,7 @@ fn the_first_run_holds_and_asks_for_autostart() {
     s.controller.start();
     assert!(s.hold.0.get());
     assert_eq!(*s.view.0.borrow(), [Background::On]);
-    assert_eq!(s.portal.requests.get(), 1);
+    assert_eq!(s.portal.asked(), [true]);
 }
 
 #[test]
@@ -134,7 +138,7 @@ fn a_grant_is_remembered_and_not_asked_again() {
         s.view.clone(),
     );
     again.start();
-    assert_eq!(s.portal.requests.get(), 1);
+    assert_eq!(s.portal.asked(), [true]);
 }
 
 #[test]
@@ -146,6 +150,7 @@ fn a_denial_turns_run_in_background_off() {
     assert!(!s.hold.0.get());
     assert_eq!(s.view.0.borrow().last(), Some(&Background::Denied));
     assert!(!s.controller.is_enabled());
+    assert_eq!(s.portal.asked(), [true]);
 }
 
 #[test]
@@ -154,7 +159,7 @@ fn switched_off_at_start_shows_off_without_holding() {
     s.controller.start();
     assert!(!s.hold.0.get());
     assert_eq!(*s.view.0.borrow(), [Background::Off]);
-    assert_eq!(s.portal.requests.get(), 0);
+    assert!(s.portal.asked().is_empty());
 }
 
 #[test]
@@ -165,18 +170,18 @@ fn turning_it_on_asks_again() {
     assert!(s.settings.boolean("run-in-background"));
     assert!(s.hold.0.get());
     assert_eq!(s.view.0.borrow().last(), Some(&Background::On));
-    assert_eq!(s.portal.requests.get(), 1);
+    assert_eq!(s.portal.asked(), [true]);
 }
 
 #[test]
-fn turning_it_off_releases_without_asking() {
+fn turning_it_off_releases_and_cancels_the_autostart() {
     let s = setup(true, true);
     s.controller.start();
     s.controller.set_enabled(false);
     assert!(!s.settings.boolean("run-in-background"));
     assert!(!s.hold.0.get());
     assert_eq!(s.view.0.borrow().last(), Some(&Background::Off));
-    assert_eq!(s.portal.requests.get(), 0);
+    assert_eq!(s.portal.asked(), [false]);
 }
 
 #[test]
@@ -188,6 +193,24 @@ fn a_denial_after_the_switch_went_off_keeps_it_off() {
     assert_eq!(s.view.0.borrow().last(), Some(&Background::Off));
     assert!(!s.hold.0.get());
     assert!(s.settings.boolean("background-requested"));
+}
+
+#[test]
+fn a_late_denial_of_an_earlier_request_is_ignored() {
+    let s = setup(false, true);
+    s.controller.start();
+    s.controller.set_enabled(true);
+    s.controller.set_enabled(false);
+    s.controller.set_enabled(true);
+    assert_eq!(s.portal.asked(), [true, false, true]);
+    s.portal.answer(false);
+    s.portal.answer(false);
+    assert!(s.controller.is_enabled());
+    assert!(s.hold.0.get());
+    assert_eq!(s.view.0.borrow().last(), Some(&Background::On));
+    s.portal.answer(false);
+    assert!(!s.controller.is_enabled());
+    assert_eq!(s.view.0.borrow().last(), Some(&Background::Denied));
 }
 
 #[test]
@@ -207,7 +230,7 @@ fn an_outside_change_takes_and_releases_the_hold() {
         drain(context);
         assert!(!s.hold.0.get());
         assert_eq!(s.view.0.borrow().last(), Some(&Background::Off));
-        assert_eq!(s.portal.requests.get(), 0);
+        assert_eq!(s.portal.asked(), [false]);
     });
 }
 
