@@ -8107,7 +8107,7 @@ git push
 - Modify: `crates/core/src/view/mod.rs`
 - Test: `crates/core/tests/view/equalizer_rows.rs`, `crates/core/tests/view/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod equalizer_rows;` to `crates/core/tests/view/main.rs`.
 
@@ -8250,12 +8250,12 @@ fn the_automatic_switch_mirrors_the_setting() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test view equalizer_rows`
 Expected: FAIL to compile (`view::equalizer_rows` missing).
 
-- [ ] **Step 3: Implement `equalizer_rows`**
+- [x] **Step 3: Implement `equalizer_rows`**
 
 `crates/core/src/view/equalizer_rows.rs`:
 
@@ -8384,12 +8384,12 @@ fn warnings(snapshot: &Snapshot) -> Vec<Text> {
 
 Add `pub mod equalizer_rows;` to `crates/core/src/view/mod.rs`.
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test view`
 Expected: PASS.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/view crates/core/tests/view
