@@ -136,9 +136,10 @@ fn value_dumps() -> Vec<String> {
 
 fn file_dumps() -> Vec<String> {
     let s = snapshot();
-    let eleven: String = (1..=11)
+    let eleven = (1..=11)
         .map(|n| format!("Filter {n}: ON PK Fc 100 Hz Gain 1 dB Q 1\n"))
-        .collect();
+        .collect::<Vec<String>>()
+        .concat();
     let inputs = [
         "nonsense\n",
         "Filter 1: ON NO Fc 100 Hz\n",
