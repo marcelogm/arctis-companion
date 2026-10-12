@@ -166,6 +166,15 @@ this, never byte equality.
 A named curve the user can pick.
 _Avoid_: profile, EQ, sound mode
 
+**Measurement**:
+The Nova 5's frequency response measured by RTINGS.com on a Brüel & Kjær 5128, shipped with the app and drawn as
+"Headset".
+_Avoid_: graph, FR (in UI text)
+
+**Target**:
+A frequency response for the same rig that a curve aims the headset at: Harman (LMG 5128 0.6) or diffuse field.
+_Avoid_: target curve (ambiguous with Curve), house curve
+
 **Built-in preset** / **Custom preset**:
 A read-only preset shipped with the app / a preset the user created, duplicated or imported.
 

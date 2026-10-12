@@ -2,7 +2,8 @@
 
 `crates/core/src/eq/` holds every equalizer decision that needs neither the headset nor PipeWire: the hardware
 envelope, curves and how two curves compare, the built-in presets, the preset file shape, Equalizer APO text,
-the response drawn by the graph and the real-time filter of the system engine. Entry: `crates/core/src/eq/mod.rs`.
+the response drawn by the graph, the measured headset and its target curves, and the real-time filter of the
+system engine. Entry: `crates/core/src/eq/mod.rs`.
 
 ## Modules
 
@@ -22,6 +23,8 @@ flowchart LR
     response --> apo
     curve --> coefficients
     coefficients --> equalizer["equalizer.rs<br/>real-time filter"]
+    response --> frequency_response["frequency_response.rs<br/>measured dB, interpolation, level"]
+    frequency_response --> reference["reference.rs<br/>embedded measurement, targets, plot"]
 ```
 
 | Concept | Code |
@@ -32,6 +35,9 @@ flowchart LR
 | Equivalent curves | `crates/core/src/eq/curve.rs::equivalent` |
 | Preamp of the system engine | `crates/core/src/eq/response.rs::preamp_db_at`, `crates/core/src/eq/response.rs::preamp_db` |
 | Built-in presets | `crates/core/src/eq/library.rs::library`, `crates/core/src/eq/library.rs::flat`, `crates/core/src/eq/library.rs::find` |
+| Harman target preset, id `harman` | `crates/core/src/eq/library.rs::library`, data `crates/core/data/nova5_autoeq_parametric_eq.txt` |
+| Measured and target responses | `crates/core/src/eq/frequency_response.rs::FrequencyResponse`, `crates/core/src/eq/frequency_response.rs::ParseError` |
+| Graph series | `crates/core/src/eq/reference.rs::plot`, `crates/core/src/eq/reference.rs::Series`, `crates/core/src/eq/reference.rs::SeriesId`, `crates/core/src/eq/reference.rs::Target` |
 | Custom preset files | `crates/core/src/eq/preset.rs::Preset`, `crates/core/src/eq/preset.rs::PresetFormatError` |
 | APO import and export | `crates/core/src/eq/apo.rs::parse`, `crates/core/src/eq/apo.rs::render`, `crates/core/src/eq/apo.rs::Import` |
 | Exact decimals | `crates/core/src/eq/decimal.rs::parse_thousandths`, `crates/core/src/eq/decimal.rs::render_thousandths` |
@@ -99,6 +105,40 @@ During a fade both chains run and the output moves linearly from the old to the 
 zeroed (`crates/core/src/eq/equalizer.rs::silence_unused_sections`), so a later curve with more sections starts
 them from silence instead of from a state frozen by an older curve.
 
+## Measured headset and targets
+
+The app embeds the RTINGS.com measurement of the Nova 5 on a Brüel & Kjær 5128 and two targets for the same rig,
+taken from AutoEq (MIT) and resampled to 1/24 octave; provenance in `crates/core/data/SOURCES.md`, licence in
+`THIRD_PARTY_LICENSES`. `crates/core/src/eq/reference.rs::plot` returns the series the graph draws, each with a
+stable id and a msgid label.
+
+```mermaid
+flowchart LR
+    M["nova5_rtings_5128.csv"] -- "include_str!, parse" --> R["FrequencyResponse"]
+    H["target_lmg_5128_0.6.csv"] --> T["Target::Harman"]
+    D["target_df_5128.csv"] --> T2["Target::DiffuseField"]
+    C["Curve"] -- "response.rs gains at 48 kHz" --> E["equalized"]
+    R --> E
+    R -- normalised --> S1["headset"]
+    E -- normalised --> S2["headset-with-eq"]
+    T -- normalised --> S3["harman-5128"]
+    T2 -- normalised --> S4["diffuse-field-5128"]
+    S1 & S2 & S3 & S4 --> P["plot(curve): Vec of Series"]
+```
+
+Every plotted series is level aligned the same way: `crates/core/src/eq/frequency_response.rs::FrequencyResponse::level_db`
+is the mean dB over 300 Hz to 3 kHz (80 log-spaced probes), and `normalised` subtracts it. A band rather than
+AutoEq's single 1 kHz point keeps one narrow feature from shifting a whole curve, and normalising the equalized
+headset again reflects that the preamp and the volume set the absolute level, so only shape is compared.
+`crates/core/src/eq/frequency_response.rs::FrequencyResponse::db_at` interpolates linearly on a log frequency
+axis and holds the end values outside the data.
+
+The Harman target preset is AutoEq's fit of this measurement to LMG 5128 0.6, rounded to the device grid and
+ordered by frequency; `crates/core/tests/eq/library.rs` checks it against `crates/core/src/eq/apo.rs::parse` of
+the AutoEq file. Like every built-in it carries no preamp: the headset
+applies the filters as given, and the system equalizer cancels the loudest point with its own preamp. Its RMS
+error against the target from 20 Hz to 10 kHz is 1.54 dB, against 4.43 dB with no equalizer.
+
 ## Presets in and out
 
 ```mermaid
@@ -124,4 +164,5 @@ Numbers in both formats pass through `crates/core/src/eq/decimal.rs::thousandths
 | What | Where |
 |---|---|
 | Envelope, tolerance table, library, JSON, APO, response, magnitudes per kind, poles, identity, crossfade, silence | `crates/core/tests/eq/main.rs` and its modules |
+| Parsing, interpolation, level, embedded grid, plot ids, Harman residual | `crates/core/tests/eq/frequency_response.rs`, `crates/core/tests/eq/reference.rs`, `crates/core/tests/eq/library.rs` |
 | No allocation in `process` and `retarget` | `crates/core/tests/eq_allocations.rs` |
