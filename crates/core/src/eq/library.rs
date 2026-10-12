@@ -40,17 +40,17 @@ const FLAT: [Filter; 10] = [
 ];
 const BASS_BOOST: [Filter; 1] = [low_shelf(105, 12)];
 const BASS_REDUCTION: [Filter; 1] = [low_shelf(120, -12)];
-const TREBLE_SOFTEN: [Filter; 2] = [peaking(3_500, -3, 1_410), high_shelf(6_000, -9)];
+const TREBLE_SOFTEN: [Filter; 2] = [peaking(3_500, -3, FACTORY_Q), high_shelf(6_000, -9)];
 const VOCAL_CLARITY: [Filter; 4] = [
     low_shelf(100, -6),
     peaking(250, -4, 1_000),
     peaking(2_500, 6, 1_000),
-    peaking(5_000, 3, 1_410),
+    peaking(5_000, 3, FACTORY_Q),
 ];
 const FOOTSTEPS: [Filter; 4] = [
     low_shelf(150, -8),
     peaking(2_000, 8, 1_000),
-    peaking(4_500, 10, 1_410),
+    peaking(4_500, 10, FACTORY_Q),
     high_shelf(10_000, -4),
 ];
 const V_SHAPE: [Filter; 3] = [
