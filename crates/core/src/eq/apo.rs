@@ -3,8 +3,6 @@ use super::decimal::{parse_thousandths, render_thousandths, rounded_quotient, th
 use super::filter::{Filter, FilterKind, Gain, Hertz, Q};
 use super::response::preamp_db;
 
-const THOUSANDTHS_PER_HALF_DB: i64 = 500;
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum Field {
     Frequency,
@@ -90,7 +88,7 @@ fn filter_line(number: usize, filter: Filter) -> String {
 }
 
 fn decibels(gain: Gain) -> String {
-    render_thousandths(i64::from(gain.half_db()) * THOUSANDTHS_PER_HALF_DB)
+    render_thousandths(i64::from(gain.half_db()) * Gain::MILLI_DB_PER_STEP)
 }
 
 fn preamp_text(curve: &Curve) -> String {
@@ -154,7 +152,7 @@ impl RawFilter {
     }
 
     fn half_db(&self) -> (i64, bool) {
-        let half_db = rounded_quotient(self.gain, THOUSANDTHS_PER_HALF_DB);
+        let half_db = rounded_quotient(self.gain, Gain::MILLI_DB_PER_STEP);
         if self.kind.has_gain() {
             within(half_db, Gain::MIN_HALF_DB.into(), Gain::MAX_HALF_DB.into())
         } else {

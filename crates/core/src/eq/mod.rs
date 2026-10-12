@@ -14,5 +14,5 @@ pub use curve::Curve;
 pub use equalizer::Equalizer;
 pub use filter::{EnvelopeError, Filter, FilterKind, Gain, Hertz, Q};
 pub use library::library;
-pub use preset::{Preset, PresetId, PresetKind};
+pub use preset::{Preset, PresetFormatError, PresetId, PresetKind};
 pub use response::response;
