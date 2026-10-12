@@ -1,0 +1,38 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisAddRuleDialog: Adw.Dialog {
+  title: _("Add Rule");
+  content-width: 420;
+  content-height: 560;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    content: Adw.PreferencesPage {
+      Adw.PreferencesGroup {
+        Adw.ComboRow preset {
+          name: "rule-preset";
+          title: _("Preset");
+          use-markup: false;
+        }
+      }
+
+      Adw.PreferencesGroup seen_group {
+        name: "seen-group";
+        title: _("Seen Playing");
+      }
+
+      Adw.PreferencesGroup other_group {
+        name: "other-group";
+
+        Adw.EntryRow other_app {
+          name: "other-app";
+          show-apply-button: true;
+          use-markup: false;
+        }
+      }
+    };
+  };
+}

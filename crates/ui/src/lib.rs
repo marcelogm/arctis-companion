@@ -1,5 +1,6 @@
 #![forbid(unsafe_code)]
 
+mod add_rule_dialog;
 pub mod app_dialogs;
 pub mod app_icons;
 mod app_rule_row;
@@ -17,6 +18,7 @@ mod toasts;
 pub mod widget_values;
 mod window;
 
+pub use add_rule_dialog::AddRuleDialog;
 pub use app_rule_row::AppRuleRow;
 pub use equalizer_group::EqualizerGroup;
 pub use headset_page::HeadsetPage;

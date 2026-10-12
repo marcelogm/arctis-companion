@@ -1,6 +1,7 @@
 mod support;
 
 mod accessibility;
+mod add_rule_dialog;
 mod app_dialogs;
 mod app_icons;
 mod app_rule_row;
