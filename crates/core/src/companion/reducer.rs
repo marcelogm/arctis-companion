@@ -11,15 +11,18 @@ use super::catalog::Catalog;
 use super::deadlines::{Deadlines, earliest};
 use super::dongle::DongleState;
 use super::engines::Engines;
+use super::engines::{Cause, Decision, Trigger};
 use super::input::Input;
 use super::routing::AudioState;
 use super::routing::{Route, needs_equalizer};
 use super::seen_apps::SeenApp;
 use super::seen_apps::{newly_playing, remember};
 use super::selection::{ActivePreset, Selection};
+use super::selection::{PATHS, candidates};
 use super::snapshot::Snapshot;
 use crate::battery::sample::Reading;
 use crate::eq::curve::Curve;
+use crate::eq::curve::equivalent;
 use crate::eq::preset::PresetId;
 use crate::messages::audio::SoundPath;
 use crate::messages::audio::{AudioCommand, AudioEvent, StreamInfo};
@@ -62,19 +65,20 @@ impl Companion {
 
     pub fn handle(&mut self, input: Input, now: Millis) -> Vec<Action> {
         let mut out = Vec::new();
-        self.dispatch(input, now, &mut out);
-        self.advance(&mut out);
+        let cause = self.dispatch(input, now, &mut out);
+        self.advance(Trigger { now, cause }, &mut out);
         self.finish(&mut out);
         out
     }
 
-    fn dispatch(&mut self, input: Input, now: Millis, out: &mut Vec<Action>) {
+    fn dispatch(&mut self, input: Input, now: Millis, out: &mut Vec<Action>) -> Cause {
         match input {
             Input::Device(update) => self.device(update, now, out),
             Input::Audio(event) => self.audio_event(&event, out),
             Input::Woke => self.deadlines.woke(),
             Input::Intent(_) | Input::SettingsChanged(_) | Input::Quitting => {}
         }
+        Cause::Automatic
     }
 
     fn device(&mut self, update: DeviceUpdate, now: Millis, out: &mut Vec<Action>) {
@@ -168,8 +172,12 @@ impl Companion {
         }
     }
 
-    fn advance(&mut self, out: &mut Vec<Action>) {
+    fn advance(&mut self, trigger: Trigger, out: &mut Vec<Action>) {
         self.try_adopt(out);
+        self.update_ruled_sets(trigger.now);
+        for path in PATHS {
+            self.settle(path, trigger, out);
+        }
     }
 
     pub(super) fn sync_policy(&self) -> Action {
@@ -271,5 +279,69 @@ impl Companion {
         if self.audio.equalizer.take().is_some() {
             out.push(Action::SendAudio(AudioCommand::RemoveEqualizer));
         }
+    }
+
+    fn update_ruled_sets(&mut self, now: Millis) {
+        let automatic = self.settings.automatic_presets;
+        for path in PATHS {
+            let running = candidates(
+                &self.audio.streams,
+                &self.settings.app_rules,
+                &self.catalog,
+                path,
+            );
+            let followed = automatic.then_some(running.as_slice());
+            self.selection.path_mut(path).follow(followed, now);
+        }
+    }
+
+    fn settle(&mut self, path: SoundPath, trigger: Trigger, out: &mut Vec<Action>) {
+        let target = self.target(path);
+        match self.engines.decide(path, &target, trigger) {
+            Decision::Keep | Decision::Hold => {}
+            Decision::Relabel => self.engines.record(path, target, None),
+            Decision::Apply => {
+                let wrote = self.apply_curve(path, &target.preset, out);
+                let spent = (wrote && trigger.cause == Cause::Automatic).then_some(trigger.now);
+                self.engines.record(path, target, spent);
+            }
+        }
+    }
+
+    fn apply_curve(&mut self, path: SoundPath, preset: &PresetId, out: &mut Vec<Action>) -> bool {
+        let curve = self.catalog.resolve(preset).curve().clone();
+        match path {
+            SoundPath::Dongle => self.write_headset_curve(curve, out),
+            SoundPath::Bluetooth => self.retarget_system_curve(curve, out),
+        }
+    }
+
+    fn write_headset_curve(&self, curve: Curve, out: &mut Vec<Action>) -> bool {
+        if self.adoption() != AdoptionStatus::Adopted {
+            return false;
+        }
+        let on_headset = self.on_headset(&curve);
+        out.push(Action::SendDevice(Change::Desired {
+            settings: self.settings.headset.with_curve(curve),
+            policy: SyncPolicy::Enforce,
+        }));
+        !on_headset
+    }
+
+    fn on_headset(&self, curve: &Curve) -> bool {
+        self.dongle
+            .observed
+            .as_ref()
+            .is_some_and(|observed| equivalent(&observed.equalizer, curve))
+    }
+
+    pub(super) fn retarget_system_curve(&mut self, curve: Curve, out: &mut Vec<Action>) -> bool {
+        let running = self.audio.equalizer.as_ref();
+        if running.is_none_or(|current| *current == curve) {
+            return false;
+        }
+        self.audio.equalizer = Some(curve.clone());
+        out.push(Action::SendAudio(AudioCommand::Retarget(curve)));
+        true
     }
 }
