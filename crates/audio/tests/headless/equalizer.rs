@@ -85,6 +85,9 @@ fn inserting_over_another_default_changes_nothing() {
         |event| matches!(event, AudioEvent::DefaultSink(sink) if sink.terminal == SinkKind::Other),
     );
     lab.send(AudioCommand::InsertEqualizer(flat()));
+    lab.wait_for("not inserted", |event| {
+        *event == AudioEvent::EqualizerNotInserted
+    });
     thread::sleep(QUIET);
     assert_eq!(tools::node_id(EQ_SINK_NAME), None);
     assert_eq!(tools::configured_default().as_deref(), Some(USB));

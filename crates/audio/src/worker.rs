@@ -276,10 +276,14 @@ impl Worker {
     }
 
     fn insert(&self, curve: &Curve) {
-        if self.engine.insert(curve) == Inserted::Created {
-            self.settle(Settling::Insertion);
-            self.outbox
-                .send_later(MANAGER_CONFIRM_AFTER, Message::ConfirmManager);
+        match self.engine.insert(curve) {
+            Inserted::Created => {
+                self.settle(Settling::Insertion);
+                self.outbox
+                    .send_later(MANAGER_CONFIRM_AFTER, Message::ConfirmManager);
+            }
+            Inserted::Failed => self.outbox.send(AudioEvent::EqualizerNotInserted),
+            Inserted::Retargeted => {}
         }
     }
 

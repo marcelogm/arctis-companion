@@ -92,7 +92,7 @@ fn change_shape(change: &Change) {
     }
 }
 
-fn audio_events() -> [AudioEvent; 6] {
+fn audio_events() -> [AudioEvent; 7] {
     let stream = StreamInfo {
         ids: AppIdentifiers::new(Some("org.mozilla.firefox"), None, Some("firefox")),
         name: "Firefox".to_owned(),
@@ -110,6 +110,7 @@ fn audio_events() -> [AudioEvent; 6] {
         AudioEvent::Streams(vec![stream]),
         AudioEvent::ManagerDenied,
         AudioEvent::BluetoothNodeSeen,
+        AudioEvent::EqualizerNotInserted,
     ]
 }
 
@@ -118,7 +119,8 @@ fn audio_event_shape(event: &AudioEvent) {
         AudioEvent::Available
         | AudioEvent::Unavailable
         | AudioEvent::ManagerDenied
-        | AudioEvent::BluetoothNodeSeen => {}
+        | AudioEvent::BluetoothNodeSeen
+        | AudioEvent::EqualizerNotInserted => {}
         AudioEvent::DefaultSink(sink) => has_type::<DefaultSink>(sink),
         AudioEvent::Streams(streams) => has_type::<Vec<StreamInfo>>(streams),
     }

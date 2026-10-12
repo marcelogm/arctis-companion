@@ -15,6 +15,7 @@ pub enum AudioEvent {
     Streams(Vec<StreamInfo>),
     ManagerDenied,
     BluetoothNodeSeen,
+    EqualizerNotInserted,
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]

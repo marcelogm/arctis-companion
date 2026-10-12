@@ -20,7 +20,9 @@ impl Companion {
         if self.audio.route() != route {
             self.selection.end_manual_picks();
         }
-        self.place_equalizer(out);
+        if *event != AudioEvent::EqualizerNotInserted {
+            self.place_equalizer(out);
+        }
     }
 
     pub(super) fn remove_equalizer(&mut self, out: &mut Vec<Action>) {
