@@ -13,6 +13,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [companion.md](companion.md) | companion reducer, battery history, ports, intents and view models |
 | [session.md](session.md) | device session reducer, lifecycle, write-then-verify, testkit |
 | [ui.md](ui.md) | main window, headset page, status pages, dialogs, text resolver |
+| [app-presets.md](app-presets.md) | app presets page, rule rows, add-rule dialog |
 
 ## Workspace
 
