@@ -64,7 +64,7 @@ jobs:
     runs-on: ubuntu-latest
     container: fedora:44
     steps:
-      - run: dnf install -y --setopt=install_weak_deps=False git gcc clang-devel pipewire-devel gtk4-devel libadwaita-devel blueprint-compiler weston mesa-dri-drivers dbus-daemon glib2
+      - run: dnf install -y --setopt=install_weak_deps=False git gcc clang-devel pipewire-devel gtk4-devel libadwaita-devel blueprint-compiler gettext weston mesa-dri-drivers dbus-daemon glib2
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@master
         with:

@@ -5,12 +5,15 @@ use std::path::{Path, PathBuf};
 use std::process::Command;
 
 const METAINFO: &str = "../../data/io.github.marcelogm.ArctisCompanion.metainfo.xml.in";
+const PO_DIR: &str = "../../po";
 
 fn main() -> Result<(), Box<dyn Error>> {
     println!("cargo::rerun-if-changed=resources");
     println!("cargo::rerun-if-changed={METAINFO}");
+    println!("cargo::rerun-if-changed={PO_DIR}");
     let out_dir = PathBuf::from(env::var("OUT_DIR")?);
     compile_blueprints(&out_dir)?;
+    merge_metainfo(&out_dir)?;
     glib_build_tools::compile_resources(
         &[
             out_dir.as_path(),
@@ -35,6 +38,22 @@ fn compile_blueprints(out_dir: &Path) -> Result<(), Box<dyn Error>> {
         Ok(())
     } else {
         Err("blueprint-compiler failed".into())
+    }
+}
+
+fn merge_metainfo(out_dir: &Path) -> Result<(), Box<dyn Error>> {
+    let merged = out_dir.join("io.github.marcelogm.ArctisCompanion.metainfo.xml");
+    let status = Command::new("msgfmt")
+        .arg("--xml")
+        .arg(format!("--template={METAINFO}"))
+        .args(["-d", PO_DIR, "-o"])
+        .arg(merged)
+        .status()
+        .map_err(|error| format!("msgfmt: {error}"))?;
+    if status.success() {
+        Ok(())
+    } else {
+        Err("msgfmt --xml failed on the metainfo".into())
     }
 }
 

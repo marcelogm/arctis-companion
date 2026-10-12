@@ -18,6 +18,6 @@
     <file preprocess="xml-stripblanks">eq_band_row.ui</file>
     <file preprocess="xml-stripblanks">presets_page.ui</file>
     <file preprocess="xml-stripblanks">eq_editor_page.ui</file>
-    <file alias="metainfo.xml">io.github.marcelogm.ArctisCompanion.metainfo.xml.in</file>
+    <file alias="metainfo.xml">io.github.marcelogm.ArctisCompanion.metainfo.xml</file>
   </gresource>
 </gresources>
