@@ -2,9 +2,12 @@
 mod schema;
 
 use arctis_app::platform::settings_store::GSettingsStore;
+use arctis_app::ports::SettingsStore;
 use arctis_core::companion::adoption::DongleIdentity;
+use arctis_core::companion::app_settings::PersistedChange;
 use arctis_core::companion::app_settings::{AppRules, AppSettings, HeadsetValues, RoutePresets};
 use arctis_core::eq::preset::PresetId;
+use arctis_core::messages::audio::SoundPath;
 use arctis_core::settings::values::{
     AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone, WirelessMode,
 };
@@ -139,4 +142,96 @@ fn an_unreadable_identity_means_never_adopted() {
         .set_string("adopted-identity", "not-hex")
         .expect("identity");
     assert_eq!(GSettingsStore::new(settings).load().adopted_identity, None);
+}
+
+fn persisted_then_loaded(change: &PersistedChange) -> AppSettings {
+    let dir = compiled_dir();
+    let (settings, _) = memory_pair(dir.path());
+    let store = GSettingsStore::new(settings);
+    store.persist(change);
+    store.load()
+}
+
+fn headset_values() -> HeadsetValues {
+    HeadsetValues {
+        mic_volume: MicVolume::try_from(7).expect("mic volume"),
+        sidetone: Sidetone::try_from(3).expect("sidetone"),
+        mute_light: MuteLight::Low,
+        volume_limiter: false,
+        wireless_mode: WirelessMode::ExtendedRange,
+        auto_power_off: AutoPowerOff::try_from(15).expect("auto power off"),
+    }
+}
+
+fn assert_round_trip(change: &PersistedChange, apply: impl FnOnce(&mut AppSettings)) {
+    let mut expected = defaults();
+    apply(&mut expected);
+    assert_eq!(persisted_then_loaded(change), expected, "{change:?}");
+}
+
+#[test]
+fn headset_and_route_changes_round_trip() {
+    assert_round_trip(&PersistedChange::Headset(headset_values()), |s| {
+        s.headset = headset_values();
+    });
+    let bass = PresetId::new("bass-boost");
+    assert_round_trip(
+        &PersistedChange::RoutePreset(SoundPath::Dongle, bass.clone()),
+        |s| {
+            s.route_presets.dongle = bass;
+        },
+    );
+    let podcast = PresetId::new("podcast");
+    assert_round_trip(
+        &PersistedChange::RoutePreset(SoundPath::Bluetooth, podcast.clone()),
+        |s| {
+            s.route_presets.bluetooth = podcast;
+        },
+    );
+}
+
+#[test]
+fn app_and_dongle_changes_round_trip() {
+    let rule = PersistedChange::AppRule {
+        identifier: "firefox".to_owned(),
+        preset: Some(PresetId::new("footsteps")),
+    };
+    assert_round_trip(&rule, |s| {
+        s.app_rules
+            .set("firefox".to_owned(), PresetId::new("footsteps"));
+    });
+    assert_round_trip(&PersistedChange::AutomaticPresets(false), |s| {
+        s.automatic_presets = false;
+    });
+    let identity = DongleIdentity::new(0x2232, Some("ABC"));
+    assert_round_trip(&PersistedChange::AdoptedIdentity(identity.clone()), |s| {
+        s.adopted_identity = Some(identity);
+    });
+    assert_round_trip(&PersistedChange::BluetoothSinkSeen, |s| {
+        s.bluetooth_sink_seen = true;
+    });
+    let threshold = Percent::try_from(20).expect("percent");
+    assert_round_trip(&PersistedChange::LowBatteryThreshold(threshold), |s| {
+        s.low_battery_threshold = threshold;
+    });
+}
+
+#[test]
+fn removing_an_app_rule_deletes_only_that_rule() {
+    let dir = compiled_dir();
+    let (settings, _) = memory_pair(dir.path());
+    let store = GSettingsStore::new(settings);
+    for identifier in ["firefox", "spotify"] {
+        store.persist(&PersistedChange::AppRule {
+            identifier: identifier.to_owned(),
+            preset: Some(PresetId::new("footsteps")),
+        });
+    }
+    store.persist(&PersistedChange::AppRule {
+        identifier: "firefox".to_owned(),
+        preset: None,
+    });
+    let rules = store.load().app_rules;
+    assert_eq!(rules.len(), 1);
+    assert!(rules.preset_for("spotify").is_some());
 }
