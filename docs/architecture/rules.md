@@ -36,7 +36,7 @@ flowchart TD
 | Lints that demand docs stay allowed; members inherit the workspace lints | `xtask/src/check_rules/lints.rs::check`, policy in `Cargo.toml` and `clippy.toml` | `xtask/tests/lints.rs`, `xtask/tests/clippy_config.rs` |
 | No public unsafe functions | `xtask/src/check_rules/unsafe_api.rs::check`, lexer wrapper `xtask/src/rust_tokens.rs::tokens` | `xtask/tests/unsafe_api.rs` |
 | Headset1 XML copies byte-equal | `xtask/src/check_rules/dbus_copy.rs::check` | `xtask/tests/dbus_copy.rs` |
-| Conventional commits, no attribution | `xtask/src/check_commits.rs::run`, `xtask/src/commit_message.rs::subject_problem`, `xtask/src/commit_message.rs::attribution_problem` | `xtask/tests/check_commits.rs` |
+| Conventional commits, no attribution | `xtask/src/check_commits.rs::run`, `xtask/src/commit_message.rs::subject_problem`, `xtask/src/commit_message.rs::attribution_problem`, `xtask/src/commit_message.rs::without_template` (a message file loses git's template lines first) | `xtask/tests/check_commits.rs` |
 | Doc paths and symbols exist | `xtask/src/check_doc_paths.rs::run`, `xtask/src/doc_refs.rs::doc_refs` | `xtask/tests/check_doc_paths.rs` |
 | Pure core | `xtask/src/check_pure.rs::run` | `xtask/tests/check_pure.rs` |
 | Hooks | `xtask/src/install_hooks.rs::run`, scripts in `xtask/hooks/` | `xtask/tests/install_hooks.rs` |

@@ -125,6 +125,30 @@ fn hash_prefixed_co_author_in_a_message_file_fails() {
 }
 
 #[test]
+fn message_file_ignores_the_git_template_naming_tools() {
+    let template = "feat: add time\n\n# On branch claude/try\n# Changes to be committed:\n#\tnew file:   CLAUDE.md\n#\tmodified:   copilot.txt\n";
+    let outcome = message_file_outcome(template);
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
+fn message_file_ignores_a_template_in_the_configured_comment_char() {
+    let fixture = Fixture::init();
+    fixture.git(&["config", "core.commentChar", ";"]);
+    fixture.write(
+        "COMMIT_EDITMSG",
+        "feat: add time\n\n; On branch claude/try\n",
+    );
+    let path = fixture.path().join("COMMIT_EDITMSG");
+    let outcome = fixture.xtask(&[
+        "check-commits",
+        "--message",
+        path.to_str().expect("utf-8 path"),
+    ]);
+    assert!(outcome.succeeded(), "{}", outcome.stderr);
+}
+
+#[test]
 fn message_file_ignores_the_verbose_diff() {
     let content =
         format!("fix: wake\n# ------------------------ >8 ------------------------\n+{TRAILER}\n");

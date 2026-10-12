@@ -34,11 +34,28 @@ pub fn above_scissors(raw: &str) -> String {
     kept.join("\n")
 }
 
+pub fn without_template(message: &str, comment_prefixes: &[String]) -> String {
+    let kept: Vec<&str> = message
+        .lines()
+        .filter(|line| {
+            !comment_prefixes
+                .iter()
+                .any(|prefix| is_template(line, prefix))
+        })
+        .collect();
+    kept.join("\n")
+}
+
 pub fn subject_of(message: &str) -> &str {
     message
         .lines()
         .find(|line| !line.trim().is_empty() && !line.starts_with('#'))
         .unwrap_or_default()
+}
+
+fn is_template(line: &str, prefix: &str) -> bool {
+    line.strip_prefix(prefix)
+        .is_some_and(|rest| rest.is_empty() || rest.starts_with(char::is_whitespace))
 }
 
 fn is_scissors(line: &str) -> bool {
