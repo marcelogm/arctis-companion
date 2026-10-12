@@ -1,0 +1,102 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisPermissionDialog: Adw.Dialog {
+  title: _("Permission Required");
+  content-width: 520;
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    content: ScrolledWindow {
+      hscrollbar-policy: never;
+      propagate-natural-height: true;
+
+      child: Box {
+        orientation: vertical;
+        spacing: 12;
+        margin-top: 12;
+        margin-bottom: 24;
+        margin-start: 24;
+        margin-end: 24;
+
+        Label {
+          label: _("Save this rule as /etc/udev/rules.d/70-arctis-companion.rules");
+          wrap: true;
+          xalign: 0;
+        }
+
+        Box {
+          spacing: 6;
+
+          Label rule_label {
+            name: "udev-rule";
+            hexpand: true;
+            selectable: true;
+            wrap: true;
+            wrap-mode: char;
+            xalign: 0;
+
+            styles [
+              "monospace",
+            ]
+          }
+
+          Button copy_rule {
+            name: "copy-rule";
+            icon-name: "edit-copy-symbolic";
+            valign: start;
+            tooltip-text: _("Copy Rule");
+
+            accessibility {
+              label: _("Copy Rule");
+            }
+
+            styles [
+              "flat",
+            ]
+          }
+        }
+
+        Label {
+          label: _("Then reload the rules and reconnect the dongle");
+          wrap: true;
+          xalign: 0;
+        }
+
+        Box {
+          spacing: 6;
+
+          Label command_label {
+            name: "reload-command";
+            hexpand: true;
+            selectable: true;
+            wrap: true;
+            wrap-mode: char;
+            xalign: 0;
+
+            styles [
+              "monospace",
+            ]
+          }
+
+          Button copy_command {
+            name: "copy-command";
+            icon-name: "edit-copy-symbolic";
+            valign: start;
+            tooltip-text: _("Copy Command");
+
+            accessibility {
+              label: _("Copy Command");
+            }
+
+            styles [
+              "flat",
+            ]
+          }
+        }
+      };
+    };
+  };
+}

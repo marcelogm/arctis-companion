@@ -4,6 +4,7 @@ mod equalizer_group;
 mod headset_page;
 mod headset_status;
 mod intents;
+mod permission_dialog;
 mod scale_row;
 mod status_pages;
 mod text;
