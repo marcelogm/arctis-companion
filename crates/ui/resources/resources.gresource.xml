@@ -13,6 +13,8 @@
     <file preprocess="xml-stripblanks">app_rule_row.ui</file>
     <file preprocess="xml-stripblanks">add_rule_dialog.ui</file>
     <file preprocess="xml-stripblanks">app_presets_page.ui</file>
+    <file preprocess="xml-stripblanks">battery_chart.ui</file>
+    <file preprocess="xml-stripblanks">battery_page.ui</file>
     <file preprocess="xml-stripblanks">eq_band_row.ui</file>
     <file preprocess="xml-stripblanks">presets_page.ui</file>
     <file preprocess="xml-stripblanks">eq_editor_page.ui</file>

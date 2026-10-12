@@ -1,0 +1,74 @@
+using Gtk 4.0;
+using Adw 1;
+
+template $ArctisBatteryPage: Adw.NavigationPage {
+  tag: "battery";
+  title: _("Battery History");
+
+  child: Adw.ToolbarView {
+    [top]
+    Adw.HeaderBar {}
+
+    content: Stack content_stack {
+      name: "battery-stack";
+
+      StackPage {
+        name: "empty";
+
+        child: $ArctisStatusView empty_view {};
+      }
+
+      StackPage {
+        name: "chart";
+
+        child: Adw.PreferencesPage {
+          Adw.PreferencesGroup {
+            title: _("Battery Level");
+
+            header-suffix: Adw.ToggleGroup range_toggle {
+              name: "chart-range";
+              active-name: "day";
+              valign: center;
+
+              Adw.Toggle {
+                name: "day";
+                label: _("Day");
+              }
+
+              Adw.Toggle {
+                name: "week";
+                label: _("Week");
+              }
+            };
+
+            $ArctisBatteryChart chart {
+              name: "battery-chart";
+            }
+          }
+
+          Adw.PreferencesGroup {
+            Adw.ActionRow last_full_charge {
+              name: "last-full-charge";
+              title: _("Last Full Charge");
+              use-markup: false;
+
+              styles [
+                "property",
+              ]
+            }
+
+            Adw.ActionRow current_level {
+              name: "current-level";
+              title: _("Current Level");
+              use-markup: false;
+
+              styles [
+                "property",
+              ]
+            }
+          }
+        };
+      }
+    };
+  };
+}

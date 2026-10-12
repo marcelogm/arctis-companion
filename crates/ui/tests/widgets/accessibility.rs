@@ -5,17 +5,19 @@ use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
 use arctis_core::testkit::snapshots::{id, snapshot, with};
 use arctis_core::view::eq_editor::eq_editor;
-use arctis_ui::{HeadsetStatus, PermissionDialog, ResponseGraph};
+use arctis_ui::{BatteryChart, HeadsetStatus, PermissionDialog, ResponseGraph};
 use gtk::{AccessibleProperty, AccessibleRelation, AccessibleRole};
 
 use crate::add_rule_dialog::{rendered_dialog, spotify_seen};
 use crate::app_presets_page::rendered_page;
+use crate::battery_history::{shown_battery_page, synthetic_week, with_history};
 use crate::support::{
     band_rows, custom_preset, descendants, filter, first, has_accessible_text, headset_model, init,
-    open_editor, open_presets, rendered_window, rich_snapshot, ruled, shown, with_preset,
+    open_editor, open_page, open_presets, rendered_window, rich_snapshot, ruled, shown,
+    with_preset,
 };
 
-const INTERACTIVE: [AccessibleRole; 8] = [
+const INTERACTIVE: [AccessibleRole; 9] = [
     AccessibleRole::Button,
     AccessibleRole::ToggleButton,
     AccessibleRole::Switch,
@@ -23,6 +25,7 @@ const INTERACTIVE: [AccessibleRole; 8] = [
     AccessibleRole::ComboBox,
     AccessibleRole::SpinButton,
     AccessibleRole::Checkbox,
+    AccessibleRole::Radio,
     AccessibleRole::Link,
 ];
 
@@ -183,5 +186,30 @@ fn the_response_graph_has_a_description() {
         &first::<ResponseGraph>(&page),
         AccessibleProperty::Description,
         &english(&model.graph.description)
+    ));
+}
+
+#[gtk::test]
+fn every_control_of_the_battery_page_has_a_name() {
+    let page = shown_battery_page(with_history(synthetic_week()));
+    let controls = descendants(&page).into_iter().filter(needs_name).count();
+    assert!(controls >= 2, "only {controls} controls need a name");
+    assert_eq!(unnamed(&page), Vec::<String>::new());
+}
+
+#[gtk::test]
+fn every_control_of_the_opened_battery_page_has_a_name() {
+    let (window, _) = rendered_window(with_history(synthetic_week()));
+    open_page(&window, "battery");
+    assert_eq!(unnamed(&window), Vec::<String>::new());
+}
+
+#[gtk::test]
+fn the_battery_chart_has_a_description() {
+    let (window, _) = rendered_window(with_history(synthetic_week()));
+    open_page(&window, "battery");
+    assert!(gtk::test_accessible_has_property(
+        &first::<BatteryChart>(&window),
+        AccessibleProperty::Description
     ));
 }

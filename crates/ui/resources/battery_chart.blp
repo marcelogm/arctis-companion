@@ -1,0 +1,14 @@
+using Gtk 4.0;
+
+template $ArctisBatteryChart: Widget {
+  height-request: 180;
+  hexpand: true;
+
+  accessibility {
+    label: _("Battery Level Chart");
+  }
+
+  styles [
+    "accent",
+  ]
+}

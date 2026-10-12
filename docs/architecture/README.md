@@ -15,6 +15,7 @@ Diagrams of the code as it is. Every backticked path below is checked by `cargo 
 | [ui.md](ui.md) | main window, headset page, status pages, dialogs, text resolver |
 | [app-presets.md](app-presets.md) | app presets page, rule rows, add-rule dialog |
 | [hid.md](hid.md) | HID adapter: sysfs discovery, hidraw ports, the device thread |
+| [battery-page.md](battery-page.md) | battery history page and chart |
 | [presets.md](presets.md) | presets page, equalizer editor, response graph, preset import and export |
 
 ## Workspace
