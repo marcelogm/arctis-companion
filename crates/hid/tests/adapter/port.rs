@@ -20,7 +20,7 @@ fn a_read_returns_one_frame() {
     let (ours, theirs) = pair();
     let port = Port::from_fd(ours);
     send(&theirs, &[0xB0, 0x02, 0x02]);
-    let Ok(Received::Frame(bytes)) = port.read() else {
+    let Ok(Received::Report(bytes)) = port.read() else {
         panic!("a frame");
     };
     assert_eq!(bytes, [0xB0, 0x02, 0x02]);

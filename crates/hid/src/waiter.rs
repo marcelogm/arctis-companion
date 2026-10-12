@@ -37,15 +37,20 @@ impl Waiter for PollWaiter {
     }
 
     fn wait(&mut self, fds: &[BorrowedFd<'_>], deadline: Option<Millis>) -> Vec<bool> {
-        let mut polled: Vec<PollFd<'_>> = fds
-            .iter()
-            .map(|fd| PollFd::from_borrowed_fd(*fd, PollFlags::IN))
-            .collect();
-        let timeout = deadline.map(|at| timespec(at.since(self.now())));
-        match rustix::event::poll(&mut polled, timeout.as_ref()) {
-            Ok(_) => polled.iter().map(is_ready).collect(),
-            Err(_) => vec![false; fds.len()],
-        }
+        poll_ready(fds, deadline.map(|at| at.since(self.now())))
+    }
+}
+
+#[must_use]
+pub fn poll_ready(fds: &[BorrowedFd<'_>], timeout_ms: Option<u64>) -> Vec<bool> {
+    let mut polled: Vec<PollFd<'_>> = fds
+        .iter()
+        .map(|fd| PollFd::from_borrowed_fd(*fd, PollFlags::IN))
+        .collect();
+    let timeout = timeout_ms.map(timespec);
+    match rustix::event::poll(&mut polled, timeout.as_ref()) {
+        Ok(_) => polled.iter().map(is_ready).collect(),
+        Err(_) => vec![false; fds.len()],
     }
 }
 

@@ -52,19 +52,18 @@ pub fn scan(root: &SysfsRoot) -> Vec<Node> {
     let Ok(entries) = fs::read_dir(&root.class) else {
         return Vec::new();
     };
-    let mut nodes: Vec<Node> = entries
+    entries
         .filter_map(Result::ok)
         .filter_map(|entry| node(root, &entry.file_name().to_string_lossy()))
-        .collect();
-    nodes.sort_by(|a, b| (&a.physical, a.interface).cmp(&(&b.physical, b.interface)));
-    nodes
+        .collect()
 }
 
 #[must_use]
 pub fn first_dongle(nodes: &[Node]) -> Option<Dongle> {
     nodes
         .iter()
-        .find_map(|node| dongle_at(nodes, &node.physical))
+        .filter_map(|node| dongle_at(nodes, &node.physical))
+        .min_by(|a, b| a.physical.cmp(&b.physical))
 }
 
 #[must_use]

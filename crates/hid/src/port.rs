@@ -18,7 +18,7 @@ pub struct PortGone;
 
 #[derive(Debug)]
 pub enum Received {
-    Frame(Vec<u8>),
+    Report(Vec<u8>),
     Empty,
 }
 
@@ -63,7 +63,7 @@ impl Port {
         let mut buffer = [0; READ_CAPACITY];
         match retrying(|| rustix::io::read(&self.fd, &mut buffer)) {
             Ok(0) => Err(PortGone),
-            Ok(length) => Ok(Received::Frame(buffer[..length].to_vec())),
+            Ok(length) => Ok(Received::Report(buffer[..length].to_vec())),
             Err(Errno::AGAIN) => Ok(Received::Empty),
             Err(_) => Err(PortGone),
         }

@@ -3,15 +3,11 @@ use std::os::fd::AsFd;
 use arctis_core::messages::device::{Change, SyncPolicy};
 use arctis_core::testkit::FakeHeadset;
 use arctis_hid::wake::{self, Mail};
-use rustix::event::{PollFd, PollFlags, Timespec};
+
+use crate::sockets::poll_now;
 
 fn ringing(mailbox: &impl AsFd) -> bool {
-    let mut fds = [PollFd::from_borrowed_fd(mailbox.as_fd(), PollFlags::IN)];
-    let zero = Timespec {
-        tv_sec: 0,
-        tv_nsec: 0,
-    };
-    rustix::event::poll(&mut fds, Some(&zero)).expect("poll") > 0
+    poll_now(&[mailbox.as_fd()])[0]
 }
 
 fn change() -> Change {
@@ -30,7 +26,7 @@ fn a_sent_change_rings_the_mailbox() {
 }
 
 #[test]
-fn taking_the_mail_returns_every_change_and_silences_the_bell() {
+fn taking_the_mail_returns_every_change_and_drains_the_wakes() {
     let (changes, mailbox) = wake::mailbox().expect("a mailbox");
     assert!(changes.send(change()));
     assert!(changes.send(change()));

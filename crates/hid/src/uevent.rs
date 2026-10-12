@@ -29,16 +29,15 @@ fn value_of<'a>(text: &'a str, key: &str) -> Option<&'a str> {
 }
 
 fn hid_id(value: &str) -> Option<(u16, u16)> {
-    let mut parts = value.split(':').skip(1);
+    let mut parts = value.split(':');
+    let _bus = parts.next()?;
     let vendor = hex_u16(parts.next()?)?;
     let product = hex_u16(parts.next()?)?;
     Some((vendor, product))
 }
 
 fn hex_u16(text: &str) -> Option<u16> {
-    u32::from_str_radix(text, 16)
-        .ok()
-        .and_then(|value| u16::try_from(value).ok())
+    u16::from_str_radix(text, 16).ok()
 }
 
 fn hid_phys(value: &str) -> Option<(&str, u8)> {

@@ -15,9 +15,9 @@ use arctis_hid::port::{OpenError, Opener, Port};
 use arctis_hid::waiter::Waiter;
 use arctis_hid::wake;
 use arctis_hid::worker::{Wiring, Worker};
-use rustix::event::{PollFd, PollFlags, Timespec};
 
 use crate::bench::{Advance, Bench};
+use crate::sockets::poll_now;
 
 const TURN_LIMIT: usize = 200_000;
 
@@ -46,24 +46,11 @@ impl Waiter for VirtualWaiter {
 fn wait_on(bench: &mut Bench, fds: &[BorrowedFd<'_>], deadline: Option<Millis>) -> Vec<bool> {
     loop {
         bench.collect_writes();
-        let ready = ready_now(fds);
+        let ready = poll_now(fds);
         if ready.contains(&true) || bench.advance(deadline) == Advance::TimedOut {
             return ready;
         }
     }
-}
-
-fn ready_now(fds: &[BorrowedFd<'_>]) -> Vec<bool> {
-    let mut polled: Vec<PollFd<'_>> = fds
-        .iter()
-        .map(|fd| PollFd::from_borrowed_fd(*fd, PollFlags::IN))
-        .collect();
-    let zero = Timespec {
-        tv_sec: 0,
-        tv_nsec: 0,
-    };
-    rustix::event::poll(&mut polled, Some(&zero)).expect("poll");
-    polled.iter().map(|fd| !fd.revents().is_empty()).collect()
 }
 
 pub struct SocketRig {

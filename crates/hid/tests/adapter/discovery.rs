@@ -1,4 +1,6 @@
-use arctis_hid::discovery::{self, Dongle};
+use std::path::PathBuf;
+
+use arctis_hid::discovery::{self, Dongle, Node};
 
 use crate::sysfs::{COMMAND_NODE, EVENTS_NODE, FakeSysfs, NOVA_5, NodeSpec, PHYSICAL};
 
@@ -93,6 +95,32 @@ fn the_first_dongle_by_physical_path_wins() {
     }
     assert_eq!(
         found(&sysfs).map(|dongle| dongle.physical),
+        Some(earlier.to_owned())
+    );
+}
+
+fn node(physical: &str, interface: u8) -> Node {
+    Node {
+        pid: NOVA_5,
+        uniq: None,
+        physical: physical.to_owned(),
+        interface,
+        path: PathBuf::from(format!("/dev/{physical}-{interface}")),
+    }
+}
+
+#[test]
+fn the_lowest_physical_path_wins_whatever_the_node_order() {
+    let later = "usb-0000:0e:00.3-1";
+    let earlier = "usb-0000:0c:00.0-5.2.1";
+    let nodes = [
+        node(later, 3),
+        node(later, 5),
+        node(earlier, 5),
+        node(earlier, 3),
+    ];
+    assert_eq!(
+        discovery::first_dongle(&nodes).map(|dongle| dongle.physical),
         Some(earlier.to_owned())
     );
 }
