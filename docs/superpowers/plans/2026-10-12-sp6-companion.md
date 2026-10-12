@@ -274,7 +274,7 @@ git push -u origin sp6-companion
 - Modify: `crates/core/src/lib.rs`
 - Test: `crates/core/tests/view/main.rs`, `crates/core/tests/view/support.rs`, `crates/core/tests/view/text.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 `crates/core/tests/view/main.rs`:
 
@@ -384,12 +384,12 @@ fn user_text_may_contain_braces() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test view`
 Expected: FAIL to compile (`arctis_core::view` and `arctis_core::testkit` do not exist).
 
-- [ ] **Step 3: Implement `view::text`**
+- [x] **Step 3: Implement `view::text`**
 
 `crates/core/src/view/mod.rs`:
 
@@ -498,7 +498,7 @@ pub mod sample;
 pub struct UnixSeconds(pub u64);
 ```
 
-- [ ] **Step 4: Implement the English resolver**
+- [x] **Step 4: Implement the English resolver**
 
 `crates/core/src/testkit/mod.rs`:
 
@@ -555,7 +555,7 @@ fn argument(arg: &Arg) -> String {
 }
 ```
 
-- [ ] **Step 5: Register the modules**
+- [x] **Step 5: Register the modules**
 
 `crates/core/src/lib.rs`:
 
@@ -577,12 +577,12 @@ pub mod view;
 
 (Keep any module SP4 has added meanwhile, such as `pub mod session;`.)
 
-- [ ] **Step 6: Run the tests to see them pass**
+- [x] **Step 6: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test view`
 Expected: PASS, 8 tests.
 
-- [ ] **Step 7: Commit**
+- [x] **Step 7: Commit**
 
 ```bash
 git add crates/core/src crates/core/tests/view
