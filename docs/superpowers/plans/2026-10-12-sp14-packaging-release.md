@@ -2202,3 +2202,18 @@ inside the build passed (check-pt_BR, validate-desktop, validate-schema, validat
 with `ServiceUnknown` (the session bus had not reloaded the exported service file), so the app was started with
 `flatpak run`. Over D-Bus, `Headset1.State` returned `connected` and `Route` returned `dongle`; the run log has no
 CRITICAL line. The extension zip was installed with `gnome-extensions install --force` and is not enabled.
+
+## Review outcomes
+
+| Finding | Outcome |
+|---|---|
+| Release bundle lacks pt_BR (`.Locale` split) | Fixed: `"separate-locales": false`, pinned by `packaging.rs::the_bundle_keeps_its_translations`; F6 no longer fetches a `.Locale`; `docs/architecture/packaging.md` explains it |
+| Soak never enforces 300 ms | Fixed: `SoakLog::confirmations_within`, asserted in `assert_soak_passed`; A1 says H14 fails past the limit |
+| A3 does not pin the rate | Fixed: forces rate 48000 and quantum 256, checks RATE/QUANT in `pw-top`, resets both |
+| Two parallel pending fields in `SoakLog` | Fixed: one `pending: Option<Pending>`; `confirmations` private |
+| `Option<bool>` field target and wrong escape order in the PO reader | Fixed: `Field` enum, early return, shared `catalogue.rs::unescape`, `\\n` sample case |
+| `msgid` parameters shadow the marker | Fixed: renamed to `template` |
+| Duplicate domain literal and meson parsers | Fixed: `GETTEXT_PACKAGE` in the metainfo assertion, `meson_project_name` beside `meson_version` sharing `meson_quoted_after`; the `locale.rs` check is gone |
+| `resolve(&Text::plain(msgid(..)))` repeated | Fixed: `crates/ui/src/text.rs::translated`, 7 call sites |
+
+No finding was rejected.
