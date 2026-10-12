@@ -36,31 +36,40 @@ facts from `docs/research/hid-protocol.md` and `docs/research/hardware-findings.
   arguments, `unwrap()` only inside `#[test]` functions (helpers and `proptest!` bodies use `expect`). When clippy
   objects, extract a function or rename; never add an `allow`. Pedantic lints are on: put `#[must_use]` on public
   functions that return a value, pass small `Copy` types by value.
-- Before each commit: `cargo fmt --all`, then Run (toolbox):
+- Before each commit, Run (toolbox): `cargo fmt --all`, then
   `cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules`.
+  The host has `cargo` but no `rustfmt`, so `cargo fmt` runs in the toolbox too. The code blocks below are not
+  rustfmt-formatted; `cargo fmt` reflows them and that is expected.
 - Commit subjects are conventional (`type(scope): summary`). Never write `Co-Authored-By`, "Generated with",
   or any AI or tool name in a commit message, PR title or PR body. Never use `--no-verify`.
-- Push after every commit: `git push -u origin sp2-protocol` (first time), then `git push`.
+- Push after every commit: `git push -u origin sp2-protocol` (first time), then `git push`. After any
+  `git rebase origin/main` that moved the branch, push with `git push --force-with-lease` (the branch is already
+  published, so a plain push is rejected).
 - SP3 builds `core::eq` in parallel. Before Task 4 and before the PR run `git fetch origin` and
   `git rebase origin/main`; see Task 4 for what to do when SP3 has already landed `eq/filter.rs` or `eq/curve.rs`.
+- Tools installed with `cargo install` land in `~/.cargo/bin`, which the toolbox login shell does not put on
+  `PATH`; commands that use them start with `export PATH="$HOME/.cargo/bin:$PATH" &&`.
+- Clippy 1.98 denies `chunks_exact` with a constant size (`chunks_exact_to_as_chunks`) and 6-byte arrays passed by
+  reference (`trivially_copy_pass_by_ref`); the code below already uses `as_chunks` and passes bands by value.
 
 ## Acceptance criteria → tasks
 
 | SP2 acceptance criterion (design §5) | Task |
 |---|---|
-| every frame in `hid-protocol.md` §7.1 and SP0 decodes | 1 (goldens moved, set pinned), 6, 8 (golden decode tests), 11 |
+| every frame in `hid-protocol.md` §7.1 and SP0 decodes | 1 (goldens moved, set pinned), 6 (captured curves), 8 (`golden_replies.rs`) |
 | every `Command` encodes to its cited bytes | 7 (cited-bytes table and captured setter goldens), 6 (captured `33` curves) |
-| stale tails ignored | 8 (fwupd tail, A0 tail, text tail goldens), 11 (proptest: any tail leaves a reply unchanged) |
+| stale tails ignored | 8 (fwupd tail, A0 tail, text tail goldens; proptest: any tail leaves a reply unchanged) |
 | proptest round-trip of `eq_wire` | 6 |
-| no constructor yields `09`, `35 01`-as-save, `A5`, `A7`, `0x22`, `0x34` | 6 (`Frame::new` crate-private), 7 (proptest over every `Command`) |
+| no constructor yields `09`, `35 01`-as-save, `A5`, `A7`, `0x22`, `0x34` | 7 (`Frame::new` crate-private, proptest over every `Command`) |
 | bootloader PIDs map to `ModelLookup::Bootloader` | 10 |
 | the udev rule test passes | 10 |
-| message types match §3.2 and device §6 | 12 (exhaustive contract test) |
-| 100 % line coverage | 14 |
-| `docs/architecture/<area>.md` page (design §5 preamble) | 13 |
+| message types match §3.2 and device §6 | 11 (exhaustive contract test) |
+| 100 % line coverage | 13 |
+| `docs/architecture/<area>.md` page (design §5 preamble) | 12 |
 | value types reject out-of-range input (quality §1 `core::settings`) | 2, 3, 4 |
-| `decode_*` never panics on any 64 bytes (quality §1 `core::protocol`) | 11 |
+| `decode_*` never panics on any 64 bytes (quality §1 `core::protocol`) | 6 (`decode_curve`), 8 (`decode_reply`), 9 (`decode_event`), each written before its decoder |
 | `0x10` slots decoded per `hardware-findings.md` §2.7 | 8 |
+| nightly `cargo mutants --package arctis-core` (quality §2) leaves no survivor in SP2 code | 13 |
 
 ## File structure
 
@@ -75,7 +84,7 @@ crates/core/src/eq/mod.rs
 crates/core/src/eq/filter.rs                Frequency, Gain, QFactor, FilterKind, Filter (data only; SP3 adds behaviour)
 crates/core/src/eq/curve.rs                 Curve, TooManyFilters (data only; SP3 adds equivalent)
 crates/core/src/protocol/mod.rs             re-exports of the §3.1 interface
-crates/core/src/protocol/frame.rs           Frame, DecodeError, framing helpers
+crates/core/src/protocol/frame.rs           DecodeError (Task 6), Frame (Task 7), framing helpers (Task 8)
 crates/core/src/protocol/status.rs          Link, Charging, Status, ChatMix
 crates/core/src/protocol/eq_wire.rs         encode_curve, decode_curve
 crates/core/src/protocol/command.rs         Query, Command, encode
@@ -87,10 +96,12 @@ crates/core/src/messages/mod.rs
 crates/core/src/messages/device.rs          Change, SyncPolicy, Phase, DeviceUpdate
 crates/core/src/messages/audio.rs           AudioCommand, AudioEvent, DefaultSink, SinkKind, SoundPath, StreamInfo, AppIdentifiers
 crates/core/tests/golden/*.hex              moved from docs/research/captures/
-crates/core/tests/golden_frames.rs          every golden decodes or encodes to its expectation
+crates/core/tests/support/mod.rs            golden loader and value helpers shared by the two golden test files
+crates/core/tests/golden_frames.rs          the golden set, captured curves and captured setter frames
+crates/core/tests/golden_replies.rs         every captured reply decodes to its expectation
 crates/core/tests/strategies/mod.rs         proptest curve strategy shared by eq_wire.rs and command.rs
 crates/core/tests/values.rs  status.rs  eq_types.rs  headset_settings.rs  eq_wire.rs  command.rs
-crates/core/tests/reply.rs  event.rs  model.rs  udev_rule.rs  never_panics.rs  messages.rs
+crates/core/tests/reply.rs  event.rs  model.rs  udev_rule.rs  messages.rs
 data/udev/70-arctis-companion.rules         uaccess for the non-bootloader PIDs (installed by SP14)
 docs/architecture/protocol.md               diagrams pointing at the code above
 docs/architecture/README.md                 one new row
@@ -108,7 +119,7 @@ Dependency direction inside `core`: `bounded` → `settings::values` → `eq` �
 **Files:**
 - Move: `docs/research/captures/*.hex` → `crates/core/tests/golden/`
 - Modify: `docs/research/hardware-findings.md`, `docs/research/hid-protocol.md`
-- Create: `crates/core/tests/golden_frames.rs`
+- Create: `crates/core/tests/support/mod.rs`, `crates/core/tests/golden_frames.rs`
 
 - [ ] **Step 1: Prepare the branch**
 
@@ -119,15 +130,42 @@ git status --short
 git rebase origin/main
 ```
 
-Expected: clean tree on `sp2-protocol`, rebased.
+Expected: clean tree on `sp2-protocol`, rebased. If the rebase moved the branch, Step 6 pushes with
+`--force-with-lease` (the plan commit is already on `origin/sp2-protocol`).
 
 - [ ] **Step 2: Write the failing test**
 
-`crates/core/tests/golden_frames.rs`:
+The hex loader lives in a shared test module because two golden test files use it (Task 8 adds
+`golden_replies.rs`; one file would pass the 400-line guideline). It sits in `tests/support/`, never in
+`tests/golden/`, which must hold only the captures. Every helper in `support/mod.rs` must be used by both
+`golden_frames.rs` and `golden_replies.rs`, or `dead_code` fails clippy in one of them.
+
+`crates/core/tests/support/mod.rs`:
 
 ```rust
 use std::fs;
 use std::path::{Path, PathBuf};
+
+pub fn golden_dir() -> PathBuf {
+    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden")
+}
+
+pub fn golden(name: &str) -> Vec<u8> {
+    let text = fs::read_to_string(golden_dir().join(name)).expect("golden file is readable");
+    text.split_whitespace()
+        .map(|byte| u8::from_str_radix(byte, 16).expect("golden bytes are hex"))
+        .collect()
+}
+```
+
+`crates/core/tests/golden_frames.rs`:
+
+```rust
+mod support;
+
+use std::fs;
+
+use support::{golden, golden_dir};
 
 const GOLDEN_NAMES: [&str; 39] = [
     "cmd_27_00.hex",
@@ -170,17 +208,6 @@ const GOLDEN_NAMES: [&str; 39] = [
     "reply_b0_link2_headset_off.hex",
     "reply_b0_link3_headset_on.hex",
 ];
-
-fn golden_dir() -> PathBuf {
-    Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/golden")
-}
-
-fn golden(name: &str) -> Vec<u8> {
-    let text = fs::read_to_string(golden_dir().join(name)).expect("golden file is readable");
-    text.split_whitespace()
-        .map(|byte| u8::from_str_radix(byte, 16).expect("golden bytes are hex"))
-        .collect()
-}
 
 fn golden_names() -> Vec<String> {
     let mut names: Vec<String> = fs::read_dir(golden_dir())
@@ -225,14 +252,14 @@ Expected: the final `grep` prints nothing.
 - [ ] **Step 5: Run the test to see it pass**
 
 Run (toolbox): `cargo test -p arctis-core --test golden_frames`
-Expected: PASS, 2 tests. (`golden` is used only by the second test for now; later tasks use it more.)
+Expected: PASS, 2 tests.
 
 - [ ] **Step 6: Commit**
 
 ```bash
 git add -A crates/core/tests docs/research
 git commit -m "test(core): move hardware captures into golden fixtures"
-git push -u origin sp2-protocol
+git push --force-with-lease -u origin sp2-protocol
 ```
 
 ---
@@ -316,6 +343,15 @@ fn auto_power_off_accepts_only_the_ten_choices() {
 fn auto_power_off_never_is_zero_minutes() {
     assert_eq!(AutoPowerOff::NEVER.minutes(), 0);
     assert_eq!(AutoPowerOff::try_from(30).map(AutoPowerOff::minutes), Ok(30));
+}
+
+#[test]
+fn unlisted_auto_power_off_minutes_read_as_the_nearest_choice() {
+    let nearest: Vec<u8> = [0, 2, 3, 20, 200]
+        .into_iter()
+        .map(|minutes| AutoPowerOff::nearest(minutes).minutes())
+        .collect();
+    assert_eq!(nearest, [0, 1, 1, 15, 90]);
 }
 ```
 
@@ -462,6 +498,14 @@ impl AutoPowerOff {
     pub const fn minutes(self) -> u8 {
         self.0
     }
+
+    #[must_use]
+    pub fn nearest(minutes: u8) -> Self {
+        Self::CHOICES
+            .into_iter()
+            .min_by_key(|choice| choice.0.abs_diff(minutes))
+            .unwrap_or(Self::NEVER)
+    }
 }
 
 impl TryFrom<u8> for AutoPowerOff {
@@ -490,7 +534,7 @@ pub mod time;
 - [ ] **Step 4: Run the test to see it pass**
 
 Run (toolbox): `cargo test -p arctis-core --test values`
-Expected: PASS, 10 tests.
+Expected: PASS, 11 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -688,11 +732,18 @@ git push
 
 SP3 owns `core::eq` behaviour (`equivalent`, envelope validation, response, DSP). SP2 needs the data types now
 because `Command::SetEqualizer(Curve)`, `HeadsetSettings::equalizer` and `AudioCommand::InsertEqualizer(Curve)`
-are frozen here. First run `git fetch origin && git rebase origin/main && ls crates/core/src/eq`. If SP3 has already
-merged `crates/core/src/eq/filter.rs` or `crates/core/src/eq/curve.rs`, skip Steps 3–4 for the file it owns, add only
-the missing items this plan uses (`Frequency`, `Gain`, `QFactor` with `MIN`, `MAX`, `get`, `TryFrom`;
-`FilterKind::ALL`; `Filter` fields `kind`, `frequency`, `gain`, `q`; `Curve::new`, `Curve::filters`,
-`Curve::MAX_FILTERS`, `TooManyFilters`), adapt later tasks to SP3's names, and note the adaptation under Deviations.
+are frozen here. First run `git fetch origin && git rebase origin/main && ls crates/core/src/eq` (then
+`git push --force-with-lease` if the rebase moved the branch). If SP3 has already merged
+`crates/core/src/eq/filter.rs` or `crates/core/src/eq/curve.rs`, skip Steps 3–4 for the file it owns, add only the
+missing items this plan uses (`Frequency`, `Gain`, `QFactor` with `MIN`, `MAX`, `get`, `TryFrom`;
+`FilterKind::ALL`; `Filter` fields `kind`, `frequency`, `gain`, `q`; `Curve::new`, `Curve::from_slots`,
+`Curve::filters`, `Curve::MAX_FILTERS`, `TooManyFilters`), adapt later tasks to SP3's names, and note the adaptation
+under Deviations. If SP3's `Filter` stores gain in dB and Q as floats (or carries an `enabled` flag), keep SP3's
+fields: `eq_wire` converts at the boundary (gain byte `round(20 + 2·dB)`, Q byte pair `round(Q·1000)`, a disabled
+filter encodes as the disabled band), the `eq_wire` round-trip strategy generates only values on that grid
+(0.5 dB, Q steps of 0.001), and the derives that floats forbid (`Eq`, `Hash`) are dropped from every type that holds
+a `Curve` (`HeadsetSettings`, `SettingChange`, `Command`, the messages) while the tests keep comparing with
+`assert_eq!` through `PartialEq`.
 
 **Files:**
 - Create: `crates/core/src/eq/mod.rs`, `crates/core/src/eq/filter.rs`, `crates/core/src/eq/curve.rs`
@@ -751,6 +802,14 @@ fn a_curve_keeps_up_to_ten_filters_in_order() {
 fn a_curve_rejects_an_eleventh_filter() {
     let eleven: Vec<Filter> = (1..=11).map(|step| peaking(step * 100)).collect();
     assert_eq!(Curve::new(eleven), Err(TooManyFilters));
+}
+
+#[test]
+fn a_curve_from_ten_slots_keeps_the_filled_ones_in_order() {
+    let mut slots = [None; Curve::MAX_FILTERS];
+    slots[2] = Some(peaking(300));
+    slots[7] = Some(peaking(800));
+    assert_eq!(Curve::from_slots(slots).filters(), [peaking(300), peaking(800)]);
 }
 ```
 
@@ -829,6 +888,13 @@ impl Curve {
     }
 
     #[must_use]
+    pub fn from_slots(slots: [Option<Filter>; Self::MAX_FILTERS]) -> Self {
+        Self {
+            filters: slots.into_iter().flatten().collect(),
+        }
+    }
+
+    #[must_use]
     pub fn filters(&self) -> &[Filter] {
         &self.filters
     }
@@ -840,7 +906,7 @@ impl Curve {
 - [ ] **Step 4: Run the test to see it pass**
 
 Run (toolbox): `cargo test -p arctis-core --test eq_types`
-Expected: PASS, 5 tests.
+Expected: PASS, 6 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -1077,7 +1143,7 @@ git push
 - Create: `crates/core/src/protocol/frame.rs`, `crates/core/src/protocol/eq_wire.rs`,
   `crates/core/tests/strategies/mod.rs`, `crates/core/tests/eq_wire.rs`
 - Modify: `Cargo.toml` (workspace dependency), `crates/core/Cargo.toml`, `crates/core/src/protocol/mod.rs`,
-  `crates/core/tests/golden_frames.rs`
+  `crates/core/tests/support/mod.rs`, `crates/core/tests/golden_frames.rs`
 
 - [ ] **Step 1: Add proptest as a dev-dependency**
 
@@ -1133,6 +1199,7 @@ use arctis_core::eq::curve::Curve;
 use arctis_core::eq::filter::{Filter, FilterKind, Frequency, Gain, QFactor};
 use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
 use arctis_core::protocol::frame::DecodeError;
+use proptest::collection::vec;
 use proptest::prelude::*;
 
 const DISABLED_BAND: [u8; 6] = [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03];
@@ -1178,7 +1245,7 @@ fn each_kind_has_its_wire_code() {
 #[test]
 fn missing_filters_encode_as_disabled_bands() {
     let bytes = encode_curve(&Curve::new(Vec::new()).expect("empty curve"));
-    assert!(bytes.chunks_exact(6).all(|band| band == DISABLED_BAND));
+    assert!(bytes.as_chunks::<6>().0.iter().all(|band| *band == DISABLED_BAND));
 }
 
 #[test]
@@ -1220,6 +1287,13 @@ fn out_of_envelope_bands_name_the_offending_offset() {
 }
 
 #[test]
+fn an_invalid_band_names_its_offset_within_the_frame() {
+    let invalid_gain = [0x20, 0x00, 0x01, 0x29, 0x82, 0x05];
+    let frame = frame_with_bands(&[DISABLED_BAND, DISABLED_BAND, DISABLED_BAND, invalid_gain]);
+    assert_eq!(decode_curve(&frame), Err(DecodeError::InvalidValue { offset: 22 }));
+}
+
+#[test]
 fn a_frame_without_ten_bands_is_too_short() {
     assert_eq!(
         decode_curve(&[0x20; 60]),
@@ -1234,19 +1308,23 @@ proptest! {
         frame.extend_from_slice(&encode_curve(&curve));
         prop_assert_eq!(decode_curve(&frame), Ok(curve));
     }
+
+    #[test]
+    fn decode_curve_never_panics(bytes in vec(any::<u8>(), 0..=64)) {
+        let _ = decode_curve(&bytes);
+    }
 }
 ```
 
-Append to `crates/core/tests/golden_frames.rs` (add the `use` lines at the top of the file):
+`crates/core/tests/support/mod.rs`, add these `use` lines under the existing ones and append the helpers:
 
 ```rust
 use arctis_core::eq::curve::Curve;
 use arctis_core::eq::filter::{Filter, FilterKind, Frequency, Gain, QFactor};
-use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
 
 const FACTORY_HZ: [u16; 10] = [32, 64, 125, 250, 500, 1000, 2000, 4000, 8000, 16000];
 
-fn filter(kind: FilterKind, hz: u16, gain: u8, q: u16) -> Filter {
+pub fn filter(kind: FilterKind, hz: u16, gain: u8, q: u16) -> Filter {
     Filter {
         kind,
         frequency: Frequency::try_from(hz).expect("frequency"),
@@ -1255,13 +1333,21 @@ fn filter(kind: FilterKind, hz: u16, gain: u8, q: u16) -> Filter {
     }
 }
 
-fn factory_flat() -> Curve {
+pub fn factory_flat() -> Curve {
     let filters = FACTORY_HZ
         .iter()
         .map(|&hz| filter(FilterKind::Peaking, hz, 20, 1410))
         .collect();
     Curve::new(filters).expect("ten filters")
 }
+```
+
+Append to `crates/core/tests/golden_frames.rs` (merge the `use` lines at the top of the file; the `support`
+import becomes `use support::{factory_flat, filter, golden, golden_dir};`):
+
+```rust
+use arctis_core::eq::filter::FilterKind;
+use arctis_core::protocol::eq_wire::{decode_curve, encode_curve};
 
 #[test]
 fn captured_curve_writes_round_trip_bit_exact() {
@@ -1299,6 +1385,9 @@ fn the_bluetooth_band_layout_is_the_factory_flat_curve() {
 }
 ```
 
+`cmd_33_edges.hex` is left out of the bit-exact round trip on purpose: its disabled band carries gain byte `00` and
+Q `c8 00`, which a `Curve` does not keep, so re-encoding it yields the canonical disabled band instead (Deviation 2).
+
 - [ ] **Step 3: Run them to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test eq_wire --test golden_frames`
@@ -1306,70 +1395,15 @@ Expected: FAIL to compile, `could not find eq_wire in protocol`.
 
 - [ ] **Step 4: Implement**
 
-`crates/core/src/protocol/frame.rs`:
+`crates/core/src/protocol/frame.rs` (Task 7 adds `Frame`, Task 8 the framing helpers, each when its first caller
+exists, so no step needs a `dead_code` exception):
 
 ```rust
-pub const PAYLOAD_LEN: usize = 64;
-pub const REPORT_LEN: usize = PAYLOAD_LEN + 1;
-
-#[derive(Clone, Debug, PartialEq, Eq)]
-pub struct Frame([u8; REPORT_LEN]);
-
-impl Frame {
-    pub(crate) fn new(id: u8, args: &[u8]) -> Self {
-        let mut bytes = [0; REPORT_LEN];
-        bytes[1] = id;
-        bytes[2..2 + args.len()].copy_from_slice(args);
-        Self(bytes)
-    }
-
-    #[must_use]
-    pub const fn as_bytes(&self) -> &[u8; REPORT_LEN] {
-        &self.0
-    }
-
-    #[must_use]
-    pub fn payload(&self) -> &[u8] {
-        &self.0[1..]
-    }
-}
-
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum DecodeError {
     TooShort { needed: usize, got: usize },
     UnexpectedId { expected: u8, got: u8 },
     InvalidValue { offset: usize },
-}
-
-pub(crate) fn expect_frame(bytes: &[u8], id: u8, needed: usize) -> Result<&[u8], DecodeError> {
-    let frame = bytes.get(..needed).ok_or(DecodeError::TooShort {
-        needed,
-        got: bytes.len(),
-    })?;
-    if frame[0] == id {
-        Ok(frame)
-    } else {
-        Err(DecodeError::UnexpectedId {
-            expected: id,
-            got: frame[0],
-        })
-    }
-}
-
-pub(crate) fn field<T: TryFrom<u8>>(frame: &[u8], offset: usize) -> Result<T, DecodeError> {
-    T::try_from(frame[offset]).map_err(|_| DecodeError::InvalidValue { offset })
-}
-
-pub(crate) const fn flag(raw: u8) -> Option<bool> {
-    match raw {
-        0 => Some(false),
-        1 => Some(true),
-        _ => None,
-    }
-}
-
-pub(crate) fn flag_field(frame: &[u8], offset: usize) -> Result<bool, DecodeError> {
-    flag(frame[offset]).ok_or(DecodeError::InvalidValue { offset })
 }
 ```
 
@@ -1390,13 +1424,13 @@ const DISABLED_BAND: [u8; BAND_LEN] = [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03];
 #[must_use]
 pub fn encode_curve(curve: &Curve) -> [u8; BANDS_LEN] {
     let mut bytes = [0; BANDS_LEN];
-    for (slot, band) in bytes.chunks_exact_mut(BAND_LEN).enumerate() {
-        let encoded = curve
+    let (bands, _) = bytes.as_chunks_mut::<BAND_LEN>();
+    for (slot, band) in bands.iter_mut().enumerate() {
+        *band = curve
             .filters()
             .get(slot)
             .copied()
             .map_or(DISABLED_BAND, encode_filter);
-        band.copy_from_slice(&encoded);
     }
     bytes
 }
@@ -1408,13 +1442,12 @@ pub fn decode_curve(frame: &[u8]) -> Result<Curve, DecodeError> {
             needed: FIRST_BAND + BANDS_LEN,
             got: frame.len(),
         })?;
-    let mut filters = Vec::with_capacity(Curve::MAX_FILTERS);
-    for (slot, band) in bands.chunks_exact(BAND_LEN).enumerate() {
-        if let Some(filter) = decode_band(band, FIRST_BAND + slot * BAND_LEN)? {
-            filters.push(filter);
-        }
+    let (bands, _) = bands.as_chunks::<BAND_LEN>();
+    let mut slots = [None; Curve::MAX_FILTERS];
+    for (slot, band) in bands.iter().enumerate() {
+        slots[slot] = decode_band(*band, FIRST_BAND + slot * BAND_LEN)?;
     }
-    Curve::new(filters).map_err(|_| DecodeError::InvalidValue { offset: FIRST_BAND })
+    Ok(Curve::from_slots(slots))
 }
 
 fn encode_filter(filter: Filter) -> [u8; BAND_LEN] {
@@ -1430,7 +1463,7 @@ fn encode_filter(filter: Filter) -> [u8; BAND_LEN] {
     ]
 }
 
-fn decode_band(band: &[u8], offset: usize) -> Result<Option<Filter>, DecodeError> {
+fn decode_band(band: [u8; BAND_LEN], offset: usize) -> Result<Option<Filter>, DecodeError> {
     let hz = u16::from_le_bytes([band[0], band[1]]);
     if hz == DISABLED_HZ {
         return Ok(None);
@@ -1473,14 +1506,14 @@ pub mod frame;
 pub mod status;
 ```
 
-`frame.rs` helpers `expect_frame`, `field`, `flag`, `flag_field` and `Frame::new` have no caller yet; if clippy
-reports them as dead code, keep going: Tasks 7–9 use them. Until Task 9, append `-A dead_code` to the clippy
-command line (a flag, never an attribute in the source).
+`decode_curve` collects into ten slots and builds the curve with the infallible `Curve::from_slots`: a fixed
+60-byte window cannot hold more than ten filters, so a `Curve::new` error branch here would be unreachable and
+would break the 100 % line criterion.
 
 - [ ] **Step 5: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test eq_wire --test golden_frames`
-Expected: PASS, eq_wire 8 tests, golden_frames 6 tests.
+Expected: PASS, eq_wire 10 tests, golden_frames 6 tests.
 
 - [ ] **Step 6: Commit**
 
@@ -1496,7 +1529,8 @@ git push
 
 **Files:**
 - Create: `crates/core/src/protocol/command.rs`, `crates/core/tests/command.rs`
-- Modify: `crates/core/src/protocol/mod.rs`, `crates/core/tests/golden_frames.rs`
+- Modify: `crates/core/src/protocol/frame.rs`, `crates/core/src/protocol/mod.rs`,
+  `crates/core/tests/support/mod.rs`, `crates/core/tests/golden_frames.rs`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1654,23 +1688,30 @@ proptest! {
 }
 ```
 
-Append to `crates/core/tests/golden_frames.rs` (merge the `use` lines at the top):
+`crates/core/tests/support/mod.rs`, add the `use` line and append the helpers:
 
 ```rust
-use arctis_core::protocol::command::{Command, encode};
-use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Sidetone, WirelessMode};
+use arctis_core::settings::values::{AutoPowerOff, MicVolume, Sidetone};
 
-fn mic(level: u8) -> MicVolume {
+pub fn mic(level: u8) -> MicVolume {
     MicVolume::try_from(level).expect("mic volume")
 }
 
-fn sidetone(level: u8) -> Sidetone {
+pub fn sidetone(level: u8) -> Sidetone {
     Sidetone::try_from(level).expect("sidetone")
 }
 
-fn auto_off(minutes: u8) -> AutoPowerOff {
+pub fn auto_off(minutes: u8) -> AutoPowerOff {
     AutoPowerOff::try_from(minutes).expect("auto power off choice")
 }
+```
+
+Append to `crates/core/tests/golden_frames.rs` (merge the `use` lines at the top; the `support` import becomes
+`use support::{auto_off, factory_flat, filter, golden, golden_dir, mic, sidetone};`):
+
+```rust
+use arctis_core::protocol::command::{Command, encode};
+use arctis_core::settings::values::{MuteLight, WirelessMode};
 
 fn captured_setters() -> [(&'static str, Command); 11] {
     [
@@ -1711,6 +1752,35 @@ Run (toolbox): `cargo test -p arctis-core --test command --test golden_frames`
 Expected: FAIL to compile, `could not find command in protocol`.
 
 - [ ] **Step 3: Implement**
+
+`crates/core/src/protocol/frame.rs`, add above `DecodeError`:
+
+```rust
+pub const PAYLOAD_LEN: usize = 64;
+pub const REPORT_LEN: usize = PAYLOAD_LEN + 1;
+
+#[derive(Clone, Debug, PartialEq, Eq)]
+pub struct Frame([u8; REPORT_LEN]);
+
+impl Frame {
+    pub(crate) fn new(id: u8, args: &[u8]) -> Self {
+        let mut bytes = [0; REPORT_LEN];
+        bytes[1] = id;
+        bytes[2..2 + args.len()].copy_from_slice(args);
+        Self(bytes)
+    }
+
+    #[must_use]
+    pub const fn as_bytes(&self) -> &[u8; REPORT_LEN] {
+        &self.0
+    }
+
+    #[must_use]
+    pub fn payload(&self) -> &[u8] {
+        &self.0[1..]
+    }
+}
+```
 
 `crates/core/src/protocol/command.rs`:
 
@@ -1863,8 +1933,9 @@ git push
 ### Task 8: Replies and firmware slots
 
 **Files:**
-- Create: `crates/core/src/protocol/firmware.rs`, `crates/core/src/protocol/reply.rs`, `crates/core/tests/reply.rs`
-- Modify: `crates/core/src/protocol/mod.rs`, `crates/core/tests/golden_frames.rs`
+- Create: `crates/core/src/protocol/firmware.rs`, `crates/core/src/protocol/reply.rs`, `crates/core/tests/reply.rs`,
+  `crates/core/tests/golden_replies.rs`
+- Modify: `crates/core/src/protocol/frame.rs`, `crates/core/src/protocol/mod.rs`
 
 - [ ] **Step 1: Write the failing tests**
 
@@ -1877,6 +1948,16 @@ use arctis_core::protocol::frame::DecodeError;
 use arctis_core::protocol::reply::{Reply, UxReadback, decode_reply};
 use arctis_core::protocol::status::{Charging, Link, Status};
 use arctis_core::settings::values::{AutoPowerOff, MuteLight, Percent, WirelessMode};
+use proptest::collection::vec;
+use proptest::prelude::*;
+use proptest::sample::select;
+
+const DOCUMENTED_REPLIES: [(Query, &[u8]); 4] = [
+    (Query::Status, &[0xB0, 0x03, 0x03, 0x25, 0x03]),
+    (Query::Firmware, b"\x100.01.010.000............000000001.07"),
+    (Query::Ux, &[0xA0, 0x1e, 0x0a]),
+    (Query::Wireless, &[0x36, 0x01]),
+];
 
 const DISABLED_BAND: [u8; 6] = [0x21, 0x4e, 0x01, 0x14, 0xe8, 0x03];
 
@@ -1975,7 +2056,6 @@ fn out_of_range_fields_name_their_offset() {
         (Query::Audio, audio_frame([16, 0, 1]), 61),
         (Query::Audio, audio_frame([15, 11, 1]), 62),
         (Query::Audio, audio_frame([15, 0, 2]), 63),
-        (Query::Ux, frame(0xA0, &[(1, 20)]), 1),
         (Query::Wireless, frame(0x36, &[(1, 2)]), 1),
     ];
     for (query, bytes, offset) in cases {
@@ -2017,7 +2097,7 @@ fn an_unreachable_headset_reports_no_firmware() {
 
 #[test]
 fn slots_with_non_digits_report_no_firmware() {
-    let decoded = firmware(b"0.0x.010.000", b"0000000x1.07");
+    let decoded = firmware(b"0.0:.010.000", b"0000000x1.07");
     assert_eq!(decoded, Firmware { receiver: None, headset: None });
 }
 
@@ -2025,17 +2105,52 @@ fn slots_with_non_digits_report_no_firmware() {
 fn versions_print_as_dotted_numbers() {
     assert_eq!(version(1, 16, 0).to_string(), "1.16.0");
 }
+
+#[test]
+fn an_unlisted_auto_power_off_reads_as_the_nearest_choice() {
+    let Ok(Reply::Ux(readback)) = decode_reply(Query::Ux, &[0xA0, 20, 0x0a]) else {
+        panic!("the UX reply does not decode");
+    };
+    assert_eq!(readback.auto_power_off.minutes(), 15);
+}
+
+proptest! {
+    #[test]
+    fn decode_reply_never_panics(query in select(Query::ALL.to_vec()), mut bytes in vec(any::<u8>(), 0..=64)) {
+        if let Some(first) = bytes.first_mut() {
+            *first = query.id();
+        }
+        let _ = decode_reply(query, &bytes);
+    }
+
+    #[test]
+    fn stale_tails_never_change_a_reply(index in 0..DOCUMENTED_REPLIES.len(), tail in vec(any::<u8>(), 64)) {
+        let (query, prefix) = DOCUMENTED_REPLIES[index];
+        let mut bytes = prefix.to_vec();
+        bytes.extend_from_slice(&tail[prefix.len()..]);
+        prop_assert!(decode_reply(query, prefix).is_ok());
+        prop_assert_eq!(decode_reply(query, &bytes), decode_reply(query, prefix));
+    }
+}
 ```
 
-Append to `crates/core/tests/golden_frames.rs` (merge the `use` lines at the top):
+`:` is the byte right after `9`, so the receiver case pins the `< 10` bound of the digit check. The audio reply has no
+tail (its documented length is the whole 64 bytes), so it is not in `DOCUMENTED_REPLIES`. A failure of a property
+is a codec bug: fix the decoder, not the test, and add the shrunk input as a named case above first.
+
+`crates/core/tests/golden_replies.rs` (its own file, so neither golden file passes the 400-line guideline):
 
 ```rust
+mod support;
+
 use arctis_core::protocol::command::Query;
+use arctis_core::protocol::eq_wire::decode_curve;
 use arctis_core::protocol::firmware::{Firmware, Version};
 use arctis_core::protocol::reply::{AudioReadback, Reply, UxReadback, decode_reply, observed_settings};
 use arctis_core::protocol::status::{Charging, Link, Status};
 use arctis_core::settings::headset_settings::HeadsetSettings;
-use arctis_core::settings::values::Percent;
+use arctis_core::settings::values::{MuteLight, Percent, WirelessMode};
+use support::{auto_off, factory_flat, golden, mic, sidetone};
 
 fn decoded(query: Query, name: &str) -> Reply {
     decode_reply(query, &golden(name)).expect("golden reply decodes")
@@ -2178,10 +2293,46 @@ fn the_initial_headset_off_readback_assembles_the_observed_settings() {
 
 - [ ] **Step 2: Run them to see them fail**
 
-Run (toolbox): `cargo test -p arctis-core --test reply --test golden_frames`
+Run (toolbox): `cargo test -p arctis-core --test reply --test golden_replies`
 Expected: FAIL to compile, `could not find firmware in protocol`.
 
 - [ ] **Step 3: Implement**
+
+`crates/core/src/protocol/frame.rs`, append the framing helpers (their first callers are in `reply.rs`; `flag` is
+also used by `event.rs` in Task 9):
+
+```rust
+pub(crate) fn expect_frame(bytes: &[u8], id: u8, needed: usize) -> Result<&[u8], DecodeError> {
+    let frame = bytes.get(..needed).ok_or(DecodeError::TooShort {
+        needed,
+        got: bytes.len(),
+    })?;
+    if frame[0] == id {
+        Ok(frame)
+    } else {
+        Err(DecodeError::UnexpectedId {
+            expected: id,
+            got: frame[0],
+        })
+    }
+}
+
+pub(crate) fn field<T: TryFrom<u8>>(frame: &[u8], offset: usize) -> Result<T, DecodeError> {
+    T::try_from(frame[offset]).map_err(|_| DecodeError::InvalidValue { offset })
+}
+
+pub(crate) const fn flag(raw: u8) -> Option<bool> {
+    match raw {
+        0 => Some(false),
+        1 => Some(true),
+        _ => None,
+    }
+}
+
+pub(crate) fn flag_field(frame: &[u8], offset: usize) -> Result<bool, DecodeError> {
+    flag(frame[offset]).ok_or(DecodeError::InvalidValue { offset })
+}
+```
 
 `crates/core/src/protocol/firmware.rs`:
 
@@ -2357,7 +2508,7 @@ fn decode_audio(bytes: &[u8]) -> Result<AudioReadback, DecodeError> {
 fn decode_ux(bytes: &[u8]) -> Result<UxReadback, DecodeError> {
     let frame = expect_frame(bytes, Query::Ux.id(), UX_LEN)?;
     Ok(UxReadback {
-        auto_power_off: field(frame, 1)?,
+        auto_power_off: AutoPowerOff::nearest(frame[1]),
         mute_light: MuteLight::from_raw(frame[2]),
     })
 }
@@ -2372,8 +2523,8 @@ fn decode_wireless(bytes: &[u8]) -> Result<WirelessMode, DecodeError> {
 
 - [ ] **Step 4: Run the tests to see them pass**
 
-Run (toolbox): `cargo test -p arctis-core --test reply --test golden_frames`
-Expected: PASS, reply 11 tests, golden_frames 16 tests.
+Run (toolbox): `cargo test -p arctis-core --test reply --test golden_replies`
+Expected: PASS, reply 14 tests, golden_replies 8 tests.
 
 - [ ] **Step 5: Commit**
 
@@ -2400,6 +2551,8 @@ use arctis_core::protocol::event::{DeviceEvent, decode_event};
 use arctis_core::protocol::status::{Charging, ChatMix, Link};
 use arctis_core::settings::headset_settings::SettingChange;
 use arctis_core::settings::values::{AutoPowerOff, MicVolume, MuteLight, Percent, Sidetone};
+use proptest::collection::vec;
+use proptest::prelude::*;
 
 fn event(bytes: &[u8]) -> Option<DeviceEvent> {
     let mut frame = bytes.to_vec();
@@ -2432,6 +2585,7 @@ fn setting_events_decode_to_setting_changes() {
         ([0x37, 7], SettingChange::MicVolume(MicVolume::try_from(7).expect("mic"))),
         ([0x39, 6], SettingChange::Sidetone(Sidetone::try_from(6).expect("sidetone"))),
         ([0xA3, 15], SettingChange::AutoPowerOff(AutoPowerOff::try_from(15).expect("choice"))),
+        ([0xA3, 20], SettingChange::AutoPowerOff(AutoPowerOff::try_from(15).expect("choice"))),
         ([0xAE, 4], SettingChange::MuteLight(MuteLight::Medium)),
     ];
     for (bytes, change) in cases {
@@ -2441,7 +2595,7 @@ fn setting_events_decode_to_setting_changes() {
 
 #[test]
 fn out_of_range_event_values_are_dropped() {
-    let frames: [&[u8]; 9] = [
+    let frames: [&[u8]; 8] = [
         &[0xB7, 101],
         &[0xBB, 4],
         &[0xB9, 4],
@@ -2450,7 +2604,6 @@ fn out_of_range_event_values_are_dropped() {
         &[0x27, 2],
         &[0x37, 16],
         &[0x39, 11],
-        &[0xA3, 20],
     ];
     for bytes in frames {
         assert_eq!(event(bytes), None, "{bytes:02x?}");
@@ -2465,6 +2618,13 @@ fn unknown_or_truncated_frames_are_not_events() {
     }
     assert_eq!(event(&[0x10, 1]), None);
     assert_eq!(event(&[0x20]), None);
+}
+
+proptest! {
+    #[test]
+    fn decode_event_never_panics(bytes in vec(any::<u8>(), 0..=64)) {
+        let _ = decode_event(&bytes);
+    }
 }
 ```
 
@@ -2482,7 +2642,7 @@ use super::command::{AUTO_POWER_OFF, MIC_VOLUME, MUTE_LIGHT, SIDETONE, VOLUME_LI
 use super::frame::flag;
 use super::status::{Charging, ChatMix, Link};
 use crate::settings::headset_settings::SettingChange;
-use crate::settings::values::{MuteLight, Percent};
+use crate::settings::values::{AutoPowerOff, MuteLight, Percent};
 
 const CHAT_MIX: u8 = 0x45;
 const BATTERY: u8 = 0xB7;
@@ -2526,20 +2686,19 @@ fn setting_change(id: u8, bytes: &[u8]) -> Option<SettingChange> {
         VOLUME_LIMITER => flag(raw).map(SettingChange::VolumeLimiter),
         MIC_VOLUME => value(bytes, 1).map(SettingChange::MicVolume),
         SIDETONE => value(bytes, 1).map(SettingChange::Sidetone),
-        AUTO_POWER_OFF => value(bytes, 1).map(SettingChange::AutoPowerOff),
+        AUTO_POWER_OFF => Some(SettingChange::AutoPowerOff(AutoPowerOff::nearest(raw))),
         MUTE_LIGHT => Some(SettingChange::MuteLight(MuteLight::from_raw(raw))),
         _ => None,
     }
 }
 ```
 
-`crates/core/src/protocol/mod.rs`: add `pub mod event;` in alphabetical order. From now on clippy runs without
-`-A dead_code`.
+`crates/core/src/protocol/mod.rs`: add `pub mod event;` in alphabetical order.
 
 - [ ] **Step 4: Run the test to see it pass**
 
 Run (toolbox): `cargo test -p arctis-core --test event && cargo clippy --workspace --all-targets -- -D warnings`
-Expected: PASS, 5 tests; clippy clean.
+Expected: PASS, 6 tests; clippy clean.
 
 - [ ] **Step 5: Commit**
 
@@ -2563,7 +2722,9 @@ git push
 `crates/core/tests/model.rs`:
 
 ```rust
-use arctis_core::protocol::model::{BOOTLOADER_PIDS, Model, ModelLookup, Support, VENDOR_ID};
+use arctis_core::protocol::model::{
+    BOOTLOADER_PIDS, Capabilities, Model, ModelLookup, Support, VENDOR_ID,
+};
 use arctis_core::settings::headset_settings::Setting;
 
 fn supported(pid: u16) -> Model {
@@ -2622,6 +2783,16 @@ fn every_model_supports_every_headset_setting() {
         let all = Setting::ALL.into_iter().all(|setting| model.capabilities.supports(setting));
         assert!(all, "{:04x}", model.pid);
     }
+}
+
+#[test]
+fn capabilities_support_only_their_listed_settings() {
+    let sidetone_only = Capabilities::new(&[Setting::Sidetone]);
+    let supported: Vec<Setting> = Setting::ALL
+        .into_iter()
+        .filter(|setting| sidetone_only.supports(*setting))
+        .collect();
+    assert_eq!(supported, [Setting::Sidetone]);
 }
 ```
 
@@ -2710,9 +2881,12 @@ pub struct Capabilities {
 }
 
 impl Capabilities {
-    pub const ALL_SETTINGS: Self = Self {
-        settings: &Setting::ALL,
-    };
+    pub const ALL_SETTINGS: Self = Self::new(&Setting::ALL);
+
+    #[must_use]
+    pub const fn new(settings: &'static [Setting]) -> Self {
+        Self { settings }
+    }
 
     #[must_use]
     pub fn supports(self, setting: Setting) -> bool {
@@ -2737,20 +2911,31 @@ pub enum ModelLookup {
 
 impl Model {
     pub const SUPPORTED: [Self; 4] = [
-        Self::with_all_settings(0x2232, "Arctis Nova 5", Support::Verified),
-        Self::with_all_settings(0x2253, "Arctis Nova 5X", Support::Verified),
-        Self::with_all_settings(0x2255, "Arctis Nova 5X", Support::Untested),
-        Self::with_all_settings(0x2264, "Arctis Nova 5X", Support::Untested),
-    ];
-
-    const fn with_all_settings(pid: u16, name: &'static str, support: Support) -> Self {
         Self {
-            pid,
-            name,
-            support,
+            pid: 0x2232,
+            name: "Arctis Nova 5",
+            support: Support::Verified,
             capabilities: Capabilities::ALL_SETTINGS,
-        }
-    }
+        },
+        Self {
+            pid: 0x2253,
+            name: "Arctis Nova 5X",
+            support: Support::Verified,
+            capabilities: Capabilities::ALL_SETTINGS,
+        },
+        Self {
+            pid: 0x2255,
+            name: "Arctis Nova 5X",
+            support: Support::Untested,
+            capabilities: Capabilities::ALL_SETTINGS,
+        },
+        Self {
+            pid: 0x2264,
+            name: "Arctis Nova 5X",
+            support: Support::Untested,
+            capabilities: Capabilities::ALL_SETTINGS,
+        },
+    ];
 
     #[must_use]
     pub fn lookup(pid: u16) -> ModelLookup {
@@ -2787,8 +2972,9 @@ pub use reply::{Reply, decode_reply};
 - [ ] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test model --test udev_rule && cargo xtask check-rules`
-Expected: PASS, model 7 tests, udev_rule 3 tests; check-rules clean (the `.rules` file uses the hash syntax and has
-no comment).
+Expected: PASS, model 8 tests, udev_rule 3 tests; check-rules clean (the `.rules` file uses the hash syntax and has
+no comment). `SUPPORTED` is written as struct literals rather than through a `const fn` helper: a helper called only
+in a `const` item runs at compile time, so its body would show as uncovered lines in Task 13.
 
 - [ ] **Step 5: Commit**
 
@@ -2800,82 +2986,7 @@ git push
 
 ---
 
-### Task 11: Decoders never panic and ignore stale tails
-
-**Files:**
-- Create: `crates/core/tests/never_panics.rs`
-
-- [ ] **Step 1: Write the tests**
-
-`crates/core/tests/never_panics.rs`:
-
-```rust
-use arctis_core::protocol::command::Query;
-use arctis_core::protocol::eq_wire::decode_curve;
-use arctis_core::protocol::event::decode_event;
-use arctis_core::protocol::reply::decode_reply;
-use proptest::collection::vec;
-use proptest::prelude::*;
-use proptest::sample::select;
-
-const DOCUMENTED_REPLIES: [(Query, &[u8]); 4] = [
-    (Query::Status, &[0xB0, 0x03, 0x03, 0x25, 0x03]),
-    (Query::Firmware, b"\x100.01.010.000............000000001.07"),
-    (Query::Ux, &[0xA0, 0x1e, 0x0a]),
-    (Query::Wireless, &[0x36, 0x01]),
-];
-
-proptest! {
-    #[test]
-    fn decode_reply_never_panics(query in select(Query::ALL.to_vec()), mut bytes in vec(any::<u8>(), 0..=64)) {
-        if let Some(first) = bytes.first_mut() {
-            *first = query.id();
-        }
-        let _ = decode_reply(query, &bytes);
-    }
-
-    #[test]
-    fn decode_event_never_panics(bytes in vec(any::<u8>(), 0..=64)) {
-        let _ = decode_event(&bytes);
-    }
-
-    #[test]
-    fn decode_curve_never_panics(bytes in vec(any::<u8>(), 0..=64)) {
-        let _ = decode_curve(&bytes);
-    }
-
-    #[test]
-    fn stale_tails_never_change_a_reply(index in 0..DOCUMENTED_REPLIES.len(), tail in vec(any::<u8>(), 64)) {
-        let (query, prefix) = DOCUMENTED_REPLIES[index];
-        let mut bytes = prefix.to_vec();
-        bytes.extend_from_slice(&tail[prefix.len()..]);
-        prop_assert!(decode_reply(query, prefix).is_ok());
-        prop_assert_eq!(decode_reply(query, &bytes), decode_reply(query, prefix));
-    }
-}
-```
-
-The audio reply has no tail (its documented length is the whole 64 bytes), so it is not in the table; its stale-tail
-case is covered by the goldens whose bytes after `[63]` do not exist.
-
-- [ ] **Step 2: Run them**
-
-Run (toolbox): `cargo test -p arctis-core --test never_panics`
-Expected: PASS, 4 tests. A failure here is a codec bug: fix the decoder in `crates/core/src/protocol/`, not the
-test. A panic case is shrunk by proptest; add it as a named regression case in `crates/core/tests/reply.rs` or
-`crates/core/tests/event.rs` before fixing.
-
-- [ ] **Step 3: Commit**
-
-```bash
-git add crates/core/tests/never_panics.rs
-git commit -m "test(core): check decoders against arbitrary frames"
-git push
-```
-
----
-
-### Task 12: Freeze the device and audio messages
+### Task 11: Freeze the device and audio messages
 
 The variants and their field names are the contract of design §3.1, §3.2 and device §6. The test constructs every
 variant with named fields and matches each enum exhaustively with no wildcard, so adding, removing or renaming a
@@ -2970,7 +3081,7 @@ fn stream() -> StreamInfo {
         ids: AppIdentifiers::new(Some("org.mozilla.firefox"), None, Some("firefox")),
         name: "Firefox".to_owned(),
         running: true,
-        path: SoundPath::Dongle,
+        path: Some(SoundPath::Dongle),
     }
 }
 
@@ -3217,7 +3328,7 @@ pub struct StreamInfo {
     pub ids: AppIdentifiers,
     pub name: String,
     pub running: bool,
-    pub path: SoundPath,
+    pub path: Option<SoundPath>,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq, Hash)]
@@ -3227,14 +3338,17 @@ impl AppIdentifiers {
     #[must_use]
     pub fn new(portal_app_id: Option<&str>, application_id: Option<&str>, binary: Option<&str>) -> Self {
         let binary = binary.map(str::to_lowercase);
-        let candidates = [portal_app_id, application_id, binary.as_deref()];
-        let mut ids: Vec<String> = Vec::new();
-        for id in candidates.into_iter().flatten().filter(|id| !id.is_empty()) {
-            if !ids.iter().any(|known| known == id) {
-                ids.push(id.to_owned());
-            }
+        let mut ids = Self(Vec::new());
+        for id in [portal_app_id, application_id, binary.as_deref()].into_iter().flatten() {
+            ids.push_new(id);
         }
-        Self(ids)
+        ids
+    }
+
+    fn push_new(&mut self, id: &str) {
+        if !id.is_empty() && !self.0.iter().any(|known| known == id) {
+            self.0.push(id.to_owned());
+        }
     }
 
     #[must_use]
@@ -3288,7 +3402,7 @@ git push
 
 ---
 
-### Task 13: Architecture page for the protocol area
+### Task 12: Architecture page for the protocol area
 
 **Files:**
 - Create: `docs/architecture/protocol.md`
@@ -3387,7 +3501,7 @@ flowchart LR
 | Status (B0) | 5 | link, battery, charging |
 | Firmware (10) | 37 | receiver slot, unused slot, headset slot (fwupd digit pairs; zeros mean unreachable) |
 | Audio (20) | 64 | ten bands, mic volume, sidetone, volume limiter |
-| Ux (A0) | 3 | automatic power off, mute light (unknown raw reads as Medium) |
+| Ux (A0) | 3 | automatic power off (an unlisted minute count reads as the nearest choice), mute light (unknown raw reads as Medium) |
 | Wireless (36) | 2 | wireless mode |
 
 Band layout (equalizer wire format): frequency u16 little endian, kind 1 to 5, gain byte 20 + 2·dB, Q × 1000 u16
@@ -3423,12 +3537,13 @@ flowchart LR
 | What | Where |
 |---|---|
 | SP0 captures, one 64-byte frame per file | `crates/core/tests/golden/` |
-| Every golden decodes or encodes to its expectation | `crates/core/tests/golden_frames.rs` |
+| Golden loader shared by the golden tests | `crates/core/tests/support/mod.rs` |
+| The golden set, captured curves and setter frames | `crates/core/tests/golden_frames.rs` |
+| Every captured reply decodes to its expectation | `crates/core/tests/golden_replies.rs` |
 | Command bytes, readbacks, allow-list proptest | `crates/core/tests/command.rs` |
-| Band encoding, round-trip proptest | `crates/core/tests/eq_wire.rs`, `crates/core/tests/strategies/mod.rs` |
-| Replies, firmware slots | `crates/core/tests/reply.rs` |
-| Events | `crates/core/tests/event.rs` |
-| No panic on any bytes, stale tails ignored | `crates/core/tests/never_panics.rs` |
+| Band encoding, round-trip and no-panic proptests | `crates/core/tests/eq_wire.rs`, `crates/core/tests/strategies/mod.rs` |
+| Replies, firmware slots, no-panic and stale-tail proptests | `crates/core/tests/reply.rs` |
+| Events, no-panic proptest | `crates/core/tests/event.rs` |
 | Models and the udev rule | `crates/core/tests/model.rs`, `crates/core/tests/udev_rule.rs` |
 | Value ranges | `crates/core/tests/values.rs`, `crates/core/tests/status.rs`, `crates/core/tests/eq_types.rs`, `crates/core/tests/headset_settings.rs` |
 | Frozen message contract | `crates/core/tests/messages.rs` |
@@ -3462,44 +3577,56 @@ git push
 
 ---
 
-### Task 14: Full verification and 100 % line coverage
+### Task 13: Full verification and 100 % line coverage
 
 **Files:** none new unless a gap is found.
 
-- [ ] **Step 1: Install the coverage tool in the toolbox (once)**
+- [ ] **Step 1: Install the coverage and mutation tools in the toolbox (once)**
 
 Run (toolbox): `command -v llvm-profdata || sudo dnf install -y llvm`
-Run (toolbox): `cargo llvm-cov --version || cargo install cargo-llvm-cov --locked`
+Run (toolbox): `export PATH="$HOME/.cargo/bin:$PATH" && (cargo llvm-cov --version || cargo install cargo-llvm-cov --locked)`
+Run (toolbox): `export PATH="$HOME/.cargo/bin:$PATH" && (cargo mutants --version || cargo install cargo-mutants --locked)`
+
+Fedora's `rustc` is built against the system LLVM (22.1.8 in the `arctis` toolbox), so the `llvm` package's
+`llvm-cov` and `llvm-profdata` read its profiles; `rustup` is not available and not needed.
 
 - [ ] **Step 2: Measure coverage of `arctis-core`**
 
 Run (toolbox):
-`LLVM_COV=$(command -v llvm-cov) LLVM_PROFDATA=$(command -v llvm-profdata) cargo llvm-cov --package arctis-core --show-missing-lines`
+`export PATH="$HOME/.cargo/bin:$PATH" && LLVM_COV=$(command -v llvm-cov) LLVM_PROFDATA=$(command -v llvm-profdata) cargo llvm-cov --package arctis-core --show-missing-lines`
 
 Expected: the rows for `bounded.rs`, `eq/curve.rs`, `eq/filter.rs`, every file under `settings/`, `protocol/` and
-`messages/` show 100.00 % in the Lines column and no missing lines. If the local LLVM does not match rustc's
-profile format, push and read the same table from the CI `test` job log
-(`gh run view --log --job <test job id> | grep -A40 Filename`).
+`messages/` show 100.00 % in the Lines column and no "Uncovered Lines" section. The Regions column of
+`protocol/firmware.rs` stays below 100 % (the `?` early returns of `dotted` and `packed` share lines with taken
+paths); the criterion is lines. If the local LLVM does not match rustc's profile format, push and read the same
+table from the CI `test` job log (`gh run view --log --job <test job id> | grep -A40 Filename`).
 
 For any uncovered line: if it is reachable, add a named test for it in the matching test file; if it is a derive
 line, exercise that type in an `assert_eq!` or drop the unused derive; if it is unreachable, restructure the code so
-the branch does not exist. Never exclude files from the measurement.
+the branch does not exist (as `Curve::from_slots` does for `decode_curve`). Never exclude files from the
+measurement.
 
-- [ ] **Step 3: Full sweep**
+- [ ] **Step 3: Mutation check of the SP2 code**
 
-```bash
-cd /home/marcelo/Desenvolvimento/arctis-wt/sp2
-cargo fmt --all --check
-```
+The nightly job runs `cargo mutants --package arctis-core`; a survivor in SP2 code would turn it red.
 
 Run (toolbox):
-`cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure`
+`export PATH="$HOME/.cargo/bin:$PATH" && cargo mutants --package arctis-core --test-workspace=false -j 4 --output "$HOME/.cache/arctis-sp2-mutants"`
 
-Run (toolbox): `PROPTEST_CASES=2560 cargo test -p arctis-core --test eq_wire --test command --test never_panics`
+Expected: `0 missed` (about 160 mutants, under a minute). The output goes outside the worktree because
+`mutants.out/` is not in `.gitignore` and `check-rules` rejects its `.log` and `.diff` files. For each `MISSED` line,
+add a named test that fails under that mutation to the matching test file, then rerun.
+
+- [ ] **Step 4: Full sweep**
+
+Run (toolbox):
+`cargo fmt --all --check && cargo clippy --workspace --all-targets -- -D warnings && cargo test --workspace --exclude arctis-ui && cargo xtask check-rules && cargo xtask check-doc-paths && cargo xtask check-pure`
+
+Run (toolbox): `PROPTEST_CASES=2560 cargo test -p arctis-core --test eq_wire --test command --test reply --test event`
 
 Expected: everything passes; check-rules prints no line-limit warning for SP2 files.
 
-- [ ] **Step 4: Commit fixes, if any**
+- [ ] **Step 5: Commit fixes, if any**
 
 ```bash
 git add -A crates/core docs
@@ -3511,7 +3638,7 @@ git push
 
 ---
 
-### Task 15: Pull request
+### Task 14: Pull request
 
 - [ ] **Step 1: Rebase on main**
 
@@ -3522,7 +3649,7 @@ git rebase origin/main
 ```
 
 If SP3 has landed `crates/core/src/eq/` meanwhile, resolve as Task 4 says (SP3's file wins; adapt imports and
-names), rerun Task 14 Step 3, then `git push --force-with-lease`.
+names), rerun Task 13 Step 4, then `git push --force-with-lease`.
 
 - [ ] **Step 2: Open the PR**
 
@@ -3553,12 +3680,15 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
    `FilterKind`, `Filter`, `Curve`, `TooManyFilters`). `Command::SetEqualizer(Curve)`,
    `HeadsetSettings::equalizer` and `AudioCommand::{InsertEqualizer, Retarget}(Curve)` are frozen by SP2, so the
    type must exist here. They carry data only; SP3 adds `curve::equivalent`, envelope validation, response and DSP
-   on top. If SP3 lands first, its definitions win and SP2 adapts (Task 4, Task 15).
+   on top. If SP3 lands first, its definitions win and SP2 adapts (Task 4, Task 14).
 2. **A disabled band is the absence of a filter.** The glossary gives a filter an "enabled" flag; on the wire a
    disabled band (frequency 20001) carries no frequency, so `Curve` keeps only the enabled filters, in band order,
-   at most ten. Gaps between enabled bands close up on decode (the edges capture: 9 filters). Missing filters encode
-   as `21 4e 01 14 e8 03`, the bytes the dongle reported in the kinds capture. A preset's enabled flag (editor,
-   ui §3) belongs to SP3's preset type, which builds a `Curve` from its enabled filters.
+   at most ten. Gaps between enabled bands close up on decode (the edges capture: 9 filters), through the
+   infallible `Curve::from_slots`. Missing filters encode as `21 4e 01 14 e8 03`, the bytes the dongle reported in
+   the kinds capture. The other bytes of a disabled band are not kept, so `cmd_33_edges.hex` (a disabled band with
+   gain byte `00`) decodes but does not re-encode bit-exact; `curve::equivalent` (device §1) already treats all
+   disabled bands as equal. A preset's enabled flag (editor, ui §3) belongs to SP3's preset type, which builds a
+   `Curve` from its enabled filters.
 3. **`Gain` and `QFactor` hold the device units** (gain byte 0..40 = −10..+10 dB in 0.5 dB steps; Q × 1000 in
    200..10000), so the codec is lossless over the whole envelope and `Curve` can derive `Eq`. Conversions to dB and
    Q as floats are SP3's.
@@ -3572,8 +3702,11 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
    "speed mode", so the other value is `Standard`.
 7. **Mute light raw bytes other than 0, 1, 4, 10 read as `Medium`**, which is what the firmware does
    (hid-protocol §5.2), instead of failing the whole UX readback.
-8. **`AutoPowerOff` accepts only the ten choices** of the GSettings enum (0, 1, 5, 10, 15, 30, 45, 60, 75, 90). A
-   readback with another value is `DecodeError::InvalidValue`; the official app offers the same list.
+8. **`AutoPowerOff` accepts only the ten choices** of the GSettings enum (0, 1, 5, 10, 15, 30, 45, 60, 75, 90) at
+   construction. A readback or event with another minute count (HeadsetControl accepts any 0..255, hid-protocol
+   §5.2) reads as the nearest choice (`AutoPowerOff::nearest`, ties to the shorter delay) instead of failing the
+   whole `A0` readback, which would leave Syncing unable to finish on such a headset. The headset is not rewritten
+   for it: adoption copies the nearest choice into desired, and reconcile compares decoded values.
 9. **Status replies are parsed to byte 4** (link, battery, charging). The chat-mix bytes 5 and 6 are not used: chat
    mix is out of scope (design §1); event 45 still decodes to `DeviceEvent::ChatMix` because the spec lists it.
 10. **Firmware**: slot B is ignored; a slot that decodes to 0.0.0 or holds non-digits is `None` (the headset slot is
@@ -3584,19 +3717,28 @@ Decisions taken where the spec is silent or ambiguous; each is the simplest opti
     SinkKind, via_equalizer, via_easy_effects }` (the routing table cases of audio §1),
     `StreamInfo { ids, name, running, path }` (audio §4 diagram), `AppIdentifiers` (ordered portal id,
     `application.id`, lowercased binary; first one is the app key), and `SoundPath::{Dongle, Bluetooth}` for the
-    glossary's "path" (named to avoid `std::path::Path`).
-13. **`Capabilities` is the list of supported `Setting`s**; every model supports all seven today (ADR 0013 needs the
-    type; no model lacks a row yet).
+    glossary's "path" (named to avoid `std::path::Path`). `StreamInfo::path` is an `Option`: `None` is a stream
+    that plays to neither Nova 5 path. Such a stream is never a candidate for the ruled set, but seen apps
+    (audio §4: "the last 50 apps seen playing") may still record it; a non-optional path would freeze that choice
+    out of the contract SP6 and SP7 build against.
+13. **`Capabilities` is the list of supported `Setting`s** with a `const fn new`; every model supports all seven
+    today (ADR 0013 needs the type; no model lacks a row yet). The test builds a partial list through `new`, so a
+    `supports` that always answers true does not survive mutation testing.
 14. **Model names**: 0x2232 "Arctis Nova 5"; 0x2253, 0x2255, 0x2264 "Arctis Nova 5X". 0x2232 and 0x2253 are
     `Support::Verified` (upstream-verified per device §1), the other two `Support::Untested`.
 15. **The udev rule is created by SP2** (`data/udev/70-arctis-companion.rules`, `SUBSYSTEM=="hidraw"` +
     `TAG+="uaccess"` per supported PID) because SP2's criterion tests it; SP14 installs it and documents it.
 16. **`0x22` capture** decodes through `eq_wire::decode_curve` only: there is no `Query` for `0x22` (ADR 0004).
 17. **Tests are integration tests** in `crates/core/tests/` against the public API; `Frame::new` and the decoding
-    helpers stay crate-private. Golden checks live in one file so the hex loader is not duplicated.
+    helpers stay crate-private. The golden checks are split in two files (`golden_frames.rs`: the set, curves,
+    setter frames; `golden_replies.rs`: replies) sharing one loader in `tests/support/mod.rs`, because one file
+    reaches about 410 lines after `cargo fmt`. The "never panics" and stale-tail properties live next to each
+    decoder's tests (`eq_wire.rs`, `reply.rs`, `event.rs`) and are written before the decoder, instead of a
+    separate test-after file.
 18. **100 % line coverage is verified with `cargo llvm-cov` locally** (or from the CI log), per file for the SP2
     modules. The CI gate stays at 90 % for the whole crate; no per-file gate is added, because the modules of later
-    sub-projects would need exclusions.
+    sub-projects would need exclusions. `cargo mutants` runs locally once (Task 13) so the nightly job starts with no
+    survivor in SP2 code; it is not an SP2 acceptance criterion.
 19. **Captures moved** from `docs/research/captures/` to `crates/core/tests/golden/`; the links in
     `hardware-findings.md` and `hid-protocol.md` point to the new place.
 20. **No serde in SP2.** Nothing here is persisted as JSON; SP3 and SP8 add serde where they store data.
