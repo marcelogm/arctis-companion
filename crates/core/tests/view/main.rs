@@ -2,6 +2,7 @@ mod support;
 
 mod app_presets;
 mod battery_chart;
+mod catalogue;
 mod eq_editor;
 mod equalizer_rows;
 mod headset_page;
