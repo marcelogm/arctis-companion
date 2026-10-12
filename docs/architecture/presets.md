@@ -12,7 +12,7 @@ flowchart TD
     P -- "row: win.show-preset id" --> E["EqEditorPage"]
     P -- "Import…" --> F["PresetFiles::open"]
     P -- "New Preset, Ctrl+N: win.new-preset" --> E
-    E --> G["ResponseGraph"]
+    E --> G["EqGraph: EqHandle × bands"]
     E --> B["EqBandRow × up to 10"]
     E -- "Duplicate · Rename · Export · Delete · Preview" --> A["header actions"]
     A -- "Export…" --> S["PresetFiles::save"]
@@ -24,7 +24,10 @@ flowchart TD
 | Editor page | `crates/ui/src/eq_editor_page.rs::EqEditorPage`, `crates/core/src/view/eq_editor.rs::eq_editor_for` | `crates/ui/resources/eq_editor_page.blp` |
 | Header actions | `crates/ui/src/eq_editor_page/header.rs::rename_dialog` and the `EqEditorPage` methods in that file | none |
 | Band row | `crates/ui/src/eq_band_row.rs::EqBandRow`, `crates/core/src/view/eq_editor.rs::BandModel` | `crates/ui/resources/eq_band_row.blp` |
-| Response graph | `crates/ui/src/response_graph.rs::ResponseGraph`, `crates/core/src/view/eq_editor.rs::x_fraction`, `crates/core/src/view/eq_editor.rs::y_fraction`, `crates/core/src/eq/response.rs::response` | none |
+| Graph model: series, level range, handles | `crates/core/src/view/eq_graph.rs::graph`, `crates/core/src/view/eq_graph.rs::GraphModel`, `crates/core/src/view/eq_graph.rs::Series`, `crates/core/src/view/eq_graph.rs::LevelRange`, `crates/core/src/eq/response.rs::response` | none |
+| Pixels, ticks, zones, hit test, drag and key edits | `crates/core/src/view/eq_plot.rs::Plot`, `crates/core/src/view/eq_plot.rs::frequency_ticks`, `crates/core/src/view/eq_plot.rs::level_ticks`, `crates/core/src/view/eq_plot.rs::zone_label_rows`, `crates/core/src/view/eq_plot.rs::hit_handle`, `crates/core/src/view/eq_plot.rs::drag_edit`, `crates/core/src/view/eq_plot.rs::nudged` | none |
+| Graph widget and handles | `crates/ui/src/eq_graph.rs::EqGraph`, `crates/ui/src/eq_graph.rs::GraphAction`, `crates/ui/src/eq_handle.rs::EqHandle`, drawing in `crates/ui/src/eq_graph/draw.rs`, input in `crates/ui/src/eq_graph/input.rs` | none |
+| Graph to page | `crates/ui/src/eq_editor_page/graph.rs` | none |
 | Page services | `crates/ui/src/services.rs::Services`, `crates/ui/src/toasts.rs::button_toast` | none |
 | File chooser | `crates/ui/src/preset_files.rs::PresetFiles`, `crates/ui/src/preset_files.rs::PortalFiles` | none |
 | Window glue | `crates/ui/src/window.rs::Window` (`show_preset`, `set_preset_files`) | `crates/ui/resources/window.blp` |
@@ -50,6 +53,10 @@ sequenceDiagram
     Note over S: Companion saves the file, applies live,<br/>throttles the headset to one write per 250 ms
 ```
 
+A drag on the graph is a `GraphAction::Preview` per motion, rendered from a dragged copy without saving, and one
+`GraphAction::Commit` on release that goes through `WorkingCopy::apply` like a row edit; wheel, keys, double click and
+Delete commit at once.
+
 `WorkingCopy` owns the rules the widget must not: a published copy replaces the working copy, the first edit of a
 burst is remembered for Undo, `burst_ended` (toast gone) opens the next burst, `undo` returns the preset as it was
 before the burst. The page keeps the toast handle only to dismiss it when another preset opens or the preset is
@@ -60,7 +67,7 @@ drops that row itself and focuses the next band, so no other band inherits its e
 | Concern | Code |
 |---|---|
 | Working copy, bursts, Undo | `crates/core/src/view/preset_edits.rs::WorkingCopy`, `crates/core/src/view/preset_edits.rs::Applied` |
-| One widget change to an edited preset | `crates/core/src/view/preset_edits.rs::BandEdit`, `crates/core/src/view/preset_edits.rs::apply_edit`, `crates/core/src/view/preset_edits.rs::add_band`, `crates/core/src/view/preset_edits.rs::remove_band`, `crates/core/src/view/preset_edits.rs::renamed` |
+| One widget change to an edited preset | `crates/core/src/view/preset_edits.rs::BandEdit`, `crates/core/src/view/preset_edits.rs::apply_edit`, `crates/core/src/view/preset_edits.rs::add_band`, `crates/core/src/view/preset_edits.rs::add_band_at`, `crates/core/src/view/preset_edits.rs::remove_band`, `crates/core/src/view/preset_edits.rs::renamed` |
 | Rounding to the device grid | `crates/core/src/eq/filter.rs::Hertz`, `crates/core/src/eq/filter.rs::Gain`, `crates/core/src/eq/filter.rs::Q` |
 | Duplicate of a built-in | `crates/core/src/view/preset_edits.rs::copy_name`, `crates/core/src/view/preset_edits.rs::duplicate` |
 | New preset from the Flat curve, first free name | `crates/core/src/view/preset_edits.rs::new_preset`, `crates/core/src/view/preset_edits.rs::new_preset_name`, `crates/ui/src/window.rs::Window` (`new_preset`), `crates/ui/src/eq_editor_page.rs::EqEditorPage::open_new` |
@@ -108,10 +115,11 @@ pick of the picked path; when it stops being `Picked` the page turns the toggle 
 
 ## Tests
 
-Pure: `crates/core/tests/view/eq_editor.rs`, `crates/core/tests/view/preset_edits.rs`,
+Pure: `crates/core/tests/view/eq_editor.rs`, `crates/core/tests/view/eq_graph.rs`, `crates/core/tests/view/eq_plot.rs`, `crates/core/tests/view/preset_edits.rs`,
 `crates/core/tests/view/preset_files.rs`. Widgets (`crates/ui/tests/widgets/main.rs`):
 `crates/ui/tests/widgets/presets_page.rs`, `crates/ui/tests/widgets/eq_editor_page.rs` (keyboard-only editing,
 undo toast), `crates/ui/tests/widgets/preset_actions.rs` (Duplicate, Rename, Export, Delete, Preview),
 `crates/ui/tests/widgets/new_preset.rs` (New Preset button and Ctrl+N),
-`crates/ui/tests/widgets/eq_band_row.rs`, `crates/ui/tests/widgets/response_graph.rs`, with the fake file chooser
+`crates/ui/tests/widgets/eq_band_row.rs`, `crates/ui/tests/widgets/eq_graph.rs` (drag, wheel, keys, double click,
+drawing), `crates/ui/tests/widgets/eq_graph_editing.rs` (live row, one save per drag, row and handle in sync), with the fake file chooser
 `crates/ui/tests/widgets/support.rs::FakeFiles`.

@@ -7,12 +7,15 @@ use std::fmt::Debug;
 use arctis_core::battery::sample::{Reading, UnixSeconds};
 use arctis_core::battery::series::Window;
 use arctis_core::companion::alerts::Alerts;
+use arctis_core::eq::FilterKind;
 use arctis_core::eq::library::library;
 use arctis_core::protocol::status::{Charging, Link};
 use arctis_core::settings::values::AutoPowerOff;
 use arctis_core::view::app_presets::{add_rule_dialog, app_presets};
 use arctis_core::view::battery_chart::battery_page;
 use arctis_core::view::eq_editor::{eq_editor_for, kind_items};
+use arctis_core::view::eq_graph::handle_label;
+use arctis_core::view::eq_plot::zones;
 use arctis_core::view::equalizer_rows::equalizer_group;
 use arctis_core::view::headset_page::{banner, headset_page};
 use arctis_core::view::headset_rows::{auto_power_off_text, sidetone_text};
@@ -23,7 +26,7 @@ use arctis_core::view::presets::{deleted_toast, presets_page};
 use arctis_core::view::text::{Arg, Text, preset_title};
 
 use crate::headset_page::{PHASES, ROUTES};
-use crate::support::{percent, rules, snapshot, with};
+use crate::support::{filter, percent, rules, snapshot, with};
 use debug_msgids::msgids_in;
 use po_file::Catalogue;
 
@@ -154,7 +157,12 @@ fn preset_dumps() -> Vec<String> {
                 dump(&export_failed(preset)),
             ]
         })
-        .chain([dump(&new_preset_name(1)), dump(&new_preset_name(2))])
+        .chain([
+            dump(&new_preset_name(1)),
+            dump(&new_preset_name(2)),
+            dump(&zones()),
+            dump(&handle_label(filter(FilterKind::LowPass, 8_000, 0, 707), 0)),
+        ])
         .collect()
 }
 
@@ -228,6 +236,8 @@ fn the_census_reaches_every_family_of_views() {
         "Off",
         "Headset Battery Low",
         "Custom Preset {number}",
+        "Presence",
+        "Band {number}, {kind}, {frequency}, Q {q}",
     ] {
         assert!(census.contains(msgid), "{msgid} not reached: {census:#?}");
     }

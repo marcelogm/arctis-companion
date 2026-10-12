@@ -114,7 +114,7 @@ crates/core/tests/    golden/*.hex udev_rule.rs end_to_end.rs
 crates/hid/src/       discovery.rs port.rs wake.rs worker.rs handle.rs
 crates/audio/src/     registry.rs outputs.rs streams.rs links.rs eq_sink.rs volume.rs worker.rs handle.rs
 crates/ui/src/        window.rs headset_page.rs headset_status.rs scale_row.rs status_pages.rs text.rs
-                      permission_dialog.rs presets_page.rs eq_editor_page.rs eq_band_row.rs response_graph.rs
+                      permission_dialog.rs presets_page.rs eq_editor_page.rs eq_band_row.rs eq_graph.rs
                       app_presets_page.rs add_rule_dialog.rs battery_page.rs battery_chart.rs
                       preferences_dialog.rs
 crates/ui/resources/  *.blp style.css

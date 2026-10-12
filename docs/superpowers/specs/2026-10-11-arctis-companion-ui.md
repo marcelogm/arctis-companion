@@ -86,12 +86,19 @@ from (SP0 captures `B0[1]` and `B9` while pressing QuickSwitch with both links u
   buttons: New Preset (`list-add-symbolic`, also Ctrl+N anywhere in the window: a custom copy of the Flat curve named
   "Custom Preset", "Custom Preset 2", …, opened in the editor) and Import (APO or JSON through the file chooser
   portal).
-- `EqEditorPage` (`AdwNavigationPage`): a read-only `ResponseGraph` (snapshot drawing, log axis 20 Hz–20 kHz, ±10 dB
-  grid, curve from `core::eq::response`, accessible description from `core::view::eq_editor`, which calls the
-  headset curve "nominal") above a list of up to 10 `EqBandRow`s (`AdwExpanderRow` titled "250 Hz · +2.0 dB"
+- `EqEditorPage` (`AdwNavigationPage`): an interactive `EqGraph` (snapshot drawing, log axis 20 Hz–20 kHz labelled at
+  20, 50, 100 … 20k with fainter minor lines, ±12 dB labelled every 3 dB with 0 dB emphasised, shaded reference zones
+  Sub-bass … Brilliance whose labels take one row, two staggered rows or hide when they do not fit, the curve from
+  `core::eq::response` filled to 0 dB, accessible description from `core::view::eq_graph`, which calls the headset
+  curve "nominal"; extra curves are data, a list of series with a line style, a colour role and a label, and the
+  vertical range is a `LevelRange`) above a list of up to 10 `EqBandRow`s (`AdwExpanderRow` titled "250 Hz · +2.0 dB"
   containing type `AdwComboRow`, frequency `AdwSpinRow`, gain `AdwSpinRow` step 0.5, Q `AdwSpinRow`, enabled
   `AdwSwitchRow`). The gain row is insensitive for low-pass and high-pass. Add Band / Remove Band.
-- Rows are the only editing model; keyboard and screen readers work by construction. Graph dragging is left out.
+- The graph has one numbered, focusable handle per band at (frequency, gain), 0 dB for pass filters. Dragging moves
+  frequency and gain, shown live in the curve and the row and saved once on release; the wheel over a handle changes Q;
+  a double click on empty space adds a peak there; Delete, Backspace or the context menu removes the band. Arrows nudge
+  a semitone or 0.5 dB, Page Up/Down or +/− change Q. Picking a handle expands its row; expanding a row selects its
+  handle. Built-in presets show handles that select but never move. Nothing animates.
 - Built-ins are read-only with a "Duplicate" header button. Custom presets save instantly (no Save button).
   Header menu: Rename, Export, Delete (undo toast naming its uses, audio §3).
 - Preview: a header toggle "Preview" (shown when a path is available) makes the edited preset the manual pick of

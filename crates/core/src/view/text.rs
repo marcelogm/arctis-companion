@@ -1,5 +1,5 @@
 use crate::battery::sample::UnixSeconds;
-use crate::eq::filter::{Gain, Hertz};
+use crate::eq::filter::{Gain, Hertz, Q};
 use crate::eq::preset::{Preset, PresetKind};
 use crate::settings::values::Percent;
 
@@ -8,6 +8,7 @@ pub enum Arg {
     Percent(Percent),
     Decibels(Gain),
     Hertz(Hertz),
+    Quality(Q),
     Number(u32),
     Time(UnixSeconds),
     Msgid(String),

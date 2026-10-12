@@ -8,7 +8,7 @@ msgid ""
 msgstr ""
 "Project-Id-Version: arctis-companion\n"
 "Report-Msgid-Bugs-To: \n"
-"POT-Creation-Date: 2026-10-12 18:14-0300\n"
+"POT-Creation-Date: 2026-10-12 18:29-0300\n"
 "PO-Revision-Date: YEAR-MO-DA HO:MI+ZONE\n"
 "Last-Translator: FULL NAME <EMAIL@ADDRESS>\n"
 "Language-Team: LANGUAGE <LL@li.org>\n"
@@ -183,13 +183,6 @@ msgid "Low-Pass"
 msgstr ""
 
 #: crates/core/src/view/eq_editor.rs
-#, rust-format
-msgid "Nominal frequency response of {preset}, with {n} active band"
-msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
-msgstr[0] ""
-msgstr[1] ""
-
-#: crates/core/src/view/eq_editor.rs
 msgid "Peak"
 msgstr ""
 
@@ -201,6 +194,51 @@ msgstr ""
 #: crates/core/src/view/eq_editor.rs
 #, rust-format
 msgid "{frequency} · {kind}"
+msgstr ""
+
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid "Band {number}, {kind}, {frequency}, Q {q}"
+msgstr ""
+
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid "Band {number}, {kind}, {frequency}, {gain}, Q {q}"
+msgstr ""
+
+#: crates/core/src/view/eq_graph.rs
+#, rust-format
+msgid "Nominal frequency response of {preset}, with {n} active band"
+msgid_plural "Nominal frequency response of {preset}, with {n} active bands"
+msgstr[0] ""
+msgstr[1] ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Bass"
+msgstr ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Brilliance"
+msgstr ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "High mids"
+msgstr ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Low mids"
+msgstr ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Mids"
+msgstr ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Presence"
+msgstr ""
+
+#: crates/core/src/view/eq_plot.rs
+msgid "Sub-bass"
 msgstr ""
 
 #: crates/core/src/view/equalizer_rows.rs
@@ -822,6 +860,14 @@ msgstr ""
 
 #: crates/ui/src/eq_editor_page/header.rs
 msgid "_Rename"
+msgstr ""
+
+#: crates/ui/src/eq_graph/input.rs
+msgid "_Remove Band"
+msgstr ""
+
+#: crates/ui/src/eq_handle.rs
+msgid "Arrow keys change frequency and gain, Page Up and Page Down change Q"
 msgstr ""
 
 #: crates/ui/src/preset_files.rs
