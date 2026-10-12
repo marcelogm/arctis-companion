@@ -2,7 +2,7 @@ use std::path::{Path, PathBuf};
 
 use arctis_app::application::APP_ID;
 
-const SUFFIXES: [&str; 4] = [".desktop", ".metainfo.xml", ".gschema.xml", ".service.in"];
+const SUFFIXES: [&str; 4] = [".desktop.in", ".metainfo.xml.in", ".gschema.xml", ".service.in"];
 
 fn data_dir() -> PathBuf {
     Path::new(env!("CARGO_MANIFEST_DIR")).join("../../data")
