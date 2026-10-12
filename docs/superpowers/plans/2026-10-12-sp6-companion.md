@@ -4339,7 +4339,7 @@ git push
 - Modify: `crates/core/src/companion/mod.rs`
 - Test: `crates/core/tests/companion/engines.rs`, `crates/core/tests/companion/main.rs`
 
-- [ ] **Step 1: Rebase on main**
+- [x] **Step 1: Rebase on main**
 
 ```bash
 git fetch origin
@@ -4349,7 +4349,7 @@ git push --force-with-lease
 
 Resolve `lib.rs`, `testkit/mod.rs` and `Cargo.toml` by keeping both sides (Conventions).
 
-- [ ] **Step 2: Write the failing tests**
+- [x] **Step 2: Write the failing tests**
 
 Add `mod engines;` to `crates/core/tests/companion/main.rs`.
 
@@ -4524,12 +4524,12 @@ fn a_reading_already_without_a_link_needs_no_closing_row() {
 }
 ```
 
-- [ ] **Step 3: Run the tests to see them fail**
+- [x] **Step 3: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test companion engines`
 Expected: FAIL to compile (`deadlines`, `engines`, `battery_watch` missing).
 
-- [ ] **Step 4: Implement `deadlines`**
+- [x] **Step 4: Implement `deadlines`**
 
 `crates/core/src/companion/deadlines.rs`:
 
@@ -4562,7 +4562,7 @@ pub fn earliest(deadlines: impl IntoIterator<Item = Option<Millis>>) -> Option<M
 }
 ```
 
-- [ ] **Step 5: Implement `engines`**
+- [x] **Step 5: Implement `engines`**
 
 `crates/core/src/companion/engines.rs`:
 
@@ -4711,7 +4711,7 @@ impl Engines {
 }
 ```
 
-- [ ] **Step 6: Implement `battery_watch`**
+- [x] **Step 6: Implement `battery_watch`**
 
 `crates/core/src/companion/battery_watch.rs`:
 
@@ -4800,12 +4800,12 @@ impl BatteryWatch {
 Add `pub mod battery_watch;`, `pub mod deadlines;` and `pub mod engines;` to `crates/core/src/companion/mod.rs`
 (alphabetical order).
 
-- [ ] **Step 7: Run the tests to see them pass**
+- [x] **Step 7: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test companion engines`
 Expected: PASS, 15 tests.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add crates/core/src/companion crates/core/tests/companion
