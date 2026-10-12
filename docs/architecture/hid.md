@@ -100,7 +100,7 @@ flowchart LR
 
 | Piece | Code |
 |---|---|
-| Scenario catalogue shared by both rigs | `crates/core/src/testkit/scenarios/mod.rs::scenario_tests`, `crates/core/src/testkit/rig.rs::Rig`, `crates/hid/tests/adapter/scenarios.rs` |
+| Scenario catalogue shared by both rigs | `crates/core/src/testkit/scenarios/mod.rs` (`scenario_tests!`), `crates/core/src/testkit/rig.rs::Rig`, `crates/hid/tests/adapter/scenarios.rs` |
 | Worker over socketpairs on a virtual clock | `crates/hid/tests/adapter/rig.rs::SocketRig`, `crates/hid/tests/adapter/rig.rs::VirtualWaiter`, `crates/hid/tests/adapter/bench.rs::Bench` |
 | sysfs fixture trees in tempdirs | `crates/hid/tests/adapter/sysfs.rs::FakeSysfs` |
 | Discovery, ports, mailbox, waiter, rescan cadence, handle | `crates/hid/tests/adapter/discovery.rs`, `crates/hid/tests/adapter/port.rs`, `crates/hid/tests/adapter/wake.rs`, `crates/hid/tests/adapter/waiter.rs`, `crates/hid/tests/adapter/rescan.rs`, `crates/hid/tests/adapter/handle.rs` |

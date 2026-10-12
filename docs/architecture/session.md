@@ -145,5 +145,5 @@ flowchart LR
 | Fidelity to the SP0 captures | `crates/core/tests/session/testkit.rs` |
 | One table row per arrow of the lifecycle | `crates/core/tests/session/lifecycle.rs`, `crates/core/tests/session/rebinding.rs`, `crates/core/tests/session/support.rs::assert_arrows` |
 | Scenarios | `crates/core/tests/session/polling.rs`, `crates/core/tests/session/reconcile.rs`, `crates/core/tests/session/verify.rs`, `crates/core/tests/session/echo.rs`, `crates/core/tests/session/wireless.rs` |
-| Scenario catalogue, also run by `crates/hid` over sockets (`docs/architecture/hid.md`) | `crates/core/src/testkit/scenarios/mod.rs::scenario_tests`, `crates/core/src/testkit/rig.rs::Rig`, `crates/core/tests/session/scenarios.rs` |
+| Scenario catalogue, also run by `crates/hid` over sockets (`docs/architecture/hid.md`) | `crates/core/src/testkit/scenarios/mod.rs` (`scenario_tests!`), `crates/core/src/testkit/rig.rs::Rig`, `crates/core/tests/session/scenarios.rs` |
 | Mutation testing skips the testkit | `.cargo/mutants.toml` |
