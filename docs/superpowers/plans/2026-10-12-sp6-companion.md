@@ -1045,7 +1045,7 @@ git push
 - Modify: `crates/core/src/battery/mod.rs`
 - Test: `crates/core/tests/battery/series.rs`, `crates/core/tests/battery/main.rs`
 
-- [ ] **Step 1: Write the failing tests**
+- [x] **Step 1: Write the failing tests**
 
 Add `mod series;` to `crates/core/tests/battery/main.rs`.
 
@@ -1158,12 +1158,12 @@ fn the_last_full_charge_is_the_latest_reading_at_full() {
 }
 ```
 
-- [ ] **Step 2: Run the tests to see them fail**
+- [x] **Step 2: Run the tests to see them fail**
 
 Run (toolbox): `cargo test -p arctis-core --test battery series`
 Expected: FAIL to compile (`battery::series` missing).
 
-- [ ] **Step 3: Implement `battery::series`**
+- [x] **Step 3: Implement `battery::series`**
 
 `crates/core/src/battery/series.rs`:
 
@@ -1304,12 +1304,12 @@ pub use sample::{Reading, Sample, Sampler, UnixSeconds};
 pub use series::{Series, Window, series};
 ```
 
-- [ ] **Step 4: Run the tests to see them pass**
+- [x] **Step 4: Run the tests to see them pass**
 
 Run (toolbox): `cargo test -p arctis-core --test battery`
 Expected: PASS, 22 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add crates/core/src/battery crates/core/tests/battery
