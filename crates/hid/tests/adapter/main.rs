@@ -1,6 +1,10 @@
+mod bench;
 mod discovery;
 mod opening;
 mod port;
+mod rescan;
+mod rig;
+mod scenarios;
 mod sockets;
 mod sysfs;
 mod waiter;
