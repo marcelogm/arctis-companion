@@ -64,13 +64,7 @@ impl Session {
             return;
         };
         self.observed = Some(settings);
-        if let Some(dongle) = self.dongle.clone() {
-            self.publish(DeviceUpdate::Identity {
-                model: dongle.model,
-                uniq: dongle.uniq,
-                firmware,
-            });
-        }
+        self.publish_identity(firmware);
         self.publish_observed();
     }
 
