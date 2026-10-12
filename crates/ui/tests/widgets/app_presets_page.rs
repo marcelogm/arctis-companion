@@ -1,15 +1,19 @@
 use adw::prelude::*;
 use arctis_core::companion::Snapshot;
+use arctis_core::companion::routing::Route;
 use arctis_core::intent::Intent;
+use arctis_core::messages::device::Phase;
 use arctis_core::testkit::english::english;
-use arctis_core::testkit::snapshots::{id, snapshot};
+use arctis_core::testkit::snapshots::{id, snapshot, with};
 use arctis_core::view::app_presets::{AppPresetsContent, add_rule_dialog, app_presets};
 use arctis_core::view::presets::preset_items;
 use arctis_ui::intents::IntentSink;
-use arctis_ui::{AppPresetsPage, AppRuleRow};
+use arctis_ui::{AddRuleDialog, AppPresetsPage, AppRuleRow, Window};
 use gtk::glib;
 
-use crate::support::{Log, descendants, first, init, named, recording_sink, ruled, seen_app};
+use crate::support::{
+    Log, descendants, first, init, named, recording_sink, rendered_window, ruled, seen_app,
+};
 
 pub fn rendered_page(snapshot: &Snapshot) -> (AppPresetsPage, IntentSink, Log) {
     init();
@@ -177,4 +181,88 @@ fn the_dialog_follows_the_latest_snapshot() {
     render(&page, &sink, &s);
     assert!(named::<adw::PreferencesGroup>(&dialog, "seen-group").get_visible());
     assert_eq!(page.add_rule_dialog(), dialog);
+}
+
+fn open_app_presets(window: &Window) -> AppPresetsPage {
+    let row = named::<adw::ActionRow>(window, "app-presets-row");
+    let action = row.action_name().expect("the row has an action");
+    WidgetExt::activate_action(&row, &action, row.action_target_value().as_ref())
+        .expect("the action exists");
+    named::<adw::NavigationView>(window, "navigation")
+        .visible_page()
+        .and_downcast::<AppPresetsPage>()
+        .expect("the app presets page is shown")
+}
+
+fn add_rule_through(window: &Window, page: &AppPresetsPage) -> AddRuleDialog {
+    named::<gtk::Button>(page, "status-button").emit_clicked();
+    window
+        .visible_dialog()
+        .and_downcast::<AddRuleDialog>()
+        .expect("the add-rule dialog is presented")
+}
+
+#[gtk::test]
+fn the_app_presets_row_opens_the_page() {
+    let (window, _) = rendered_window(snapshot());
+    assert_eq!(
+        open_app_presets(&window).tag().as_deref(),
+        Some("app-presets")
+    );
+}
+
+#[gtk::test]
+fn the_window_renders_the_rules_and_forwards_their_intents() {
+    let (window, log) = rendered_window(ruled(&[("firefox", "footsteps")]));
+    let page = open_app_presets(&window);
+    assert!(log.borrow().is_empty());
+    named::<gtk::Button>(&page, "remove-rule").emit_clicked();
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::RemoveAppRule("firefox".to_owned())]
+    );
+}
+
+#[gtk::test]
+fn rules_stay_editable_in_bluetooth_only_mode() {
+    let mut s = with(Phase::Absent, Route::Bluetooth);
+    s.presets.rules = ruled(&[("firefox", "footsteps")]).presets.rules;
+    let (window, log) = rendered_window(s);
+    let page = open_app_presets(&window);
+    let row = named::<AppRuleRow>(&page, "app-rule");
+    assert!(row.is_sensitive());
+    named::<gtk::Button>(&row, "remove-rule").emit_clicked();
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::RemoveAppRule("firefox".to_owned())]
+    );
+}
+
+#[gtk::test]
+fn a_rule_added_in_the_dialog_reaches_the_window_handler() {
+    let (window, log) = rendered_window(snapshot());
+    window.present();
+    let page = open_app_presets(&window);
+    let entry = named::<adw::EntryRow>(&add_rule_through(&window, &page), "other-app");
+    entry.set_text("mpv");
+    entry.emit_by_name::<()>("apply", &[]);
+    assert_eq!(
+        *log.borrow(),
+        vec![Intent::SetAppRule {
+            identifier: "mpv".to_owned(),
+            preset: preset_items(&snapshot())[0].id.clone(),
+        }]
+    );
+    assert!(window.visible_dialog().is_none());
+}
+
+#[gtk::test]
+fn the_presented_dialog_follows_new_snapshots() {
+    let (window, _) = rendered_window(snapshot());
+    window.present();
+    let dialog = add_rule_through(&window, &open_app_presets(&window));
+    let mut s = snapshot();
+    s.presets.seen_apps = vec![seen_app("Spotify", &["com.spotify.Client"])];
+    window.render(&std::rc::Rc::new(s));
+    assert!(named::<adw::PreferencesGroup>(&dialog, "seen-group").get_visible());
 }
