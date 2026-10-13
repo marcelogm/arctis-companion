@@ -15,6 +15,6 @@ Headset settings exist twice: desired (persisted in GSettings, owned by `Compani
 
 ## Consequences
 
-- Changes made from the phone app while this app is not running are overwritten on reconnect. Revisit if SP0 proves persistence.
+- Changes made from the phone app while this app is not running are overwritten on reconnect. Revisit if the hardware probe proves persistence.
 - A real button press that lands on a value written within `ECHO_WINDOW` is treated as an echo; the readback still shows it.
 - Code: `crates/core/src/companion/adoption.rs`, `crates/core/src/session/reconcile.rs`, `crates/core/src/session/echo.rs`.

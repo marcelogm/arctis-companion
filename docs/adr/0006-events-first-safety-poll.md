@@ -2,7 +2,7 @@
 
 Status: accepted (2026-10-11), revised 2026-10-12
 
-Battery, charging, link and on-headset changes come from unsolicited events, read on both iface 3 and iface 5 because where they arrive is unverified. `B0` is queried on probe, on a link event, every 10 s while the headset is off (`HEADSET_OFF_POLL`: no 2.4 GHz audio flows then, so it cannot glitch), and in Ready only as a safety net 5 minutes after the last battery event, never during a write. HeadsetControl #452 links frequent status polling to audio glitches on the Nova 5. If SP0 finds no events at all, the Ready cadence becomes what SP0's glitch test allows, with a 60 s floor.
+Battery, charging, link and on-headset changes come from unsolicited events, read on both iface 3 and iface 5 because where they arrive is unverified. `B0` is queried on probe, on a link event, every 10 s while the headset is off (`HEADSET_OFF_POLL`: no 2.4 GHz audio flows then, so it cannot glitch), and in Ready only as a safety net 5 minutes after the last battery event, never during a write. HeadsetControl #452 links frequent status polling to audio glitches on the Nova 5. If the hardware probe finds no events at all, the Ready cadence becomes what its glitch test allows, with a 60 s floor.
 
 ## Considered options
 

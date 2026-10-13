@@ -1,8 +1,8 @@
-# Arctis Nova 5: hardware and sandbox findings (SP0)
+# Arctis Nova 5: hardware and sandbox findings
 
-Status: SP0 result, 2026-10-12 00:36–01:00 (-03), run by an agent with nobody at the desk. It answers each SP0 item
-of [the design](../superpowers/specs/2026-10-11-arctis-companion-design.md) §5 with captures, or names it **needs a
-person** with the designed fallback and the procedure for SP14's hardware checklist (§7). Protocol facts are in
+Status: hardware probe result, 2026-10-12 00:36–01:00 (-03), run by an agent with nobody at the desk. It answers each
+probe item with captures, or names it **needs a person** with the designed fallback and the procedure for
+[the hardware checklist](../hardware-checklist.md) (§7). Protocol facts are in
 [hid-protocol.md](hid-protocol.md); frames captured here are in [`crates/core/tests/golden/`](../../crates/core/tests/golden) (§8).
 
 ## 0. Conditions and safety record
@@ -63,7 +63,7 @@ Every query is answered in 0.6–1.9 ms (`B0` 0.8, `10` 1.1, `20` 1.9, `A0` 1.2,
 snapshot) although the headset is off. `20`, `A0` and `36` return the last known settings and `B0` returns
 link 2 with the last battery value. Consequences, all already compatible with the design:
 
-- a query timeout is not a headset-off signal; `B0[1] != 3` is (device §2 Probing, `HEADSET_OFF_POLL`);
+- a query timeout is not a headset-off signal; `B0[1] != 3` is (`HEADSET_OFF_POLL`);
 - the settings shown while HeadsetOff come from the dongle's copy, so `Observed` may be published in HeadsetOff,
   but the design keeps adoption to Ready, which is the safer choice;
 - setters never produce a reply frame on iface 3 (the listener saw no `27 37 39 AE A3 35 33` frame).
@@ -115,7 +115,7 @@ headset on (§7 item 6). Tolerances stay as designed: frequency ±1 Hz, Q ±1 %,
 ### 2.6 Sidetone bytes
 
 `39 03`, `39 06`, `39 0a` read back as `20[62]` = 3, 6, 10. The bytes the official app sends for Low, Medium and
-High cannot be observed from this computer. Marks stay 0, 3, 6, 10 (device §5); §7 item 7 checks them.
+High cannot be observed from this computer. Marks stay 0, 3, 6, 10; §7 item 7 checks them.
 
 ### 2.7 Version slots of `0x10`
 
@@ -132,7 +132,7 @@ fwupd's SteelSeries plugin reads the same command as `Version2` (`0x10`, `fu-ste
 ### 2.8 `HID_UNIQ`
 
 `HID_UNIQ=` is empty on all three interfaces and `/sys/bus/usb/devices/1-5.2.1/serial` does not exist (no
-iSerial string). The dongle identity is the PID alone (device §5 rule "else the PID alone"). fwupd shows a headset
+iSerial string). The dongle identity is the PID alone. fwupd shows a headset
 serial `6167039804022420062`, read with the fizz `Serial2` command `0x12`, which is not in the allow-list.
 
 ## 3. Glitches
@@ -190,7 +190,7 @@ binds again, so nothing remains to wait for. Decided: the **100 ms** default sta
 Unreadable window: the recreated node exists 2.6 ms after the `EIO` with mode `0600`; `open` fails with `EACCES`
 for 56–60 ms (median 57.8 ms over 48 rebinds) until udev applies the rule. That is the same udev event that applies
 `TAG+="uaccess"`, so the planned rule should behave alike; measuring it with `92-viia.rules` moved away needs root
-(§7 item 9). Rebinding treats `EACCES` like a missing node (device §2), which covers it.
+(§7 item 9). Rebinding treats `EACCES` like a missing node, which covers it.
 
 The same rebind was observed and recovered from inside a Flatpak sandbox (§6.1).
 
@@ -210,8 +210,8 @@ forbidden until then (§7 item 10). `B0[1]` and `B9` with QuickSwitch need a per
 `/sys/class/hidraw/*/device/uevent` readable, the three Nova 5 nodes found by `HID_ID` and `HID_PHYS`, iface 3
 opened read-write, `36` answered, a rebind seen as `EIO`, the new node found by a sysfs rescan (`EACCES` ×13, then
 open after 58 ms) and `36` answered again. Without `--device=all`, `/sys/class/hidraw` is still listed but
-`/dev/hidraw*` does not exist, so `open` fails with `ENOENT` for a node that discovery reports; SP5 maps that
-`ENOENT` to PermissionDenied like `EACCES` (§9).
+`/dev/hidraw*` does not exist, so `open` fails with `ENOENT` for a node that discovery reports; the HID adapter
+maps that `ENOENT` to PermissionDenied like `EACCES` (§9).
 
 ### 6.2 Headless instance
 
@@ -253,7 +253,7 @@ default.audio.sink = arctis_companion_eq      default.configured.audio.sink = ar
 
 When the client exited, WirePlumber fell back `default.audio.sink` to the bluez node, but
 `default.configured.audio.sink` kept naming the vanished EQ sink. Removal must therefore restore the configured
-default itself (audio §2 "Removal"); after a crash the stale value is harmless because WirePlumber falls back.
+default itself; after a crash the stale value is harmless because WirePlumber falls back.
 
 Decision: **two `pw_stream`s** (the `module-loopback` shape). `pipewire` 0.10 wraps streams, so `crates/audio` stays
 `#![forbid(unsafe_code)]` and `raw_filter.rs` is not created.
@@ -262,11 +262,11 @@ Decision: **two `pw_stream`s** (the `module-loopback` shape). `pipewire` 0.10 wr
 
 USB sink `alsa_output.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.iec958-stereo` and source
 `alsa_input.usb-SteelSeries_SteelSeries_Arctis_Nova_5-00.mono-fallback`; their Device has `device.vendor.id 0x1038`,
-`device.product.id 0x2232`, `device.bus usb`, which confirms the audio §1 matching rule. No Nova 5 bluez node exists
+`device.product.id 0x2232`, `device.bus usb`, which confirms the USB matching rule. No Nova 5 bluez node exists
 and bluez is not running on this host, so the bluez properties need a person (§7 item 12); until then the rule
 `device.api = bluez5` and `node.description` starting with "Arctis Nova 5" stands.
 
-## 7. Hardware checklist for SP14 (needs a person)
+## 7. Hardware checklist (needs a person)
 
 Each item keeps its designed default until a person runs it; scripts must use the same allow-list guard.
 
@@ -285,13 +285,13 @@ Each item keeps its designed default until a person runs it; scripts must use th
 | 11 | QuickSwitch | both links up, press QuickSwitch, log `B0[1]` and events | no "playing from Bluetooth" state |
 | 12 | Nova 5 bluez node | pair over Bluetooth, `pw-dump` the node and its Device | match by `device.api` and description prefix |
 | 13 | Optional flap confirmation | `systemctl stop fwupd` for 2 min, `journalctl -k` shows no `input3` rebind, start it again | fwupd is the cause (§4) |
-| 14 | SP5 soak with the headset on | only if §11 says the headset was off: turn it on, set Automatic power off to Never for the run, then `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored --nocapture`; the `soak:` line must show writes requested = confirmed and failed 0. Check the sidetone first: §11 says an earlier run may have left it one step off | write then verify (device §4) |
+| 14 | HID soak with the headset on | only if §11 says the headset was off: turn it on, set Automatic power off to Never for the run, then `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored --nocapture`; the `soak:` line must show writes requested = confirmed and failed 0. Check the sidetone first: §11 says an earlier run may have left it one step off | write then verify |
 
 ## 8. Captures
 
 [`crates/core/tests/golden/*.hex`](../../crates/core/tests/golden): one 64-byte frame per file, lowercase hex bytes separated by spaces on one line,
 exactly as read from or written to hidraw without the leading report-id `00`. Replies keep their stale tails, which
-is what the golden tests need. SP2 moved them to `crates/core/tests/golden/`.
+is what the golden tests need.
 
 | Files | Content |
 |---|---|
@@ -314,26 +314,26 @@ is what the golden tests need. SP2 moved them to `crates/core/tests/golden/`.
 | `WIRELESS_MODE_GRACE` | 5 s (unchanged) | §2.4; §7 item 5 |
 | `STATUS_SAFETY_POLL` | 5 min, floor 60 s (unchanged) | §3; §7 item 8 |
 | `RESCAN_REBINDING`, `REBIND_GIVE_UP` | 250 ms, 30 s (unchanged) | node openable 60 ms after `EIO` |
-| `core::companion::timing` | all unchanged | no SP0 result touches them; `AUTO_SWITCH_MIN_INTERVAL` waits for §7 item 8 |
+| `core::companion::timing` | all unchanged | no probe result touches them; `AUTO_SWITCH_MIN_INTERVAL` waits for §7 item 8 |
 | `core::eq::curve` tolerances | ±1 Hz, Q ±1 %, gain byte exact, disabled bands equal (unchanged) | §2.5 |
 | Identity | PID alone on the Nova 5 | §2.8 |
 | `0x10` decoding | slots A and C as §2.7, slot B ignored | fwupd source |
-| `ENOENT` on a node discovery reports | PermissionDenied, like `EACCES` (SP5) | §6.1 |
-| ManagerDenied detection | read `default.configured.audio.sink` back after writing it (SP7) | §6.2 |
-| Manager role | `media.category = Manager` in the context properties (SP7) | §6.2 |
+| `ENOENT` on a node discovery reports | PermissionDenied, like `EACCES` | §6.1 |
+| ManagerDenied detection | read `default.configured.audio.sink` back after writing it | §6.2 |
+| Manager role | `media.category = Manager` in the context properties | §6.2 |
 | EQ node shape | two `pw_stream`s; `crates/audio` stays `forbid(unsafe_code)` | §6.3 |
 | `Command` | unchanged: no `22`, no `34` until §7 item 10 | §5, ADR 0013 |
 
-## 10. Deviations from the SP0 plan
+## 10. Deviations from the plan
 
 | Deviation | Why |
 |---|---|
 | Device items were measured with the headset off; their headset-on halves moved to §7 | the headset had powered itself off and nobody could turn it on |
 | fwupd was not stopped; the cause was confirmed from source, timing and the stale tail instead, and the stop test is optional item 13 | `systemctl stop fwupd` needs root |
 | `34` was not sent although `22` returned a band layout | it needs phone audio and a listener, and this run allowed no `34` |
-| The device spec's timing table and ADR 0005 now point here instead of saying "SP0 measures/confirms" | keeps the authoritative docs in step with the results |
+| ADR 0005 now points here instead of saying "the probe measures/confirms" | keeps the authoritative docs in step with the results |
 
-## 11. SP5 soak
+## 11. HID soak
 
 `crates/hid/tests/hardware/soak.rs` ran the real `crates/hid/src/worker.rs::Worker` (sysfs discovery, `poll(2)`,
 raw hidraw) against this dongle for 30 minutes on 2026-10-12 with fwupd 2.1.8 running. Each minute, while the

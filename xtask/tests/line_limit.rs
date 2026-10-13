@@ -34,12 +34,3 @@ fn the_staged_mode_warns_too() {
     assert!(outcome.succeeded());
     assert!(outcome.stderr.contains("401 lines"), "{}", outcome.stderr);
 }
-
-#[test]
-fn plans_are_exempt_from_the_line_limit() {
-    let fixture = Fixture::init();
-    fixture.write("docs/superpowers/plans/plan.md", &"line\n".repeat(900));
-    let outcome = fixture.xtask(&["check-rules"]);
-    assert!(outcome.succeeded(), "{}", outcome.stderr);
-    assert!(!outcome.stderr.contains("warning"), "{}", outcome.stderr);
-}

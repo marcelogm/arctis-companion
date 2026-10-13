@@ -1,7 +1,7 @@
 # App presets page
 
 `crates/ui/` shows the app rules of `core::view::app_presets` and turns edits into `Intent::SetAppRule` and
-`Intent::RemoveAppRule`. Design rationale: ui part §4, audio part §4, ADR 0010.
+`Intent::RemoveAppRule`. Design rationale: ADR 0010.
 
 ## Widget tree
 

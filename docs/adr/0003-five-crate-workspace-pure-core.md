@@ -6,7 +6,7 @@ The workspace has `core` (pure: protocol, session, eq, companion, battery, view 
 
 ## Considered options
 
-- Four crates with the UI inside `app`: UI tests and app platform code would share a crate, and SP8 and SP9 could not proceed in parallel without conflicts.
+- Four crates with the UI inside `app`: UI tests and app platform code would share a crate, and the bridge and the widgets could not proceed in parallel without conflicts.
 - Eleven fine-grained crates (testability proposal): each boundary compiler-enforced, but high navigation cost and constant cross-crate type moves for a single-device app.
 
 ## Consequences

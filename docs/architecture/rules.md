@@ -20,7 +20,7 @@ flowchart TD
     SN --> F
     F --> G{"generated or verbatim?"}
     G -- yes --> S["skipped"]
-    G -- no --> L["line_limit: warning only,<br/>plans and SVG unlimited"]
+    G -- no --> L["line_limit: warning only,<br/>SVG unlimited"]
     G -- no --> CO["comments: rust, c_like, hash, xml, markdown;<br/>unknown syntax is an error"]
     G -- no --> U["unsafe_api: pub unsafe fn,<br/>pub items of extern blocks"]
     R --> LI["lints: guarded allows,<br/>members inherit workspace lints"]

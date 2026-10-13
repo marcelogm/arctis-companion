@@ -1,7 +1,7 @@
 # Architecture
 
 Diagrams of the code as it is. Every backticked path below is checked by `cargo xtask check-doc-paths`
-(`xtask/src/check_doc_paths.rs::run`). Design rationale lives in the spec and the ADRs.
+(`xtask/src/check_doc_paths.rs::run`). Design rationale lives in the ADRs.
 
 | Page | Area |
 |---|---|

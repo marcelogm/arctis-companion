@@ -6,7 +6,7 @@ so. No agent or script ticks a box.
 
 Before you start:
 
-- Scripts that talk to the dongle must keep the `Command` allow-list guard from SP0
+- Scripts that talk to the dongle must keep the `Command` allow-list guard from the hardware probe
   (`docs/research/hardware-findings.md` §0, "Scripts"): no other report goes to `/dev/hidraw*`.
 - The sidetone may be one step away from your usual value: an earlier soak run stopped without a summary
   (`docs/research/hardware-findings.md` §11). Check it in the app before running H14 or A1.
@@ -34,7 +34,7 @@ differs from the designed default, an issue is opened against the named constant
 | H11 | QuickSwitch | both links up, press QuickSwitch, log `B0[1]` and events | no "playing from Bluetooth" state | [ ] |
 | H12 | Nova 5 bluez node | pair over Bluetooth, `pw-dump` the node and its Device | match by `device.api` and description prefix | [ ] |
 | H13 | Optional flap confirmation | `systemctl stop fwupd` for 2 min, `journalctl -k` shows no `input3` rebind, start it again | fwupd is the cause (hardware-findings §4) | [ ] |
-| H14 | SP5 soak with the headset on | turn the headset on, set Automatic power off to Never for the run, then `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored --nocapture`; passes when the `soak:` line shows writes requested = confirmed and failed 0 | write then verify (device §4) | [ ] |
+| H14 | HID soak with the headset on | turn the headset on, set Automatic power off to Never for the run, then `ARCTIS_HW=1 cargo test -p arctis-hid --test hardware -- --ignored --nocapture`; passes when the `soak:` line shows writes requested = confirmed and failed 0 | write then verify | [ ] |
 
 ## A — Release acceptance on hardware
 
@@ -72,8 +72,7 @@ differs from the designed default, an issue is opened against the named constant
 
 ## E — Shell extension
 
-Run each scenario in `extension/` with `npm run devkit -- <scenario>` and compare with the Expect column (from the
-SP13 pull request).
+Run each scenario in `extension/` with `npm run devkit -- <scenario>` and compare with the Expect column.
 
 | # | Scenario | Expect | Done |
 |---|---|---|---|
