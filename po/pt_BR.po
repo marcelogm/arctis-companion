@@ -917,10 +917,6 @@ msgstr "Importar um arquivo do Equalizer APO ou de predefinição"
 msgid "New Preset"
 msgstr "Nova predefinição"
 
-#: crates/ui/resources/presets_page.blp
-msgid "_Import…"
-msgstr "_Importar…"
-
 #: crates/ui/resources/shortcuts_dialog.blp
 msgid "Close Window"
 msgstr "Fechar janela"

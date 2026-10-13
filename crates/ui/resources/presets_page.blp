@@ -23,9 +23,12 @@ template $ArctisPresetsPage: Adw.NavigationPage {
       [end]
       Button import {
         name: "import";
-        label: _("_Import…");
-        use-underline: true;
+        icon-name: "document-open-symbolic";
         tooltip-text: _("Import an Equalizer APO or preset file");
+
+        accessibility {
+          label: _("Import an Equalizer APO or preset file");
+        }
       }
     }
 
