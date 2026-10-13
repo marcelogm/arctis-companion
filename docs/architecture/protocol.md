@@ -1,8 +1,8 @@
 # Protocol, headset settings and thread messages
 
 The pure codec for the Nova 5 dongle, the headset setting values and the messages that cross the device and
-audio thread seams. All of it lives in `crates/core/` and does no I/O. Design rationale: device part §1, §5 and
-§6 of the spec, ADR 0004 and ADR 0013.
+audio thread seams. All of it lives in `crates/core/` and does no I/O. Design rationale: ADR 0004
+and ADR 0013.
 
 ## Modules
 
@@ -10,7 +10,7 @@ audio thread seams. All of it lives in `crates/core/` and does no I/O. Design ra
 flowchart BT
     B["bounded.rs<br/>OutOfRange, bounded! newtypes, raw_enum! byte enums"]
     V["settings::values<br/>MicVolume Sidetone Percent MuteLight WirelessMode AutoPowerOff"]
-    E["eq::filter, eq::curve<br/>Filter, Curve (SP3 owns their behaviour)"]
+    E["eq::filter, eq::curve<br/>Filter, Curve (see eq.md)"]
     H["settings::headset_settings<br/>HeadsetSettings Setting SettingChange"]
     P["protocol<br/>encode decode_reply decode_event Model::lookup"]
     M["messages<br/>Change DeviceUpdate AudioCommand AudioEvent"]
@@ -21,7 +21,7 @@ flowchart BT
 | Module | Code |
 |---|---|
 | Range-checked values | `crates/core/src/bounded.rs::OutOfRange` and the `bounded!` and `raw_enum!` macros in `crates/core/src/bounded.rs`; `MuteLight` and `WirelessMode` in `crates/core/src/settings/values.rs`, `crates/core/src/settings/values.rs::AutoPowerOff` |
-| Filters and curves (SP3, see eq.md) | `crates/core/src/eq/filter.rs::Filter`, `crates/core/src/eq/filter.rs::FilterKind`, `crates/core/src/eq/curve.rs::Curve` |
+| Filters and curves (see eq.md) | `crates/core/src/eq/filter.rs::Filter`, `crates/core/src/eq/filter.rs::FilterKind`, `crates/core/src/eq/curve.rs::Curve` |
 | Headset settings | `crates/core/src/settings/headset_settings.rs::HeadsetSettings`, `crates/core/src/settings/headset_settings.rs::Setting`, `crates/core/src/settings/headset_settings.rs::SettingChange`, `crates/core/src/settings/headset_settings.rs::apply` |
 | Frames | `crates/core/src/protocol/frame.rs::Frame`, `crates/core/src/protocol/frame.rs::DecodeError`, `crates/core/src/protocol/frame.rs::expect_frame` |
 | Commands | `crates/core/src/protocol/command.rs::Command`, `crates/core/src/protocol/command.rs::Query`, `crates/core/src/protocol/command.rs::encode`, `crates/core/src/protocol/command.rs::readback` |
@@ -37,7 +37,7 @@ flowchart BT
 
 ```mermaid
 sequenceDiagram
-    participant S as caller (session, SP4)
+    participant S as caller (session)
     participant C as command.rs
     participant D as dongle
     participant R as reply.rs
@@ -101,12 +101,12 @@ with no gain.
 ```mermaid
 flowchart LR
     subgraph main["main thread"]
-        C["Companion (SP6)"]
+        C["Companion"]
     end
-    subgraph dev["device thread (SP4, SP5)"]
+    subgraph dev["device thread"]
         S["Session"]
     end
-    subgraph aud["audio thread (SP7)"]
+    subgraph aud["audio thread"]
         A["audio adapter"]
     end
     C -- "Change::Desired{settings, policy}" --> S
@@ -117,13 +117,13 @@ flowchart LR
 
 ## Tests
 
-The SP2 integration tests build into one test binary, `crates/core/tests/protocol/main.rs`, so the helpers in
+The protocol integration tests build into one test binary, `crates/core/tests/protocol/main.rs`, so the helpers in
 `crates/core/tests/protocol/support.rs` and `crates/core/tests/protocol/strategies.rs` are shared without copies.
-The udev rule test stays a file of its own at the path the device spec names.
+The udev rule test stays a file of its own, `crates/core/tests/udev_rule.rs`.
 
 | What | Where |
 |---|---|
-| SP0 captures, one 64-byte frame per file | `crates/core/tests/golden/` |
+| Hardware probe captures, one 64-byte frame per file | `crates/core/tests/golden/` |
 | Golden loader and shared builders | `crates/core/tests/protocol/support.rs` |
 | The golden set, captured curves and setter frames | `crates/core/tests/protocol/golden_frames.rs` |
 | Every captured reply decodes to its expectation | `crates/core/tests/protocol/golden_replies.rs` |

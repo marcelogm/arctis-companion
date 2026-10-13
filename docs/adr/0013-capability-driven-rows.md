@@ -4,7 +4,7 @@ Status: accepted (2026-10-11), revised 2026-10-12
 
 The official app has a 2.4 GHz / Bluetooth audio-mode switch, but no USB command for it is known and the dongle has no view of the Bluetooth link. The HIG says not to show a control that cannot work, so the header shows only how this computer's audio reaches the headset, read-only. Each model declares `Capabilities` in `crates/core/src/protocol/model.rs`, and `core::view` omits rows a model lacks, so a control appears the day its command is verified.
 
-The official "Dual EQ" also gives the headset a Bluetooth preset that shapes phone audio. Our Bluetooth preset shapes only this computer's Bluetooth audio, through the system engine, and its row is named "Bluetooth from This Computer". SP0 sends the read-only `0x22`; only if it returns a band layout does SP0 try `0x34` with phone audio. A working pair becomes a capability with its own row in a later sub-project.
+The official "Dual EQ" also gives the headset a Bluetooth preset that shapes phone audio. Our Bluetooth preset shapes only this computer's Bluetooth audio, through the system engine, and its row is named "Bluetooth from This Computer". The hardware probe sends the read-only `0x22`; only if it returns a band layout does it try `0x34` with phone audio. A working pair becomes a capability with its own row later.
 
 ## Considered options
 

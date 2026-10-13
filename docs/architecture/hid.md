@@ -4,7 +4,7 @@
 `crates/core/src/session/reducer.rs::Session` on the device thread: it turns sysfs scans, port reads, port errors,
 the poll timeout and desired settings from the main thread into `Input`s, and executes the `Effect`s that come back.
 It decides nothing about the protocol: every frame it writes comes from the session, so only allow-listed commands
-reach the dongle. Design rationale: device part §2 and §6 of the spec, ADR 0005 and ADR 0015.
+reach the dongle. Design rationale: ADR 0005 and ADR 0015.
 
 ## Modules
 

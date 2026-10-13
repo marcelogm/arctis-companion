@@ -2,7 +2,7 @@
 
 The presets page lists built-in and custom presets and imports Equalizer APO or JSON files; the editor page edits
 one preset band by band, shows its response and exports it. Decisions are pure in `crates/core/src/view/`; the
-widgets in `crates/ui/src/` render them and emit `Intent`s. Design rationale: ui part §3, audio part §3, ADR 0011.
+widgets in `crates/ui/src/` render them and emit `Intent`s. Design rationale: ADR 0011.
 
 ## Pages
 

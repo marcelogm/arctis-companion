@@ -76,7 +76,7 @@ The feature report on iface 3 is declared but no upstream project uses it (UNVER
 | Status: connection, battery, charging, chatmix | R | `0xB0` | `B0` | `[0]=B0 [1]=link [2]=unused [3]=battery% [4]=charging [5]=chatmix game 0-100 [6]=chatmix chat 0-100` | HC `getBattery` 171-203, `getChatmix` 313-345, `readDeviceStatus` `steelseries_protocol.hpp:253`; LAM `headset_status` 69; live |
 | Firmware / version strings | R | `0x10` | `10` | `[0]=10 [1..12]=receiver firmware [13..24]=unknown [25..36]=headset firmware (zeros while the headset is unreachable)` | ASM `nova_5.yaml:49`; fwupd `FuStructSteelseriesVersion2Res2` and its decoding, see [hardware-findings.md](hardware-findings.md) §2.7 |
 | Current EQ (wireless profile) | R | `0x20` | `20` | `[0]=20, 10 bands x 6 bytes at [1..60], [61]=mic volume 0-15, [62]=sidetone 0-10, [63]=volume limiter 0/1` | LAM `audio_settings` 171; live |
-| Current EQ (Bluetooth profile) | R | `0x22` | `22` | same band layout as `0x20`, bands only, no trailer | LAM `audio_settings_bt` 222. Sent once by SP0 (headset off): returns a flat factory band layout, [hardware-findings.md](hardware-findings.md) §5 |
+| Current EQ (Bluetooth profile) | R | `0x22` | `22` | same band layout as `0x20`, bands only, no trailer | LAM `audio_settings_bt` 222. Sent once by the hardware probe (headset off): returns a flat factory band layout, [hardware-findings.md](hardware-findings.md) §5 |
 | UX settings | R | `0xA0` | `A0` | `[0]=A0 [1]=inactivity minutes [2]=mute LED raw [3]=unused [4]=eq-sync (unused) [5..7]=unused` | LAM `ux_settings` 270; live |
 | Wireless mode | R | `0x36` | `36` | `[0]=36 [1]=mode (0 = range, 1 = speed)` | LAM `wireless_mode_status` 60; ASM `nova_5.yaml:81`; live |
 
@@ -217,7 +217,7 @@ rx a0 1e 0a 00 01 01 00 01 00 01 14 82 05 7d 00 01 14 82 05 fa 00 01 14 82 05 f4
 | | `[3..7]` | `00 01 01 00 01` | unused/eq-sync bytes (LAM: `unused1`, `eq_sync_unused`, `unused2..4`); values not meaningful |
 | | `[8..]` | `00 01 14 ...` | stale tail |
 
-Slot A is the receiver firmware and slot C the headset firmware, both in fwupd's digit-pair encoding (`"0.01.010.000"` is `1.16.0`, `"000000001.07"` is `1.7.0`); slot B is unknown. Resolved by SP0 from fwupd's source, see [hardware-findings.md](hardware-findings.md) §2.7.
+Slot A is the receiver firmware and slot C the headset firmware, both in fwupd's digit-pair encoding (`"0.01.010.000"` is `1.16.0`, `"000000001.07"` is `1.7.0`); slot B is unknown. Resolved by the hardware probe from fwupd's source, see [hardware-findings.md](hardware-findings.md) §2.7.
 
 The stale-tail behaviour in the `0xB0`, `0x36`, `0xA0` replies is real: each reply begins with the new data and keeps the tail of the previous reply. Parsers must use fixed lengths.
 
@@ -237,7 +237,7 @@ While capturing, reads on hidraw6 failed with `EIO (5)` about every 20 s and the
 
 Only iface 3 flaps; ifaces 4 and 5 stay bound. The hidraw index is not stable (`hidraw13` appeared once).
 
-**Cause (confirmed by SP0 on 2026-10-12, without root; details in [hardware-findings.md](hardware-findings.md) §4):** fwupd's SteelSeries plugin. fwupd 2.1.8 polls the "Arctis Nova 5 Headset via USB Receiver" device every `FU_STEELSERIES_FIZZ_TUNNEL_POLL_INTERVAL` = 20000 ms (`plugins/steelseries/fu-steelseries-fizz-tunnel.c`). Each poll opens the receiver, which claims USB interface 3 (`SteelSeriesCmdInterface = 3` in `steelseries.quirk`) through usbfs, so the kernel unbinds usbhid; fwupd sends `B0` (`ConnectionStatus2`), plus a battery read and a file CRC through the receiver when the headset is reachable, then releases the interface and usbhid binds again. Evidence: 48 rebinds 19.998–20.002 s apart; fwupd's threads wake in a 12–15 ms burst around each rebind; `udevadm monitor` shows unbind and bind 2 ms apart with no USB device event; the first reply after a rebind carries the stale tail of a `B0` reply that no hidraw reader requested (`crates/core/tests/golden/reply_36_tail_from_fwupd_b0.hex`). Every host with fwupd and this receiver sees the flap.
+**Cause (confirmed by the hardware probe on 2026-10-12, without root; details in [hardware-findings.md](hardware-findings.md) §4):** fwupd's SteelSeries plugin. fwupd 2.1.8 polls the "Arctis Nova 5 Headset via USB Receiver" device every `FU_STEELSERIES_FIZZ_TUNNEL_POLL_INTERVAL` = 20000 ms (`plugins/steelseries/fu-steelseries-fizz-tunnel.c`). Each poll opens the receiver, which claims USB interface 3 (`SteelSeriesCmdInterface = 3` in `steelseries.quirk`) through usbfs, so the kernel unbinds usbhid; fwupd sends `B0` (`ConnectionStatus2`), plus a battery read and a file CRC through the receiver when the headset is reachable, then releases the interface and usbhid binds again. Evidence: 48 rebinds 19.998–20.002 s apart; fwupd's threads wake in a 12–15 ms burst around each rebind; `udevadm monitor` shows unbind and bind 2 ms apart with no USB device event; the first reply after a rebind carries the stale tail of a `B0` reply that no hidraw reader requested (`crates/core/tests/golden/reply_36_tail_from_fwupd_b0.hex`). Every host with fwupd and this receiver sees the flap.
 
 Measured timing of one rebind (headset off):
 
@@ -247,7 +247,7 @@ Measured timing of one rebind (headset off):
 | `open` succeeds once udev applied the rule (56–60 ms of `EACCES`) | 59–63 ms |
 | first query answered, no frame pending, no error | at once, about 1 ms round trip |
 
-Design consequences (device §2, ADR 0005):
+Design consequences (ADR 0005):
 
 - Never cache `/dev/hidrawN`. Discover by sysfs (`HID_ID` vendor and product, `HID_PHYS` suffix `/input3` or `/input5`) and re-open on `EIO`/`ENODEV`; treat `EACCES` while Rebinding like a missing node.
 - Rebinding sends no queries; `REBIND_SETTLE` stays 100 ms (0 ms was safe in 24 of 24 trials). No re-enumeration settle is needed.
@@ -337,7 +337,7 @@ Spot-checked against the cloned primary sources: HC pid list (`steelseries_arcti
 2. Meaning of `0x09` and of HC's `35 01` side effect (section 5.2).
 3. Exact sidetone Off/Low/Medium/High to byte mapping used by the official app.
 4. Which interface carries unsolicited events, and whether the mute button produces one.
-5. Meaning of the three version slots of `0x10`: answered by SP0 (receiver, unknown, headset).
-6. Cause of the 20 s iface 3 re-bind: fwupd's SteelSeries plugin, confirmed by SP0 (7.4).
+5. Meaning of the three version slots of `0x10`: answered by the hardware probe (receiver, unknown, headset).
+6. Cause of the 20 s iface 3 re-bind: fwupd's SteelSeries plugin, confirmed by the hardware probe (7.4).
 7. Whether PIDs `0x2255` and `0x2264` use the same protocol (taken from LAM and ASM only).
 8. Whether a BT-specific channel (`0x22`, `0x34`, `0xA5` with conn 1) does anything on the Nova 5.

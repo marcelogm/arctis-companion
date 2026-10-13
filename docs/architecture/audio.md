@@ -2,7 +2,7 @@
 
 `crates/audio/` is the only code that talks to PipeWire. It mirrors the PipeWire graph into a plain model, derives
 the default sink's route and the playing streams from it, and runs the system equalizer as two client streams in
-place of the Nova 5 Bluetooth node. Design rationale: audio part §1, §2 and §4 of the spec, ADR 0008, ADR 0009
+place of the Nova 5 Bluetooth node. Design rationale: ADR 0008, ADR 0009
 and ADR 0010. Entry: `crates/audio/src/handle.rs::AudioHandle`.
 
 ## Modules

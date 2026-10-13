@@ -3,7 +3,7 @@
 `crates/app/` is the composition root and the only crate that touches GSettings, files under
 `$XDG_DATA_HOME/arctis-companion`, the session bus and the portals. It decides nothing: every decision is
 `crates/core/src/companion/reducer.rs::Companion`'s, and the bridge runs each returned action on one port. Design
-rationale: design §2, §3.1 and §3.2, ADR 0001, ADR 0002, ADR 0011 and ADR 0012.
+rationale: ADR 0001, ADR 0002, ADR 0011 and ADR 0012.
 
 ## Modules
 

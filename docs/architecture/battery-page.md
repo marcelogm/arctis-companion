@@ -1,8 +1,7 @@
 # Battery page
 
 `crates/ui/` shows the battery history as a navigation page with a Day / Week chart. The model comes from
-`crates/core/src/view/battery_chart.rs::battery_page`; the page emits no intent. Design rationale: ui part §4,
-audio part §5, ADR 0012.
+`crates/core/src/view/battery_chart.rs::battery_page`; the page emits no intent. Design rationale: ADR 0012.
 
 ## Data flow
 

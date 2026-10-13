@@ -4,7 +4,7 @@
 phases, settles, the probe, silent Rebinding, echo filtering, reconcile, pacing and write-then-verify. It never
 sleeps and never touches a file descriptor: `crates/core/src/session/reducer.rs::Session` takes an `Input` and the
 current `Millis` and returns `Effect`s. `crates/core/src/testkit/` (cargo feature `testkit`) drives it against a
-modelled dongle on a virtual clock. Design rationale: device part §2 to §6 of the spec, ADR 0005, 0006 and 0007.
+modelled dongle on a virtual clock. Design rationale: ADR 0005, 0006 and 0007.
 
 ## Modules
 
@@ -144,7 +144,7 @@ flowchart LR
 |---|---|
 | Modelled dongle: registers, stale tails through one reused buffer, readback latency, Q quantization, echoes, dropped writes, silence, events, another claimant's leftover reply, a curve band outside the envelope | `crates/core/src/testkit/fake_headset.rs::FakeHeadset`, `crates/core/src/testkit/fake_headset.rs::Behaviour`, `crates/core/src/testkit/fake_headset.rs::Emission`, `crates/core/src/testkit/fake_headset.rs::hold_unreadable_band`, `crates/core/src/testkit/replies.rs` |
 | Virtual clock, rescans while Rebinding, flaps with EACCES windows, EIO on a write, wire and update logs | `crates/core/src/testkit/simulation.rs::Simulation`, `crates/core/src/testkit/simulation.rs::Flap`, `crates/core/src/testkit/simulation.rs::run_for` |
-| Fidelity to the SP0 captures | `crates/core/tests/session/testkit.rs` |
+| Fidelity to the hardware probe captures | `crates/core/tests/session/testkit.rs` |
 | One table row per arrow of the lifecycle | `crates/core/tests/session/lifecycle.rs`, `crates/core/tests/session/rebinding.rs`, `crates/core/tests/session/support.rs::assert_arrows` |
 | Scenarios | `crates/core/tests/session/polling.rs`, `crates/core/tests/session/reconcile.rs`, `crates/core/tests/session/verify.rs`, `crates/core/tests/session/echo.rs`, `crates/core/tests/session/wireless.rs`, `crates/core/tests/session/unreadable.rs` |
 | Scenario catalogue, also run by `crates/hid` over sockets (`docs/architecture/hid.md`) | `crates/core/src/testkit/scenarios/mod.rs` (`scenario_tests!`), `crates/core/src/testkit/rig.rs::Rig`, `crates/core/tests/session/scenarios.rs` |

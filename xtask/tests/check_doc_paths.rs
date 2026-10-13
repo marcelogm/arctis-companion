@@ -97,14 +97,8 @@ fn the_glossary_is_checked() {
 }
 
 #[test]
-fn specs_are_exempt() {
-    assert!(
-        outcome_for(
-            "docs/superpowers/specs/old.md",
-            "`crates/core/src/gone.rs`\n"
-        )
-        .succeeded()
-    );
+fn research_is_exempt() {
+    assert!(outcome_for("docs/research/old.md", "`crates/core/src/gone.rs`\n").succeeded());
 }
 
 #[test]
@@ -140,10 +134,7 @@ fn adr_prose_is_not_checked() {
 }
 
 #[test]
-fn review_log_is_not_an_adr() {
-    let outcome = outcome_for(
-        "docs/adr/review-log.md",
-        "- Code: `crates/core/src/gone.rs`\n",
-    );
+fn an_unnumbered_page_is_not_an_adr() {
+    let outcome = outcome_for("docs/adr/notes.md", "- Code: `crates/core/src/gone.rs`\n");
     assert!(outcome.succeeded(), "{}", outcome.stderr);
 }

@@ -3,7 +3,7 @@
 `Companion` is the main thread's policy. It reads what the device thread, the audio thread, the widgets and
 GSettings report, and answers with actions for the app's ports. `core::view` turns its `Snapshot` into page models
 made only of `Text` values and plain data. All of it is pure code in `crates/core/`; time enters as an argument.
-Design rationale: design §3.2, audio part §1, §4, §5, device part §5, ui part §1–§5, ADR 0007, 0008, 0010, 0012
+Design rationale: ADR 0007, 0008, 0010, 0012
 and 0013.
 
 ## Modules
@@ -21,7 +21,7 @@ flowchart LR
     H --> A["Action"]
     H --> S["Snapshot"]
     S --> V["core::view page models"]
-    V --> W["widgets, SP9 to SP12"]
+    V --> W["widgets"]
 ```
 
 | Concept | Code |
@@ -53,7 +53,7 @@ shows "Reconnecting…" whenever the published phase is Rebinding.
 
 ```mermaid
 sequenceDiagram
-    participant B as bridge (SP8)
+    participant B as bridge
     participant C as Companion
     B->>C: handle(Input, now)
     C->>C: dispatch: device, audio, intent, settings, quit
@@ -104,7 +104,7 @@ flowchart LR
     St["DeviceUpdate::Status"] --> W["BatteryWatch"]
     W --> Sa["Sampler: a row only on change"] --> R["Action::RecordBattery"]
     W --> Al["Alerts: Low at the threshold, Critical at 5 %,<br/>3-point hysteresis, once per discharge;<br/>a cleared warning or a lost dongle withdraws and re-arms"] --> N["Action::Notify and Withdraw"]
-    R --> F["battery.csv, written by SP8"]
+    R --> F["battery.csv, written by the bridge"]
     F --> Se["series: Day or Week,<br/>gaps, charging spans"] --> Ch["battery_chart: 0..1 geometry"]
 ```
 

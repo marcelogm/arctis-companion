@@ -2,7 +2,7 @@
 
 `crates/ui/` renders `core::view` models and turns user input into `core::intent::Intent`s. It reads no
 GSettings, no channel and no app file; documents a person picks in the file chooser reach the preset pages
-through `crates/ui/src/preset_files.rs::PresetFiles` ([presets.md](presets.md)). Design rationale: ui part §1, §2, §4; ADR 0013.
+through `crates/ui/src/preset_files.rs::PresetFiles` ([presets.md](presets.md)). Design rationale: ADR 0013.
 
 ## Widget tree
 
@@ -20,7 +20,7 @@ flowchart TD
     W -. "win.preferences" .-> PD["PreferencesDialog"]
     W -. "win.permission-instructions" .-> PM["PermissionDialog"]
     W -. "win.about, win.shortcuts" .-> AD["About, Keyboard Shortcuts"]
-    N -. "win.show-page: presets, app-presets, battery" .-> P["pages of SP10 to SP12"]
+    N -. "win.show-page: presets, app-presets, battery" .-> P["pages"]
 ```
 
 | Widget | Code | Template |
@@ -44,7 +44,7 @@ also bundles the metainfo for the About dialog: `crates/ui/build.rs` merges the 
 
 ```mermaid
 sequenceDiagram
-    participant B as bridge (SP8)
+    participant B as bridge
     participant W as Window
     participant V as core::view
     participant P as HeadsetPage
@@ -71,7 +71,7 @@ sequenceDiagram
     participant U as person
     participant R as ScaleRow
     participant S as IntentSink
-    participant B as bridge (SP8)
+    participant B as bridge
     U->>R: drags Sidetone to 6
     R->>R: nearest_step(value, max)
     R->>S: emit(Intent::from_scale(Sidetone, 6))
