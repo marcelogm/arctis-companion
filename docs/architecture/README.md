@@ -82,9 +82,8 @@ flowchart LR
     R --> I["i18n: po/check.sh"]
     T --> F["flatpak: flatpak-builder"]
     T --> A["audio-integration: private PipeWire + WirePlumber,<br/>crates/audio/tests/headless/run.sh"]
-    N["nightly"] --> M["cargo mutants, proptest x10,<br/>optional shell smoke"]
     TG["tag v*"] --> RL["release: bundle, extension zip, udev rule"]
 ```
 
-Workflows: `.github/workflows/ci.yml`, `.github/workflows/nightly.yml`, `.github/workflows/release.yml`. Branch ruleset: `.github/rulesets/main.json`
+Workflows: `.github/workflows/ci.yml`, `.github/workflows/release.yml`. Branch ruleset: `.github/rulesets/main.json`
 (rebase merges only, `rules` required).
