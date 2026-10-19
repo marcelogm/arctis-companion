@@ -99,4 +99,4 @@ flowchart LR
 ```
 
 Scripts: `extension/package.json`, `extension/po/extract.sh`, `extension/po/check.sh`. CI: job `extension` in
-`.github/workflows/ci.yml`; optional `shell-smoke` in `.github/workflows/nightly.yml`.
+`.github/workflows/ci.yml`.
